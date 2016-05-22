@@ -27,7 +27,7 @@ public class TarantoolConnection16Impl extends TarantoolConnection16Base<Integer
         this(SocketChannel.open(new InetSocketAddress(host, port)));
     }
 
-    public List exec(Code code, Object... args) {
+    public synchronized List exec(Code code, Object... args) {
         write(code, args);
         return (List) readData();
     }
