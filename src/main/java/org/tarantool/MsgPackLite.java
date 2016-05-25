@@ -211,7 +211,7 @@ public class MsgPackLite {
         DataInputStream in = is instanceof DataInputStream ? (DataInputStream) is : new DataInputStream(is);
         int value = in.read();
         if (value < 0) {
-            throw new IllegalArgumentException("No more input available when expecting a value");
+            throw new CommunicationException("No more input available when expecting a value");
         }
         switch ((byte) value) {
         case MP_NULL:
