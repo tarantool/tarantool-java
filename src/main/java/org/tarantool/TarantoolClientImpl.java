@@ -1,19 +1,16 @@
 package org.tarantool;
 
-import java.io.BufferedInputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import org.tarantool.async.AsyncQuery;
+import org.tarantool.schema.TarantoolConnectionSchemaAware;
+
+import java.io.*;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -22,9 +19,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import org.tarantool.async.AsyncQuery;
-import org.tarantool.schema.TarantoolConnectionSchemaAware;
 
 public class TarantoolClientImpl extends AbstractTarantoolConnection16<Integer, Object, Object, Future<List>> implements TarantoolConnectionSchemaAware, TarantoolClient, TarantoolConnection16Ops<Integer, Object, Object, Future<List>> {
     protected SocketChannel channel;
@@ -74,11 +68,46 @@ public class TarantoolClientImpl extends AbstractTarantoolConnection16<Integer, 
     });
 
 
-    public TarantoolClientImpl(SocketChannel channel, long batchTimeout,int predictedFutures) {
+    private String host;
+    private int port;
+    private boolean isAutoReconnect = false;
+    /**
+     * reconnect vals
+     **/
+    protected long reconnectBackoffMs = 1000;
+    private long lastConnectAttemptMs = 0;
+
+
+    public TarantoolClientImpl(SocketChannel channel, long batchTimeout, int predictedFutures) {
+        this.batchTimeout = batchTimeout;
+        this.channel = channel;
+
+        initiateConnect();
+
+        reader.start();
+        if (batchTimeout > 0) {
+            flusher.start();
+        }
+    }
+
+    public TarantoolClientImpl(String host, int port, long batchTimeout) throws IOException {
+        this.host = host;
+        this.port = port;
+        this.isAutoReconnect = true;
+        this.batchTimeout = batchTimeout;
+
+        this.channel = SocketChannel.open(new InetSocketAddress(host, port));
+        initiateConnect();
+
+        reader.start();
+        if (batchTimeout > 0) {
+            flusher.start();
+        }
+    }
+
+    protected void initiateConnect() {
         try {
-            this.channel = channel;
             this.outBuffer = batchTimeout > 0 ? ByteBuffer.allocateDirect(channel.socket().getSendBufferSize()) : null;
-            this.batchTimeout = batchTimeout;
             final InputStream inputStream = new BufferedInputStream(channel.socket().getInputStream(), channel.socket().getReceiveBufferSize());
             InputStream counter = new InputStream() {
                 @Override
@@ -112,16 +141,36 @@ public class TarantoolClientImpl extends AbstractTarantoolConnection16<Integer, 
         } catch (SocketException e) {
             throw new CommunicationException("Couldn't disable read timeout", e);
         }
-        reader.start();
-        if (batchTimeout > 0) {
-            flusher.start();
+    }
+
+
+    private boolean isConnected() {
+        return channel.isConnected();
+    }
+
+    private synchronized boolean socketReconnect() {
+        if (!isConnected() && isAutoReconnect) {
+            while (!isConnected()) {
+                try {
+                    if (new java.util.Date().getTime() - lastConnectAttemptMs >= this.reconnectBackoffMs) {
+                        System.out.println("Reconnect...");
+                        this.lastConnectAttemptMs = new Date().getTime();
+                        this.channel = SocketChannel.open(new InetSocketAddress(host, port));
+                        initiateConnect();
+                        System.out.println("Reconnect... ok");
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
         }
+        return isConnected();
     }
 
     @Override
     public AsyncQuery<List> exec(Code code, Object... args) {
         AsyncQuery<List> q = new AsyncQuery<List>(syncId.incrementAndGet(), code, args);
-        futures.put(q.getId(),q);
+        futures.put(q.getId(), q);
         try {
             write(code, q.getId(), args);
         } catch (Exception e) {
@@ -167,7 +216,6 @@ public class TarantoolClientImpl extends AbstractTarantoolConnection16<Integer, 
     public Long getSchemaId() {
         return (Long) headers.get(Key.SCHEMA_ID);
     }
-
 
     private void write(Code code, Long syncId, Object... args) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream(128);
@@ -223,15 +271,23 @@ public class TarantoolClientImpl extends AbstractTarantoolConnection16<Integer, 
     }
 
     private void writeFully(ByteBuffer buffer) throws IOException {
-        int code = 0;
-        while (buffer.remaining() > 0 && (code = channel.write(buffer)) > -1) {
+        boolean isComplete = false;
+        while (!isComplete) {
+            try {
+                int code = 0;
+                while (buffer.remaining() > 0 && (code = channel.write(buffer)) > -1) {
 
-        }
-        if (code < 0) {
-            throw new CommunicationException("Can't write bytes");
+                }
+                if (code < 0) {
+                    channel.close();
+                    throw new CommunicationException("Can't write bytes");
+                }
+                isComplete = true;
+            } catch (CommunicationException e) {
+                socketReconnect();
+            }
         }
     }
-
 
     protected void readThread() {
         while (!Thread.interrupted()) {
@@ -249,6 +305,14 @@ public class TarantoolClientImpl extends AbstractTarantoolConnection16<Integer, 
                 Long syncId = (Long) headers.get(Key.SYNC.getId());
                 AsyncQuery<List> future = futures.remove(syncId);
                 complete(code, future);
+            } catch (CommunicationException e) {
+                try {
+                    channel.close();
+                    socketReconnect();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
+                socketReconnect();
             } catch (IOException e) {
                 if (Thread.interrupted()) {
                     return;
@@ -392,6 +456,5 @@ public class TarantoolClientImpl extends AbstractTarantoolConnection16<Integer, 
             return ByteBuffer.wrap(buf, 0, count);
         }
     }
-
 
 }
