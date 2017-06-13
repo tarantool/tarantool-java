@@ -20,7 +20,6 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
      * Connection state
      */
     protected String salt;
-    protected MsgPackLite msgPackLite = MsgPackLite.INSTANCE;
     protected AtomicLong syncId = new AtomicLong();
     protected int initialRequestSize = 4096;
     /**
@@ -117,8 +116,8 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
                 body.put((Key) args[i], value);
             }
         }
-        msgPackLite.pack(header, ds);
-        msgPackLite.pack(body, ds);
+        MsgPackLite.pack(header, ds);
+        MsgPackLite.pack(body, ds);
         ds.flush();
         ByteBuffer buffer = bos.toByteBuffer();
         buffer.put(0, (byte) 0xce);
@@ -127,11 +126,11 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
     }
 
     protected void readPacket(DataInputStream is) throws IOException {
-        int size = ((Number) msgPackLite.unpack(is)).intValue();
+        int size = ((Number) MsgPackLite.unpack(is)).intValue();
         long mark = cis.getBytesRead();
-        headers = (Map<Integer, Object>) msgPackLite.unpack(is);
+        headers = (Map<Integer, Object>) MsgPackLite.unpack(is);
         if (cis.getBytesRead() - mark < size) {
-            body = (Map<Integer, Object>) msgPackLite.unpack(is);
+            body = (Map<Integer, Object>) MsgPackLite.unpack(is);
         }
         is.skipBytes((int) (cis.getBytesRead() - mark - size));
     }
