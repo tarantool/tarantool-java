@@ -142,20 +142,7 @@ public class MsgPackLite {
             }
             out.write(data);
         } else if (item instanceof byte[]) {
-            byte[] data;
-            if (item instanceof byte[]) {
-                data = (byte[]) item;
-            } else {
-                ByteBuffer bb = ((ByteBuffer) item);
-                if (bb.hasArray()) {
-                    data = bb.array();
-                } else {
-                    data = new byte[bb.capacity()];
-                    bb.position();
-                    bb.limit(bb.capacity());
-                    bb.get(data);
-                }
-            }
+            byte[] data = (byte[]) item;
             if (data.length <= MAX_8BIT) {
                 out.write(MP_BIN8);
                 out.writeByte(data.length);
