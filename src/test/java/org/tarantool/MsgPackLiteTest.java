@@ -85,6 +85,24 @@ public class MsgPackLiteTest {
 		byte[] actual = packActual(Collections.nCopies(100, "Foo"));
 		Assert.assertArrayEquals(packer.toByteArray(), actual);
 	}
+	
+	@Test
+	public void testKeyCode() throws IOException{
+		packer.packInt(Key.CODE.id);
+		Assert.assertArrayEquals(packer.toByteArray(), packActual(Key.CODE));
+	}
+	
+	@Test
+	public void testKeyData() throws IOException{
+		packer.packInt(Key.DATA.id);
+		Assert.assertArrayEquals(packer.toByteArray(), packActual(Key.DATA));
+	}
+	
+	@Test
+	public void testKeyIterator() throws IOException{
+		packer.packInt(Key.ITERATOR.id);
+		Assert.assertArrayEquals(packer.toByteArray(), packActual(Key.ITERATOR));
+	}
 
 	@Test
 	public void testMap() throws IOException {
