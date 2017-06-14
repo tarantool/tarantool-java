@@ -52,6 +52,12 @@
             <version>4.12</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.msgpack</groupId>
+            <artifactId>msgpack-core</artifactId>
+            <version>0.8.13</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <parent>
