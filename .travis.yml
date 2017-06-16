@@ -1,3 +1,6 @@
+sudo: required
+before_script:
+  - ./install_tarantool.sh
 language: java
 jdk:
   - openjdk6
