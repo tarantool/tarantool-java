@@ -72,13 +72,6 @@ public class MsgPackLite {
 
     public void pack(Object item, OutputStream os) throws IOException {
         DataOutputStream out = new DataOutputStream(os);
-        if (item instanceof Callable) {
-            try {
-                item = ((Callable) item).call();
-            } catch (Exception e) {
-                throw new IllegalArgumentException(e);
-            }
-        }
         if (item == null) {
             out.write(MP_NULL);
         } else if (item instanceof Boolean) {
