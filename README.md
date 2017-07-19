@@ -1,77 +1,40 @@
-You could get [1.6.9](https://github.com/tarantool/tarantool-java/tree/connector-1.6.9)
 
-# Java Connector for Tarantool 1.7.3
-
-[![Join the chat at https://gitter.im/tarantool/tarantool-java](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tarantool/tarantool-java?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
-## Problems & Questions
-http://stackoverflow.com/questions/ask/advice with tags `tarantool` and `java`.
-
-## Note
-Tarantool client is not supports name resolving for fields, indexes, space etc. I highly recommend to use server side lua to
-operate with named items. For example you could create dao object with simple CRUD functions.
-If you still need client name resolving for some reasons you could create function which will return required maps with name to id mappings.
-
-## How to start
-
-First you should add dependency to your pom file
+First you should add snaphost repository and  dependency to your pom file
 ```xml
 <dependency>
   <groupId>org.tarantool</groupId>
   <artifactId>connector</artifactId>
-  <version>1.7.2</version>
+  <version>1.8.jdbc-SNAPSHOT</version>
 </dependency>
 ```
-Second configure TarantoolClientConfig.
+
+
+## Spring NamedParameterJdbcTemplate usage example.
+
+To configure sockets you should implements SQLSocketProvider and add socketProvider=abc.xyz.MySocketProvider to connect url. 
+For example tarantool://localhost:3301?username=test&password=test&socketProvider=abc.xyz.MySocketProvider
 
 ```java
-     TarantoolClientConfig config = new TarantoolClientConfig();
-     config.username = "test";
-     config.password = "test";
+             NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(new DriverManagerDataSource("tarantool://localhost:3301?username=test&password=test"));
+             RowMapper<Object> rowMapper = new RowMapper<Object>() {
+                 @Override
+                 public Object mapRow(ResultSet resultSet, int i) throws SQLException {
+                     return Arrays.asList(resultSet.getInt(1), resultSet.getString(2));
+                 }
+             };
+     
+             try {
+                 System.out.println(template.update("drop table hello_world", Collections.<String, Object>emptyMap()));
+             } catch (Exception ignored) {
+             }
+             System.out.println(template.update("create table hello_world(hello int not null PRIMARY KEY, world varchar(255) not null)", Collections.<String, Object>emptyMap()));
+             Map<String, Object> params = new LinkedHashMap<String, Object>();
+             params.put("text", "hello world");
+             params.put("id", 1);
+     
+             System.out.println(template.update("insert into hello_world(hello, world) values(:id,:text)", params));
+             System.out.println(template.query("select * from hello_world", rowMapper));
+     
+             System.out.println(template.query("select * from hello_world where hello=:id", Collections.singletonMap("id", 1), rowMapper));
 ```
-
-Then implements your SocketChannelProvider. SocketChannelProvider should return connected SocketChannel.
-Here you also could implement some reconnect or fallback policy. Remember that TarantoolClient uses [fail fast
-policy](https://en.wikipedia.org/wiki/Fail-fast) when client is not connected.
-
-
-```java
-     SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
-                @Override
-                public SocketChannel get(int retryNumber, Throwable lastError) {
-                    if (lastError != null) {
-                        lastError.printStackTrace(System.out);
-                    }
-                    try {
-                        return SocketChannel.open(new InetSocketAddress("localhost", 3301));
-                    } catch (IOException e) {
-                        throw new IllegalStateException(e);
-                    }
-                }
-            };
-```
-
-Now you are ready to create client
-```java
-TarantoolClient client = new TarantoolClientImpl(socketChannelProvider, config);
-```
-
-TarantoolClient is thread safe and async so you should use one client inside whole application. 
-
-TarantoolClient provides 3 interfaces to execute queries
-
-* SyncOps returns operation result
-* AsyncOps returns operation result Future
-* FireAndForgetOps returns query ID
-
-
-Feel free to override any method of TarantoolClientImpl. For example you
-could override 
-```java
-protected void complete(long code, FutureImpl<List> q);
-```
-to hook all results.
-
-
-
 
