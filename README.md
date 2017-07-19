@@ -9,7 +9,7 @@ First you should add snaphost repository and  dependency to your pom file
 ```
 
 
-Spring NamedParameterJdbcTemplate usage example.
+## Spring NamedParameterJdbcTemplate usage example.
 
 To configure sockets you should implements SQLSocketProvider and add socketProvider=abc.xyz.MySocketProvider to connect url. 
 For example tarantool://localhost:3301?username=test&password=test&socketProvider=abc.xyz.MySocketProvider
