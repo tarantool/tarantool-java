@@ -4,7 +4,7 @@ package org.tarantool;
 public abstract class AbstractTarantoolOps<Space, Tuple, Operation, Result> implements TarantoolClientOps<Space, Tuple, Operation, Result> {
     private Code callCode = Code.OLD_CALL;
 
-    public abstract Result exec(Code code, Object... args);
+    protected abstract Result exec(Code code, Object... args);
 
     public Result select(Space space, Space index, Tuple key, int offset, int limit, Iterator iterator) {
         return select(space, index, key, offset, limit, iterator.getValue());

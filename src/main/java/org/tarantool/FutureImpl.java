@@ -9,11 +9,13 @@ import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 
 public class FutureImpl<V> extends AbstractQueuedSynchronizer implements Future<V> {
     protected final long id;
+    protected Code code;
     protected V value;
     protected Exception error;
 
-    public FutureImpl(long id) {
+    public FutureImpl(long id, Code code) {
         this.id = id;
+        this.code = code;
         setState(1);
     }
 
@@ -91,4 +93,7 @@ public class FutureImpl<V> extends AbstractQueuedSynchronizer implements Future<
         return id;
     }
 
+    public Code getCode() {
+        return code;
+    }
 }
