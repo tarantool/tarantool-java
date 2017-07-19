@@ -25,7 +25,6 @@ To get the Java connector for Tarantool 1.6.9, visit
   <version>1.8.jdbc-SNAPSHOT</version>
 </dependency>
 ```
-<<<<<<< HEAD
 
 2. Configure `TarantoolClientConfig`.
 
