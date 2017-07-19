@@ -35,7 +35,8 @@ config.password = "test";
 ```
 
 3. Implement your `SocketChannelProvider`.
-   It should return a connected `SocketChannel`.
+
+It should return a connected `SocketChannel`.
 
 ```java
 SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
@@ -53,10 +54,9 @@ SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
 };
 ```
 
-Here you could also implement some reconnection or fallback policy.
-Remember that `TarantoolClient` adopts a
-[fail-fast](https://en.wikipedia.org/wiki/Fail-fast) policy
-when a client is not connected.
+Here you could also implement some reconnection or fallback policy. Remember
+that `TarantoolClient` adopts a [fail-fast](https://en.wikipedia.org/wiki/Fail-fast)
+policy when a client is not connected.
 
 4. Create a client.
 
