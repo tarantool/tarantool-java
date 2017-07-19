@@ -288,7 +288,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean isBeforeFirst() throws SQLException {
-        return row == null;
+        return row == null && iterator.previousIndex() == -1;
     }
 
     @Override
@@ -326,7 +326,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean last() throws SQLException {
-        while (iterator.nextIndex() < JDBCBridgeExecutor.size()) {
+        while (iterator.hasNext()) {
             next();
         }
         return row != null;
