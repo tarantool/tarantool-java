@@ -1,11 +1,17 @@
 package org.tarantool;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 
+import org.tarantool.jdbc.SQLResultSet;
+
 public class JDBCBridge {
+    public static final JDBCBridge EMPTY = new JDBCBridge(Collections.<TarantoolBase.SQLMetaData>emptyList(), Collections.<List<Object>>emptyList());
+
     final List<TarantoolBase.SQLMetaData> sqlMetadata;
     final Map<String,Integer> columnsByName;
     final List<List<Object>> rows;
@@ -19,7 +25,7 @@ public class JDBCBridge {
         this.rows = rows;
         columnsByName = new LinkedHashMap<String, Integer>((int) Math.ceil(sqlMetadata.size() / 0.75), 0.75f);
         for (int i = 0; i < sqlMetadata.size(); i++) {
-            columnsByName.put(sqlMetadata.get(i).getName(), i);
+            columnsByName.put(sqlMetadata.get(i).getName(), i + 1);
         }
     }
 
@@ -32,18 +38,26 @@ public class JDBCBridge {
         return connection.update(sql, params).intValue();
     }
 
+    public static JDBCBridge mock(List<String> fields, List<List<Object>> values)  {
+        List<TarantoolBase.SQLMetaData> meta = new ArrayList<TarantoolBase.SQLMetaData>(fields.size());
+        for(String field:fields) {
+           meta.add(new TarantoolBase.SQLMetaData(field));
+        }
+        return new JDBCBridge(meta, values);
+    }
+
     public static Object execute(TarantoolConnection connection, String sql, Object ... params) {
         connection.sql(sql, params);
         Long rowCount = connection.getSqlRowCount();
         if(rowCount == null) {
-            return new JDBCBridge(connection);
+            return new SQLResultSet(new JDBCBridge(connection));
         }
         return rowCount.intValue();
     }
 
 
     public String getColumnName(int columnIndex) {
-       return sqlMetadata.get(columnIndex).getName();
+        return columnIndex > sqlMetadata.size() ? null : sqlMetadata.get(columnIndex - 1).getName();
     }
 
     public Integer getColumnIndex(String columnName) {
@@ -51,7 +65,7 @@ public class JDBCBridge {
     }
 
     public int getColumnCount() {
-        return sqlMetadata.size();
+        return columnsByName.size();
     }
 
     public ListIterator<List<Object>> iterator() {

@@ -3,6 +3,7 @@ package org.tarantool.jdbc;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.Types;
 
 import org.tarantool.JDBCBridge;
 
@@ -65,7 +66,7 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
 
     @Override
     public String getSchemaName(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return null;
     }
 
     @Override
@@ -85,17 +86,17 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
 
     @Override
     public String getCatalogName(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return null;
     }
 
     @Override
     public int getColumnType(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return Types.OTHER;
     }
 
     @Override
     public String getColumnTypeName(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return "scalar";
     }
 
     @Override
@@ -131,7 +132,7 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
     @Override
     public String toString() {
         return "SQLResultSetMetaData{" +
-                "JDBCBridgeExecutor=" + JDBCBridgeExecutor +
+                "bridge=" + JDBCBridgeExecutor +
                 '}';
     }
 }

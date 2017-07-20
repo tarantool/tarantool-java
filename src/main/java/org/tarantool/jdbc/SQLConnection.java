@@ -23,11 +23,15 @@ import java.util.concurrent.Executor;
 import org.tarantool.TarantoolConnection;
 
 @SuppressWarnings("Since15")
-public class SqlConnection implements Connection {
+public class SQLConnection implements Connection {
     final TarantoolConnection connection;
+    final String url;
+    final Properties properties;
 
-    public SqlConnection(TarantoolConnection connection) {
+    public SQLConnection(TarantoolConnection connection, String url, Properties properties) {
         this.connection = connection;
+        this.url = url;
+        this.properties = properties;
     }
 
     @Override
@@ -85,12 +89,12 @@ public class SqlConnection implements Connection {
 
     @Override
     public DatabaseMetaData getMetaData() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return new SQLDatabaseMetadata(this);
     }
 
     @Override
     public void setReadOnly(boolean readOnly) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+
     }
 
     @Override
@@ -100,12 +104,11 @@ public class SqlConnection implements Connection {
 
     @Override
     public void setCatalog(String catalog) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public String getCatalog() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return null;
     }
 
     @Override
@@ -276,12 +279,11 @@ public class SqlConnection implements Connection {
 
     @Override
     public void setSchema(String schema) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public String getSchema() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return null;
     }
 
     @Override

@@ -13,23 +13,28 @@ import org.tarantool.TarantoolConnection;
 @SuppressWarnings("Since15")
 public class SQLStatement implements Statement {
     protected final TarantoolConnection connection;
-    protected final SqlConnection sqlConnection;
+    protected final SQLConnection sqlConnection;
     private SQLResultSet resultSet;
     private int updateCount;
+    private int maxRows;
 
-    protected SQLStatement(TarantoolConnection connection, SqlConnection sqlConnection) {
+    protected SQLStatement(TarantoolConnection connection, SQLConnection sqlConnection) {
         this.connection = connection;
         this.sqlConnection = sqlConnection;
     }
 
     @Override
     public ResultSet executeQuery(String sql) throws SQLException {
-        return (resultSet = new SQLResultSet(JDBCBridge.query(connection, sql)));
+        resultSet = new SQLResultSet(JDBCBridge.query(connection, sql));
+        updateCount = -1;
+        return resultSet;
     }
 
     @Override
     public int executeUpdate(String sql) throws SQLException {
-        return JDBCBridge.update(connection, sql);
+        int update = JDBCBridge.update(connection, sql);
+        resultSet = null;
+        return update;
     }
 
     @Override
@@ -49,12 +54,15 @@ public class SQLStatement implements Statement {
 
     @Override
     public int getMaxRows() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return maxRows;
     }
 
     @Override
     public void setMaxRows(int max) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+       maxRows = max;
+       if(resultSet!=null) {
+           resultSet.maxRows = maxRows;
+       }
     }
 
     @Override
@@ -74,7 +82,7 @@ public class SQLStatement implements Statement {
 
     @Override
     public void cancel() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+
     }
 
     @Override
@@ -97,8 +105,11 @@ public class SQLStatement implements Statement {
         Object result = JDBCBridge.execute(connection, sql);
         if (result instanceof SQLResultSet) {
             resultSet = (SQLResultSet) result;
+            resultSet.maxRows = maxRows;
+            updateCount = -1;
             return true;
         } else {
+            resultSet = null;
             updateCount = (Integer) result;
             return false;
         }
@@ -106,17 +117,25 @@ public class SQLStatement implements Statement {
 
     @Override
     public ResultSet getResultSet() throws SQLException {
-        return resultSet;
+        try {
+            return resultSet;
+        } finally {
+            resultSet = null;
+        }
     }
 
     @Override
     public int getUpdateCount() throws SQLException {
-        return updateCount;
+        try {
+            return updateCount;
+        } finally {
+            updateCount = -1;
+        }
     }
 
     @Override
     public boolean getMoreResults() throws SQLException {
-        return resultSet != null;
+        return false;
     }
 
     @Override
@@ -133,12 +152,11 @@ public class SQLStatement implements Statement {
 
     @Override
     public void setFetchSize(int rows) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public int getFetchSize() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return 0;
     }
 
     @Override
@@ -173,7 +191,7 @@ public class SQLStatement implements Statement {
 
     @Override
     public boolean getMoreResults(int current) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return false;
     }
 
     @Override
@@ -233,12 +251,12 @@ public class SQLStatement implements Statement {
 
     @Override
     public void closeOnCompletion() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+
     }
 
     @Override
     public boolean isCloseOnCompletion() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return false;
     }
 
     @Override

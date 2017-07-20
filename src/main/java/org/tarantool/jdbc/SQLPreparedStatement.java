@@ -32,7 +32,7 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     final Map<Integer, Object> params;
 
 
-    public SQLPreparedStatement(TarantoolConnection connection, SqlConnection sqlConnection, String sql) {
+    public SQLPreparedStatement(TarantoolConnection connection, SQLConnection sqlConnection, String sql) {
         super(connection, sqlConnection);
         this.sql = sql;
         this.params = new HashMap<Integer, Object>();
