@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer, List<?>, Object, Result> {
+    protected static final String WELCOME = "Tarantool ";
+    protected String serverVersion;
     /**
      * Connection state
      */
@@ -42,10 +44,11 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
             byte[] bytes = new byte[64];
             is.readFully(bytes);
             String firstLine = new String(bytes);
-            if (!firstLine.startsWith("Tarantool")) {
+            if (!firstLine.startsWith(WELCOME)) {
                 close();
                 throw new CommunicationException("Welcome message should starts with tarantool but starts with '" + firstLine + "'", new IllegalStateException("Invalid welcome packet"));
             }
+            serverVersion = firstLine.substring(WELCOME.length());
             is.readFully(bytes);
             this.salt = new String(bytes);
             if (username != null && password != null) {
@@ -229,5 +232,9 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
 
     public void setInitialRequestSize(int initialRequestSize) {
         this.initialRequestSize = initialRequestSize;
+    }
+
+    public String getServerVersion() {
+        return serverVersion;
     }
 }

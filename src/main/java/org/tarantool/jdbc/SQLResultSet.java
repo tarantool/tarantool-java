@@ -34,21 +34,22 @@ import org.tarantool.JDBCBridge;
 @SuppressWarnings("Since15")
 public class SQLResultSet implements ResultSet {
     ListIterator<List<Object>> iterator;
-    final JDBCBridge JDBCBridgeExecutor;
+    final JDBCBridge bridge;
     final SQLResultSetMetaData metaData;
 
+    int maxRows;
     List<Object> row = null;
 
 
-    public SQLResultSet(JDBCBridge JDBCBridgeExecutor) {
-        this.JDBCBridgeExecutor = JDBCBridgeExecutor;
-        iterator = JDBCBridgeExecutor.iterator();
-        metaData = new SQLResultSetMetaData(JDBCBridgeExecutor);
+    public SQLResultSet(JDBCBridge bridge) {
+        this.bridge = bridge;
+        iterator = bridge.iterator();
+        metaData = new SQLResultSetMetaData(bridge);
     }
 
     @Override
     public boolean next() throws SQLException {
-        if (iterator.hasNext()) {
+        if (iterator.hasNext() && (maxRows == 0 || iterator.nextIndex() < maxRows)) {
             row = iterator.next();
             return true;
         }
@@ -68,12 +69,18 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public String getString(int columnIndex) throws SQLException {
-        return (String) getRaw(columnIndex);
+        Object raw = getRaw(columnIndex);
+        return raw == null ? null : String.valueOf(raw);
     }
 
     protected Object getRaw(int columnIndex) {
         return row.get(columnIndex - 1);
     }
+
+    protected Integer getColumnIndex(String columnLabel) {
+        return bridge.getColumnIndex(columnLabel);
+    }
+
 
     @Override
     public boolean getBoolean(int columnIndex) throws SQLException {
@@ -82,32 +89,37 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public byte getByte(int columnIndex) throws SQLException {
-        return ((Number) getRaw(columnIndex)).byteValue();
+        return (getNumber(columnIndex)).byteValue();
     }
 
     @Override
     public short getShort(int columnIndex) throws SQLException {
-        return ((Number) getRaw(columnIndex)).shortValue();
+        return (getNumber(columnIndex)).shortValue();
     }
 
     @Override
     public int getInt(int columnIndex) throws SQLException {
-        return ((Number) getRaw(columnIndex)).intValue();
+        return getNumber(columnIndex).intValue();
+    }
+
+    private Number getNumber(int columnIndex) {
+        Number raw = (Number) getRaw(columnIndex);
+        return raw == null ? 0 : raw;
     }
 
     @Override
     public long getLong(int columnIndex) throws SQLException {
-        return ((Number) getRaw(columnIndex)).longValue();
+        return (getNumber(columnIndex)).longValue();
     }
 
     @Override
     public float getFloat(int columnIndex) throws SQLException {
-        return ((Number) getRaw(columnIndex)).floatValue();
+        return (getNumber(columnIndex)).floatValue();
     }
 
     @Override
     public double getDouble(int columnIndex) throws SQLException {
-        return ((Number) getRaw(columnIndex)).doubleValue();
+        return (getNumber(columnIndex)).doubleValue();
     }
 
     @Override
@@ -153,82 +165,82 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public String getString(String columnLabel) throws SQLException {
-        return getString(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getString(getColumnIndex(columnLabel));
     }
 
     @Override
     public boolean getBoolean(String columnLabel) throws SQLException {
-        return getBoolean(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getBoolean(getColumnIndex(columnLabel));
     }
 
     @Override
     public byte getByte(String columnLabel) throws SQLException {
-        return getByte(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getByte(getColumnIndex(columnLabel));
     }
 
     @Override
     public short getShort(String columnLabel) throws SQLException {
-        return getShort(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getShort(getColumnIndex(columnLabel));
     }
 
     @Override
     public int getInt(String columnLabel) throws SQLException {
-        return getInt(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getInt(getColumnIndex(columnLabel));
     }
 
     @Override
     public long getLong(String columnLabel) throws SQLException {
-        return getLong(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getLong(getColumnIndex(columnLabel));
     }
 
     @Override
     public float getFloat(String columnLabel) throws SQLException {
-        return getFloat(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getFloat(getColumnIndex(columnLabel));
     }
 
     @Override
     public double getDouble(String columnLabel) throws SQLException {
-        return getDouble(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getDouble(getColumnIndex(columnLabel));
     }
 
     @Override
     public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-        return getBigDecimal(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getBigDecimal(getColumnIndex(columnLabel));
     }
 
     @Override
     public byte[] getBytes(String columnLabel) throws SQLException {
-        return getBytes(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getBytes(getColumnIndex(columnLabel));
     }
 
     @Override
     public Date getDate(String columnLabel) throws SQLException {
-        return getDate(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getDate(getColumnIndex(columnLabel));
     }
 
     @Override
     public Time getTime(String columnLabel) throws SQLException {
-        return getTime(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getTime(getColumnIndex(columnLabel));
     }
 
     @Override
     public Timestamp getTimestamp(String columnLabel) throws SQLException {
-        return getTimestamp(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getTimestamp(getColumnIndex(columnLabel));
     }
 
     @Override
     public InputStream getAsciiStream(String columnLabel) throws SQLException {
-        return getAsciiStream(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getAsciiStream(getColumnIndex(columnLabel));
     }
 
     @Override
     public InputStream getUnicodeStream(String columnLabel) throws SQLException {
-        return getUnicodeStream(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getUnicodeStream(getColumnIndex(columnLabel));
     }
 
     @Override
     public InputStream getBinaryStream(String columnLabel) throws SQLException {
-        return getBinaryStream(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getBinaryStream(getColumnIndex(columnLabel));
     }
 
     @Override
@@ -258,12 +270,12 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Object getObject(String columnLabel) throws SQLException {
-        return getRaw(JDBCBridgeExecutor.getColumnIndex(columnLabel));
+        return getRaw(getColumnIndex(columnLabel));
     }
 
     @Override
     public int findColumn(String columnLabel) throws SQLException {
-        return JDBCBridgeExecutor.getColumnIndex(columnLabel);
+        return getColumnIndex(columnLabel);
     }
 
     @Override
@@ -293,7 +305,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean isAfterLast() throws SQLException {
-        return iterator.nextIndex() == JDBCBridgeExecutor.size() && row == null;
+        return iterator.nextIndex() == bridge.size() && row == null;
     }
 
     @Override
@@ -303,13 +315,13 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean isLast() throws SQLException {
-        return iterator.nextIndex() == JDBCBridgeExecutor.size();
+        return iterator.nextIndex() == bridge.size();
     }
 
     @Override
     public void beforeFirst() throws SQLException {
         row = null;
-        iterator = JDBCBridgeExecutor.iterator();
+        iterator = bridge.iterator();
     }
 
     @Override
@@ -1027,7 +1039,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
-        return type.cast(getRaw(JDBCBridgeExecutor.getColumnIndex(columnLabel)));
+        return type.cast(getRaw(getColumnIndex(columnLabel)));
     }
 
     @Override
