@@ -1,0 +1,15 @@
+language: java
+
+sudo: required
+dist: trusty
+
+jdk:
+  - oraclejdk10
+  - openjdk10
+
+before_script:
+  - src/test/travis.pre.sh
+
+script:
+  - mvn test
+  - sudo cat /var/log/tarantool/jdk-testing.log
