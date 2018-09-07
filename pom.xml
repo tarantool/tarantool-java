@@ -6,7 +6,8 @@
     <version>1.8.jdbc-SNAPSHOT</version>
     <packaging>jar</packaging>
     <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+      <junit.jupiter.version>5.3.0</junit.jupiter.version>
     </properties>
     <name>Tarantool Connector for Java</name>
     <url>https://github.com/tarantool/tarantool-java</url>
@@ -23,7 +24,8 @@
         <url>https://github.com/tarantool/tarantool-java</url>
         <connection>scm:git:git://github.com/tarantool/tarantool-java.git</connection>
         <developerConnection>scm:git:git@github.com:tarantool/tarantool-java.git</developerConnection>
-    </scm>
+      </scm>
+
     <developers>
         <developer>
             <name>Dmitry Grytsovets</name>
@@ -32,6 +34,7 @@
             <organizationUrl>http://tarantool.org/</organizationUrl>
         </developer>
     </developers>
+
     <build>
         <plugins>
             <plugin>
@@ -43,13 +46,42 @@
                     <target>1.6</target>
                 </configuration>
             </plugin>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.0</version>
+            </plugin>
         </plugins>
     </build>
+
     <dependencies>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.12</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-all</artifactId>
+            <version>1.9.5</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
