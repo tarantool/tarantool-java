@@ -81,7 +81,7 @@ public class TestTarantoolClient {
         }
 
         @Override
-        protected void complete(long code, FutureImpl<List<?>> q) {
+        protected void complete(long code, FutureImpl<?> q) {
             super.complete(code, q);
             if (code != 0) {
                 System.out.println(code);

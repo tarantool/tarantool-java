@@ -11,11 +11,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer, List<?>, Object, Result> {
+    protected static final String WELCOME = "Tarantool ";
+    protected String serverVersion;
     /**
      * Connection state
      */
@@ -41,10 +44,11 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
             byte[] bytes = new byte[64];
             is.readFully(bytes);
             String firstLine = new String(bytes);
-            if (!firstLine.startsWith("Tarantool")) {
+            if (!firstLine.startsWith(WELCOME)) {
                 close();
                 throw new CommunicationException("Welcome message should starts with tarantool but starts with '" + firstLine + "'", new IllegalStateException("Invalid welcome packet"));
             }
+            serverVersion = firstLine.substring(WELCOME.length());
             is.readFully(bytes);
             this.salt = new String(bytes);
             if (username != null && password != null) {
@@ -136,6 +140,62 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
         is.skipBytes((int) (cis.getBytesRead() - mark - size));
     }
 
+    protected static class SQLMetaData {
+        protected String name;
+
+        public SQLMetaData(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public String toString() {
+            return "SQLMetaData{" +
+                    "name='" + name + '\'' +
+                    '}';
+        }
+    }
+
+    protected List<SQLMetaData> getSQLMetadata() {
+        List<Map<Integer, Object>> meta = (List<Map<Integer, Object>>) body.get(Key.SQL_METADATA.getId());
+        List<SQLMetaData> values = new ArrayList<SQLMetaData>(meta.size());
+        for(Map<Integer,Object> c:meta ) {
+           values.add(new SQLMetaData((String) c.get(Key.SQL_FIELD_NAME.getId())));
+        }
+        return values;
+    }
+
+    protected List<List<Object>> getSQLData() {
+        return (List<List<Object>>) body.get(Key.DATA.getId());
+    }
+
+    protected List<Map<String, Object>> readSqlResult(List<List<?>> data) {
+        List<Map<String, Object>> values = new ArrayList<Map<String, Object>>(data.size());
+        List<SQLMetaData> metaData = getSQLMetadata();
+        LinkedHashMap<String, Object> value = new LinkedHashMap<String, Object>();
+        for (List row : data) {
+            for (int i = 0; i < row.size(); i++) {
+                value.put(metaData.get(i).getName(), row.get(i));
+            }
+            values.add(value);
+        }
+        return values;
+    }
+
+
+    protected Long getSqlRowCount() {
+        Map<Key, Object> info = (Map<Key, Object>) body.get(Key.SQL_INFO.getId());
+        Number rowCount;
+        if (info != null && (rowCount = ((Number) info.get(Key.SQL_ROW_COUNT.getId()))) != null) {
+            return rowCount.longValue();
+        }
+        return null;
+    }
+
+
     protected TarantoolException serverError(long code, Object error) {
         return new TarantoolException(code, error instanceof String ? (String) error : new String((byte[]) error));
     }
@@ -172,5 +232,9 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
 
     public void setInitialRequestSize(int initialRequestSize) {
         this.initialRequestSize = initialRequestSize;
+    }
+
+    public String getServerVersion() {
+        return serverVersion;
     }
 }

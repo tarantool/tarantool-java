@@ -20,7 +20,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
 
-public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implements TarantoolClient {
+public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements TarantoolClient {
     public static final CommunicationException NOT_INIT_EXCEPTION = new CommunicationException("Not connected, initializing connection");
     protected TarantoolClientConfig config;
 
@@ -31,8 +31,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
     protected volatile Exception thumbstone;
     protected volatile CountDownLatch alive;
 
-    protected Map<Long, FutureImpl<List<?>>> futures;
+    protected Map<Long, FutureImpl<?>> futures;
     protected AtomicInteger wait = new AtomicInteger();
+    protected CountDownLatch stop;
     /**
      * Write properties
      */
@@ -77,7 +78,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
         this.alive = new CountDownLatch(1);
         this.socketProvider = socketProvider;
         this.stats = new TarantoolClientStats();
-        this.futures = new ConcurrentHashMap<Long, FutureImpl<List<?>>>(config.predictedFutures);
+        this.futures = new ConcurrentHashMap<Long, FutureImpl<?>>(config.predictedFutures);
         this.sharedBuffer = ByteBuffer.allocateDirect(config.sharedBufferSize);
         this.writerBuffer = ByteBuffer.allocateDirect(sharedBuffer.capacity());
         this.connector.setDaemon(true);
@@ -164,13 +165,12 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
 
     protected void startThreads(String threadName) throws IOException, InterruptedException {
         final CountDownLatch init = new CountDownLatch(2);
-        stopIO = new CountDownLatch(2);
         reader = new Thread(new Runnable() {
             @Override
             public void run() {
                 init.countDown();
                 readThread();
-                stopIO.countDown();
+                stop.countDown();
             }
         });
         writer = new Thread(new Runnable() {
@@ -178,7 +178,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
             public void run() {
                 init.countDown();
                 writeThread();
-                stopIO.countDown();
+                stop.countDown();
             }
         });
 
@@ -197,9 +197,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
     }
 
 
-    public Future<List<?>> exec(Code code, Object... args) {
+    protected Future<?> exec(Code code, Object... args) {
         validateArgs(args);
-        FutureImpl<List<?>> q = new FutureImpl<List<?>>(syncId.incrementAndGet());
+        FutureImpl<?> q = new FutureImpl(syncId.incrementAndGet(), code);
         if (isDead(q)) {
             return q;
         }
@@ -225,11 +225,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
         this.thumbstone = new CommunicationException(message, cause);
         this.alive = new CountDownLatch(1);
         while (!futures.isEmpty()) {
-            Iterator<Map.Entry<Long, FutureImpl<List<?>>>> iterator = futures.entrySet().iterator();
+            Iterator<Map.Entry<Long, FutureImpl<?>>> iterator = futures.entrySet().iterator();
             while (iterator.hasNext()) {
-                Map.Entry<Long, FutureImpl<List<?>>> elem = iterator.next();
+                Map.Entry<Long, FutureImpl<?>> elem = iterator.next();
                 if (elem != null) {
-                    FutureImpl<List<?>> future = elem.getValue();
+                    FutureImpl<?> future = elem.getValue();
                     fail(future, cause);
                 }
                 iterator.remove();
@@ -333,7 +333,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
                     readPacket(is);
                     code = (Long) headers.get(Key.CODE.getId());
                     Long syncId = (Long) headers.get(Key.SYNC.getId());
-                    FutureImpl<List<?>> future = futures.remove(syncId);
+                    FutureImpl<?> future = futures.remove(syncId);
                     stats.received++;
                     wait.decrementAndGet();
                     complete(code, future);
@@ -381,14 +381,19 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
     }
 
 
-    protected void fail(FutureImpl<List<?>> q, Exception e) {
+    protected void fail(FutureImpl<?> q, Exception e) {
         q.setError(e);
     }
 
-    protected void complete(long code, FutureImpl<List<?>> q) {
+    protected void complete(long code, FutureImpl<?> q) {
         if (q != null) {
             if (code == 0) {
-                q.setValue((List) body.get(Key.DATA.getId()));
+                List<?> data = (List<?>) body.get(Key.DATA.getId());
+                if(q.getCode() == Code.EXECUTE) {
+                    completeSql(q, (List<List<?>>) data);
+                } else {
+                    ((FutureImpl)q).setValue(data);
+                }
             } else {
                 Object error = body.get(Key.ERROR.getId());
                 fail(q, serverError(code, error));
@@ -396,8 +401,18 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
         }
     }
 
+    protected void completeSql(FutureImpl<?> q, List<List<?>> data) {
+        Long rowCount = getSqlRowCount();
+        if (rowCount!=null) {
+            ((FutureImpl) q).setValue(rowCount);
+        } else {
+            List<Map<String, Object>> values = readSqlResult(data);
+            ((FutureImpl) q).setValue(values);
+        }
+    }
 
-    protected List syncGet(Future<List<?>> r) {
+
+    protected <T> T syncGet(Future<T> r) {
         try {
             return r.get();
         } catch (ExecutionException e) {
@@ -433,6 +448,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
     }
 
     protected void stopIO() {
+        stop = new CountDownLatch(2);
         if (reader != null) {
             reader.interrupt();
         }
@@ -485,7 +501,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
 
     @Override
     public TarantoolClientOps<Integer, List<?>, Object, Future<List<?>>> asyncOps() {
-        return this;
+        return (TarantoolClientOps)this;
     }
 
     @Override
@@ -494,11 +510,42 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
     }
 
 
+    @Override
+    public TarantoolSQLOps<Object, Long, List<Map<String, Object>>> sqlSyncOps() {
+        return new TarantoolSQLOps<Object, Long, List<Map<String,Object>>>() {
+
+            @Override
+            public Long update(String sql, Object... bind) {
+                return (Long) syncGet(exec(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, bind));
+            }
+
+            @Override
+            public List<Map<String, Object>> query(String sql, Object... bind) {
+                return (List<Map<String, Object>>) syncGet(exec(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, bind));
+            }
+        };
+    }
+
+    @Override
+    public TarantoolSQLOps<Object, Future<Long>, Future<List<Map<String, Object>>>> sqlAsyncOps() {
+        return new TarantoolSQLOps<Object, Future<Long>, Future<List<Map<String,Object>>>>() {
+            @Override
+            public Future<Long> update(String sql, Object... bind) {
+                return (Future<Long>) exec(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, bind);
+            }
+
+            @Override
+            public Future<List<Map<String, Object>>> query(String sql, Object... bind) {
+                return (Future<List<Map<String, Object>>>) exec(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, bind);
+            }
+        };
+    }
+
     protected class SyncOps extends AbstractTarantoolOps<Integer, List<?>, Object, List<?>> {
 
         @Override
         public List exec(Code code, Object... args) {
-            return syncGet(TarantoolClientImpl.this.exec(code, args));
+            return (List) syncGet(TarantoolClientImpl.this.exec(code, args));
         }
 
         @Override
@@ -529,7 +576,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
         }
     }
 
-    protected boolean isDead(FutureImpl<List<?>> q) {
+    protected boolean isDead(FutureImpl<?> q) {
         if (TarantoolClientImpl.this.thumbstone != null) {
             fail(q, new CommunicationException("Connection is dead", thumbstone));
             return true;
