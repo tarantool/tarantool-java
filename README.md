@@ -95,3 +95,9 @@ Got problems or questions? Post them on
 [Stack Overflow](http://stackoverflow.com/questions/ask/advice) with the
 `tarantool` and `java` tags, or use these tags to search the existing knowledge
 base for possible answers and solutions.
+
+## Building
+To run tests
+```
+./mvnw clean test
+```
