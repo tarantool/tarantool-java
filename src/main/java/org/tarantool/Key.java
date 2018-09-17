@@ -18,13 +18,13 @@ public enum Key implements Callable<Integer> {
     UPSERT_OPS(0x28),
     DATA(0x30), ERROR(0x31),
 
-    SQL_FIELD_NAME(0x29),
+    SQL_FIELD_NAME(0),
     SQL_METADATA(0x32),
     SQL_TEXT(0x40),
     SQL_BIND(0x41),
     SQL_OPTIONS(0x42),
-    SQL_INFO(0x43),
-    SQL_ROW_COUNT(0x44);
+    SQL_INFO(0x42),
+    SQL_ROW_COUNT(0);
 
     int id;
 
