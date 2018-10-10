@@ -10,6 +10,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -765,29 +766,53 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException {
-        List<List<Object>> spaces = (List<List<Object>>) connection.connection.select(_VSPACE, 2, Arrays.asList(table), 0, 1, 0);
+        final List<String> colNames = Arrays.asList(
+                "TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "COLUMN_NAME", "KEY_SEQ", "PK_NAME");
 
-        List<List<Object>> rows = new ArrayList<List<Object>>();
+        if (table == null || table.isEmpty())
+            return emptyResultSet(colNames);
 
-        if (spaces != null && spaces.size() > 0) {
-            List<Object> space = spaces.get(0);
-            List<Map<String, Object>> fields = (List<Map<String, Object>>) space.get(FORMAT_IDX);
-            List<List<Object>> indexes = (List<List<Object>>) connection.connection.select(_VINDEX, 0, Arrays.asList(space.get(SPACE_ID_IDX), 0), 0, 1, 0);
-            List<Object> primaryKey = indexes.get(0);
-            List<List<Object>> parts = (List<List<Object>>) primaryKey.get(INDEX_FORMAT_IDX);
+        try {
+            List spaces = connection.connection.select(_VSPACE, 2, Collections.singletonList(table), 0, 1, 0);
+
+            if (spaces == null || spaces.size() == 0)
+                return emptyResultSet(colNames);
+
+            List space = ensureType(List.class, spaces.get(0));
+            List fields = ensureType(List.class, space.get(FORMAT_IDX));
+            int spaceId = ensureType(Number.class, space.get(SPACE_ID_IDX)).intValue();
+            List indexes = connection.connection.select(_VINDEX, 0, Arrays.asList(spaceId, 0), 0, 1, 0);
+            List primaryKey = ensureType(List.class, indexes.get(0));
+            List parts = ensureType(List.class, primaryKey.get(INDEX_FORMAT_IDX));
+
+            List<List<Object>> rows = new ArrayList<List<Object>>();
             for (int i = 0; i < parts.size(); i++) {
-                List<Object> part = parts.get(i);
-                int ordinal = ((Number) part.get(0)).intValue();
-                String column = (String) fields.get(ordinal).get("name");
-                rows.add(Arrays.asList(table, column, i + 1, "primary", primaryKey.get(NAME_IDX)));
+                // For native spaces, the 'parts' is 'List of Lists'.
+                // We only accept SQL spaces, for which the parts is 'List of Maps'.
+                Map part = checkType(Map.class, parts.get(i));
+                if (part == null)
+                    return emptyResultSet(colNames);
+
+                int ordinal = ensureType(Number.class, part.get("field")).intValue();
+                Map field = ensureType(Map.class, fields.get(ordinal));
+                // The 'name' field is optional in the format structure. But it is present for SQL space.
+                String column = ensureType(String.class, field.get("name"));
+                rows.add(Arrays.asList(null, null, table, column, i + 1, primaryKey.get(NAME_IDX)));
             }
+            // Sort results by column name.
+            Collections.sort(rows, new Comparator<List<Object>>() {
+                @Override
+                public int compare(List<Object> row0, List<Object> row1) {
+                    String col0 = (String) row0.get(3);
+                    String col1 = (String) row1.get(3);
+                    return col0.compareTo(col1);
+                }
+            });
+            return new SQLNullResultSet((JDBCBridge.mock(colNames, rows)));
         }
-        return new SQLNullResultSet((JDBCBridge.mock(
-                Arrays.asList("TABLE_NAME", "COLUMN_NAME", "KEY_SEQ", "PK_NAME",
-                        //nulls
-                        "TABLE_CAT", "TABLE_SCHEM"
-                ),
-                rows)));
+        catch (Throwable t) {
+            throw new SQLException("Error processing metadata for table \"" + table + "\".", t);
+        }
     }
 
     @Override
@@ -1026,4 +1051,21 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     public boolean isWrapperFor(Class<?> iface) throws SQLException {
         throw new SQLFeatureNotSupportedException();
     }
+
+    private static <T> T ensureType(Class<T> cls, Object v) throws Exception {
+        if (v == null || !cls.isAssignableFrom(v.getClass())) {
+            throw new Exception(String.format("Wrong value type '%s', expected '%s'.",
+                    v == null ? "null" : v.getClass().getName(), cls.getName()));
+        }
+        return cls.cast(v);
+    }
+
+    private static <T> T checkType(Class<T> cls, Object v) {
+        return (v != null && cls.isAssignableFrom(v.getClass())) ? cls.cast(v) : null;
+    }
+
+    private ResultSet emptyResultSet(List<String> colNames) {
+        return new SQLNullResultSet((JDBCBridge.mock(colNames, Collections.<List<Object>>emptyList())));
+    }
+
 }

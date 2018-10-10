@@ -32,9 +32,6 @@ public abstract class AbstractJdbcIT {
     private static String URL = String.format("tarantool://%s:%d?user=%s&password=%s", host, port, user, pass);
 
     private static String[] initSql = new String[] {
-            "DROP TABLE IF EXISTS test",
-            "DROP TABLE IF EXISTS test_types",
-
             "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100))",
             "INSERT INTO test VALUES (1, 'one'), (2, 'two'), (3, 'three')",
 
@@ -78,12 +75,15 @@ public abstract class AbstractJdbcIT {
                     "X'010203040506'," + //LONGVARBINARY
                     "'1983-03-14'," + //DATE
                     "'12:01:06'," + //TIME
-                    "129479994)" //TIMESTAMP
+                    "129479994)", //TIMESTAMP
+
+            "CREATE TABLE test_compound(id1 INT, id2 INT, val VARCHAR(100), PRIMARY KEY (id2, id1))"
     };
 
     private static String[] cleanSql = new String[] {
             "DROP TABLE IF EXISTS test",
-            "DROP TABLE IF EXISTS test_types"
+            "DROP TABLE IF EXISTS test_types",
+            "DROP TABLE IF EXISTS test_compound"
     };
 
     static Object[] testRow = new Object[] {
@@ -112,6 +112,7 @@ public abstract class AbstractJdbcIT {
 
     @BeforeAll
     public static void setupEnv() throws Exception {
+        sqlExec(cleanSql);
         sqlExec(initSql);
     }
 
