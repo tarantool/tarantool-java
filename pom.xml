@@ -3,11 +3,44 @@
 
     <groupId>org.tarantool</groupId>
     <artifactId>connector</artifactId>
-    <version>1.7.6-SNAPSHOT</version>
+    <version>1.8.jcache-SNAPSHOT</version>
     <packaging>jar</packaging>
     <properties>
       <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
       <junit.jupiter.version>5.3.0</junit.jupiter.version>
+      <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+      <java.version>1.8</java.version>
+      <maven.compiler.source>1.8</maven.compiler.source>
+      <maven.compiler.target>1.8</maven.compiler.target>
+      <kotlin.version>1.2.51</kotlin.version>
+      <jcache.api.version>1.1.0</jcache.api.version>
+      <jcache.tck.version>1.1.0</jcache.tck.version>
+
+      <skipTests>true</skipTests>
+
+      <!--IPV4-->
+      <java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
+
+      <!--
+            Implementation specifications, the defaults below are for the Tarantool JCache,
+            this needs to be overridden in submodules and replaced with the parameters of the
+            implementation.
+       -->
+
+      <!-- Change the following properties on the command line to override with the coordinates for your implementation-->
+      <implementation-groupId>org.tarantool</implementation-groupId>
+      <implementation-artifactId>tarantool-jcache</implementation-artifactId>
+      <implementation-version>0.0.1-SNAPSHOT</implementation-version>
+
+      <!-- Change the following properties to your CacheManager and Cache implementation. Used by the unwrap tests. -->
+      <CacheManagerImpl>org.tarantool.jsr107.TarantoolCacheManager</CacheManagerImpl>
+      <CacheImpl>org.tarantool.jsr107.TarantoolCache</CacheImpl>
+      <CacheEntryImpl>org.tarantool.jsr107.TarantoolEntry</CacheEntryImpl>
+
+      <!--Change the following to point to your MBeanServer, so that the TCK can resolve it. -->
+      <javax.management.builder.initial>org.tarantool.jsr107.management.TCKMBeanServerBuilder
+      </javax.management.builder.initial>
+      <org.jsr107.tck.management.agentId>TarantoolMBeanServer</org.jsr107.tck.management.agentId>
     </properties>
     <name>Tarantool Connector for Java</name>
     <url>https://github.com/tarantool/tarantool-java</url>
@@ -42,18 +75,98 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.2</version>
                 <configuration>
-                    <source>1.6</source>
-                    <target>1.6</target>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.0</version>
             </plugin>
+          <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-dependency-plugin</artifactId>
+              <version>2.8</version>
+              <executions>
+                  <!--Required because JUnit will not detect tests simply included in a dep-->
+                  <execution>
+                      <id>copy-cache-tests</id>
+                      <goals>
+                          <goal>unpack-dependencies</goal>
+                      </goals>
+                      <configuration>
+                          <outputDirectory>${project.build.testOutputDirectory}
+                          </outputDirectory>
+                          <includeArtifactIds>cache-tests</includeArtifactIds>
+                          <includeScope>test</includeScope>
+                      </configuration>
+                  </execution>
+              </executions>
+          </plugin>
+
+          <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <version>2.9</version>
+              <configuration>
+                  <skipTests>${skipTests}</skipTests>
+                  <systemPropertyVariables>
+                      <java.net.preferIPv4Stack>${java.net.preferIPv4Stack}</java.net.preferIPv4Stack>
+                      <javax.management.builder.initial>${javax.management.builder.initial}
+                      </javax.management.builder.initial>
+                      <org.jsr107.tck.management.agentId>${org.jsr107.tck.management.agentId}
+                      </org.jsr107.tck.management.agentId>
+                      <javax.cache.CacheManager>${CacheManagerImpl}</javax.cache.CacheManager>
+                      <javax.cache.Cache>${CacheImpl}</javax.cache.Cache>
+                      <javax.cache.Cache.Entry>${CacheEntryImpl}</javax.cache.Cache.Entry>
+                      <javax.cache.annotation.CacheInvocationContext>$
+                          {CacheInvocationContextImpl}
+                      </javax.cache.annotation.CacheInvocationContext>
+                  </systemPropertyVariables>
+                  <excludes>
+                      <exclude>**/annotation/*Test.java</exclude>
+                  </excludes>
+              </configuration>
+          </plugin>
         </plugins>
     </build>
 
     <dependencies>
+        <dependency>
+            <groupId>javax.cache</groupId>
+            <artifactId>cache-api</artifactId>
+            <version>1.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>javax.persistence</groupId>
+            <artifactId>persistence-api</artifactId>
+            <version>1.0.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.12</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/javax.cache/cache-tests -->
+        <dependency>
+          <groupId>javax.cache</groupId>
+          <artifactId>cache-tests</artifactId>
+          <version>1.1.0</version>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>javax.cache</groupId>
+          <artifactId>cache-tests</artifactId>
+          <version>1.1.0</version>
+          <classifier>tests</classifier>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.hamcrest</groupId>
+          <artifactId>hamcrest-library</artifactId>
+          <version>1.2</version>
+          <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
