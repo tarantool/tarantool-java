@@ -122,9 +122,6 @@ public class TarantoolCacheManager implements CacheManager {
         }
     }
 
-    config.initTimeoutMillis = 1000;
-    config.writeTimeoutMillis = 2;
-    config.sharedBufferSize = 128;
     config.useNewCall = true;
 
     SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
