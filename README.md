@@ -1,3 +1,7 @@
+[![Coverage Status][coveralls-badge]][coveralls-page]
+
+[coveralls-badge]: https://coveralls.io/repos/github/tarantool/tarantool-java/badge.svg?branch=connector-1.8.jdbc
+[coveralls-page]: https://coveralls.io/github/tarantool/tarantool-java?branch=connector-1.8.jdbc
 
 First you should add snaphost repository and  dependency to your pom file
 ```xml

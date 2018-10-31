@@ -12,5 +12,16 @@ before_script:
   - src/test/travis.pre.sh
 
 script:
-  - mvn verify
+  - |
+    if [ "${TRAVIS_JDK_VERSION}" = openjdk11 ]; then
+        mvn verify jacoco:report
+    else
+        mvn verify
+    fi
   - sudo cat /var/log/tarantool/jdk-testing.log
+
+after_success:
+  - |
+    if [ "${TRAVIS_JDK_VERSION}" = openjdk11 ]; then
+        mvn coveralls:report -DrepoToken=${COVERALLS_TOKEN}
+    fi
