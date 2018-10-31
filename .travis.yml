@@ -4,7 +4,7 @@ sudo: required
 dist: trusty
 
 jdk:
-  - oraclejdk10
+  - oraclejdk11
   - openjdk10
 
 before_script:

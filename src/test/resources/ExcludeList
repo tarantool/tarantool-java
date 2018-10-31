@@ -1,0 +1,12 @@
+#List tests to be excluded.
+#Lines beginning with a '#' are comments
+#Enter One method per line with syntax FULL_CLASS_NAME#METHOD_NAME as in the example below
+
+# This is a dummy test that fails if not in the exclude list.
+org.jsr107.tck.CachingTest#dummyTest
+
+# An example of how to exclude a test
+#org.jsr107.tck.CachingTest#cachingProviderGetCache
+org.jsr107.tck.event.CacheListenerTest#testFilteredListener
+org.jsr107.tck.event.CacheListenerTest#testCacheEntryListener
+org.jsr107.tck.event.CacheListenerTest#testCacheClearListener
