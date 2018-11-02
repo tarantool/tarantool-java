@@ -56,3 +56,13 @@ box.schema.user.grant('guest','read,write,execute,create,drop','universe')
 For more information related with Tarantool see:
 https://tarantool.io/en/doc/2.0/book/getting_started/using_docker/
 
+Got problems or questions? Post them on
+[Stack Overflow](http://stackoverflow.com/questions/ask/advice) with the
+`tarantool` and `java` tags, or use these tags to search the existing knowledge
+base for possible answers and solutions.
+
+## Building
+To run tests
+```
+./mvnw clean test
+```
