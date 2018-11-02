@@ -56,9 +56,3 @@ box.schema.user.grant('guest','read,write,execute,create,drop','universe')
 For more information related with Tarantool see:
 https://tarantool.io/en/doc/2.0/book/getting_started/using_docker/
 
-## Testing
-
-1. Run JSR107 Technology Compability Kit (TCK) test:
-```bash
-mvn clean -DskipTests=false test
-```
