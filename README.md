@@ -58,6 +58,37 @@ Remember that `TarantoolClient` adopts a
 [fail-fast](https://en.wikipedia.org/wiki/Fail-fast) policy
 when a client is not connected.
 
+The `TarantoolClient` will stop functioning if your implementation of a socket
+channel provider raises an exception or returns a null. You will need a new
+instance of client to recover. Hence, you should only throw in case you have
+met unrecoverable error.
+
+Below is an example of `SocketChannelProvider` implementation that handles short
+tarantool restarts.
+
+```java
+SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
+    @Override
+    public SocketChannel get(int retryNumber, Throwable lastError) {
+        long deadline = System.currentTimeMillis() + RESTART_TIMEOUT;
+        while (!Thread.currentThread().isInterrupted()) {
+            try {
+                return SocketChannel.open(new InetSocketAddress("localhost", 3301));
+            } catch (IOException e) {
+                if (deadline < System.currentTimeMillis())
+                    throw new RuntimeException(e);
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+        throw new RuntimeException(new TimeoutException("Connect timed out."));
+    }
+};
+```
+
 4. Create a client.
 
 ```java

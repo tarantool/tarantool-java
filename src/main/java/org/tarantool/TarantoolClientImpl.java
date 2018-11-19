@@ -503,7 +503,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
 
         @Override
         public void close() {
-            throw new IllegalStateException("You should close TarantoolClient to make this");
+            throw new IllegalStateException("You should close TarantoolClient instead.");
         }
     }
 
@@ -525,7 +525,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
 
         @Override
         public void close() {
-            throw new IllegalStateException("You should close TarantoolClient to make this");
+            throw new IllegalStateException("You should close TarantoolClient instead.");
         }
     }
 

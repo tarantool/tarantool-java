@@ -1,7 +1,5 @@
-time = require('clock').time
-
 box.cfg {
-    listen = '0.0.0.0:3301',
+    listen = 3301,
 }
 
 box.once('init', function()
@@ -16,7 +14,11 @@ box.once('init', function()
     box.schema.user.create('test_ordin', { password = '2HWRXHfa' })
     box.schema.user.create('test_admin', { password = '4pWBZmLEgkmKK5WP' })
 
-    box.schema.user.grant('test_ordin', 'read,write', 'user')
-    box.schema.user.grant('test_admin', 'execute',    'super')
+    box.schema.user.grant('test_ordin', 'read,write', 'space', 'user')
+    box.schema.user.grant('test_admin', 'super')
 end)
 
+-- Java has no internal support for unix domain sockets,
+-- so we will use tcp for console communication.
+console = require('console')
+console.listen(3313)

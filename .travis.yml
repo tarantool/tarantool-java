@@ -12,5 +12,5 @@ before_script:
   - src/test/travis.pre.sh
 
 script:
-  - mvn test
-  - sudo cat /var/log/tarantool/jdk-testing.log
+  - mvn verify
+  - cat testroot/jdk-testing.log
