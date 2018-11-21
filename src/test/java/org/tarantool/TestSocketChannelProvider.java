@@ -34,7 +34,6 @@ public class TestSocketChannelProvider implements SocketChannelProvider {
                 }
             }
         }
-        throw new RuntimeException("Test failure due to invalid environment. " +
-            "Timeout connecting to " + host + ":" + port);
+        throw new RuntimeException(new InterruptedException());
     }
 }

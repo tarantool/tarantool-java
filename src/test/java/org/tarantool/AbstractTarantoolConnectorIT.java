@@ -2,11 +2,17 @@ package org.tarantool;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.opentest4j.AssertionFailedError;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -93,10 +99,13 @@ public abstract class AbstractTarantoolConnectorIT {
 
     @AfterAll
     public static void cleanupEnv() {
-        executeLua(cleanScript);
+        try {
+            executeLua(cleanScript);
 
-        console.close();
-        control.stop("jdk-testing");
+            console.close();
+        } finally {
+            control.stop("jdk-testing");
+        }
     }
 
     private static void executeLua(String[] exprs) {
@@ -116,13 +125,16 @@ public abstract class AbstractTarantoolConnectorIT {
     }
 
     protected TarantoolClient makeClient() {
+        return new TarantoolClientImpl(socketChannelProvider, makeClientConfig());
+    }
+
+    protected TarantoolClientConfig makeClientConfig() {
         TarantoolClientConfig config = new TarantoolClientConfig();
         config.username = username;
         config.password = password;
-        config.initTimeoutMillis = 1000;
+        config.initTimeoutMillis = RESTART_TIMEOUT;
         config.sharedBufferSize = 128;
-
-        return new TarantoolClientImpl(socketChannelProvider, config);
+        return config;
     }
 
     protected static TarantoolConsole openConsole() {
@@ -183,5 +195,28 @@ public abstract class AbstractTarantoolConnectorIT {
 
     protected void startTarantool(String instance) {
         control.start(instance);
+    }
+
+    /**
+     * Asserts that execution of the Runnable completes before the given timeout is exceeded.
+     *
+     * @param timeout Timeout in ms.
+     * @param message Error message.
+     * @param r Runnable.
+     */
+    protected void assertTimeoutPreemptively(int timeout, String message, Runnable r) {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+        Future future = executorService.submit(r);
+
+        try {
+            future.get(timeout, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException ex) {
+            throw new AssertionFailedError(message);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        } finally {
+            executorService.shutdownNow();
+        }
     }
 }
