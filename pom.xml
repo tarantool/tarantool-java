@@ -62,6 +62,9 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <trimStackTrace>false</trimStackTrace>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>

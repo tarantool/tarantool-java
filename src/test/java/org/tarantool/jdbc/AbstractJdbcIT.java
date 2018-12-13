@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.tarantool.TestUtils.makeInstanceEnv;
 
 import org.tarantool.TarantoolControl;
 
@@ -32,6 +33,10 @@ public abstract class AbstractJdbcIT {
     private static final String user = System.getProperty("tntUser", "test_admin");
     private static final String pass = System.getProperty("tntPass", "4pWBZmLEgkmKK5WP");
     private static String URL = String.format("tarantool://%s:%d?user=%s&password=%s", host, port, user, pass);
+
+    protected static final String LUA_FILE = "jdk-testing.lua";
+    protected static final int LISTEN = 3301;
+    protected static final int ADMIN = 3313;
 
     private static String[] initSql = new String[] {
             "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100))",
@@ -116,6 +121,7 @@ public abstract class AbstractJdbcIT {
     @BeforeAll
     public static void setupEnv() throws Exception {
         control = new TarantoolControl();
+        control.createInstance("jdk-testing", LUA_FILE, makeInstanceEnv(LISTEN, ADMIN));
         control.start("jdk-testing");
         control.waitStarted("jdk-testing");
 

@@ -18,7 +18,7 @@ script:
     else
         mvn verify
     fi
-  - cat testroot/jdk-testing.log
+  - head -n -0 testroot/*.log
 
 after_success:
   - |

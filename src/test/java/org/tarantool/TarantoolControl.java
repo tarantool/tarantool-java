@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.Map;
@@ -35,6 +36,8 @@ public class TarantoolControl {
     protected static final String instanceDir = new File("src/test").getAbsolutePath();
     protected static final String tarantoolCtlConfig = new File("src/test/.tarantoolctl").getAbsolutePath();
     protected static final int RESTART_TIMEOUT = 2000;
+    // Per-instance environment.
+    protected final Map<String, Map<String, String>> instanceEnv = new HashMap<String, Map<String, String>>();
 
     static {
         try {
@@ -125,8 +128,7 @@ public class TarantoolControl {
         ProcessBuilder builder = new ProcessBuilder("env", "tarantoolctl", command, instanceName);
         builder.directory(new File(tntCtlWorkDir));
         Map<String, String> env = builder.environment();
-        env.put("PWD", tntCtlWorkDir);
-        env.put("TEST_WORKDIR", tntCtlWorkDir);
+        env.putAll(buildInstanceEnvironment(instanceName));
 
         final Process process;
         try {
@@ -137,7 +139,7 @@ public class TarantoolControl {
 
         final CountDownLatch latch = new CountDownLatch(1);
         // The thread below is necessary to organize timed wait on the process.
-        // We cannot use Process.waitFor(long, TimeUnit) because we on java 6.
+        // We cannot use Process.waitFor(long, TimeUnit) because we're on java 6.
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -188,9 +190,6 @@ public class TarantoolControl {
      *
      * Then test the instance with TarantoolTcpConsole (ADMIN environment
      * variable is set) or TarantoolLocalConsole.
-     *
-     * XXX: Now TarantoolLocalConsole is used unconditionally, see
-     * openConsole().
      */
     public void waitStarted(String instanceName) {
         while (status(instanceName) != 0)
@@ -244,13 +243,74 @@ public class TarantoolControl {
         return 0;
     }
 
+    public Map<String,String> buildInstanceEnvironment(String instanceName) {
+        Map<String, String> env = new HashMap<String, String>();
+        env.put("PWD", tntCtlWorkDir);
+        env.put("TEST_WORKDIR", tntCtlWorkDir);
+
+        Map<String, String> instanceEnv = this.instanceEnv.get(instanceName);
+        if (instanceEnv != null) {
+            env.putAll(instanceEnv);
+        }
+        return env;
+    }
+
+    public void createInstance(String instanceName, String luaFile, Map<String, String> env) {
+        File src = new File(instanceDir, luaFile.endsWith(".lua") ? luaFile : luaFile.concat(".lua"));
+        if (!src.exists())
+            throw new RuntimeException("Lua file " + src + " doesn't exist.");
+
+        File dst = new File(tntCtlWorkDir, instanceName + ".lua");
+        try {
+            copyFile(src, dst);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        instanceEnv.put(instanceName, env);
+    }
+
+    public void cleanupInstance(String instanceName) {
+        instanceEnv.remove(instanceName);
+
+        File dst = new File(tntCtlWorkDir, instanceName + ".lua");
+        dst.delete();
+
+        try {
+            rmdir(new File(tntCtlWorkDir, instanceName));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void waitReplication(String instanceName, int timeout) {
+        TarantoolConsole console = openConsole(instanceName);
+        try {
+            TestUtils.waitReplication(console, timeout);
+        } finally {
+            console.close();
+        }
+    }
+
     /*
-     * XXX: This function is planned to use text console (from ADMIN
-     * environment variable) when it is available for the instance and
-     * fallback to TarantoolLocalConsole.
+     * Open a console to the instance.
+     *
+     * Use text console (from ADMIN environment variable) when it is available
+     * for the instance or fallback to TarantoolLocalConsole.
      */
     public TarantoolConsole openConsole(String instanceName) {
-        return TarantoolConsole.open(tntCtlWorkDir, instanceName);
+        Map<String, String> env = instanceEnv.get(instanceName);
+        if (env == null)
+            throw new RuntimeException("No such instance '" + instanceName +"'.");
+
+        String admin = env.get("ADMIN");
+        if (admin == null) {
+            return TarantoolConsole.open(tntCtlWorkDir, instanceName);
+        } else {
+            int idx = admin.indexOf(':');
+            return TarantoolConsole.open(idx < 0 ? "localhost" : admin.substring(0, idx),
+                 Integer.valueOf(idx < 0 ? admin : admin.substring(idx + 1)));
+        }
     }
 
     public static void sleep() {

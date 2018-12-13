@@ -122,13 +122,17 @@ public abstract class TarantoolConsole implements Closeable {
     }
 
     public <T> T eval(String expr) {
+        List<T> list = evalList(expr);
+        return list.get(0);
+    }
+
+    public <T> List<T> evalList(String expr) {
         suppressPrompt();
         write(expr);
         suppressEcho(expr);
         Matcher m = expect(REPLY_PATTERN);
         Yaml yaml = new Yaml();
-        List<T> result = yaml.load(m.group(0));
-        return result.get(0);
+        return yaml.load(m.group(0));
     }
 
     /**

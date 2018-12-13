@@ -18,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static org.tarantool.TestUtils.makeInstanceEnv;
+
 /**
  * Abstract test. Provides environment control and frequently used functions.
  */
@@ -28,6 +30,9 @@ public abstract class AbstractTarantoolConnectorIT {
     protected static final String username = System.getProperty("tntUser", "test_admin");
     protected static final String password = System.getProperty("tntPass", "4pWBZmLEgkmKK5WP");
 
+    protected static final String LUA_FILE = "jdk-testing.lua";
+    protected static final int LISTEN = 3301;
+    protected static final int ADMIN = 3313;
     protected static final int TIMEOUT = 500;
     protected static final int RESTART_TIMEOUT = 2000;
 
@@ -82,6 +87,7 @@ public abstract class AbstractTarantoolConnectorIT {
     @BeforeAll
     public static void setupEnv() {
         control = new TarantoolControl();
+        control.createInstance("jdk-testing", LUA_FILE, makeInstanceEnv(LISTEN, ADMIN));
         startTarantool("jdk-testing");
 
         console = openConsole();
@@ -128,13 +134,23 @@ public abstract class AbstractTarantoolConnectorIT {
         return new TarantoolClientImpl(socketChannelProvider, makeClientConfig());
     }
 
-    protected TarantoolClientConfig makeClientConfig() {
-        TarantoolClientConfig config = new TarantoolClientConfig();
+    protected static TarantoolClientConfig makeClientConfig() {
+        return fillClientConfig(new TarantoolClientConfig());
+    }
+
+    protected static TarantoolClusterClientConfig makeClusterClientConfig() {
+        TarantoolClusterClientConfig config = fillClientConfig(new TarantoolClusterClientConfig());
+        config.executor = null;
+        config.operationExpiryTimeMillis = TIMEOUT;
+        return config;
+    }
+
+    private static <T> T fillClientConfig(TarantoolClientConfig config) {
         config.username = username;
         config.password = password;
         config.initTimeoutMillis = RESTART_TIMEOUT;
         config.sharedBufferSize = 128;
-        return config;
+        return (T)config;
     }
 
     protected static TarantoolConsole openConsole() {

@@ -1,5 +1,7 @@
 box.cfg {
-    listen = 3301,
+    listen = os.getenv('LISTEN') or 3301,
+    replication = os.getenv('MASTER') and string.split(os.getenv('MASTER'), ";") or nil,
+    replication_timeout = tonumber(os.getenv('REPLICATION_TIMEOUT')),
 }
 
 box.once('init', function()
@@ -21,4 +23,4 @@ end)
 -- Java has no internal support for unix domain sockets,
 -- so we will use tcp for console communication.
 console = require('console')
-console.listen(3313)
+console.listen(os.getenv('ADMIN') or 3313)

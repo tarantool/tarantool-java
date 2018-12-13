@@ -246,14 +246,15 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         if (thumbstone != null) {
             return;
         }
-        this.thumbstone = new CommunicationException(message, cause);
+        final CommunicationException err = new CommunicationException(message, cause);
+        this.thumbstone = err;
         while (!futures.isEmpty()) {
             Iterator<Map.Entry<Long, FutureImpl<?>>> iterator = futures.entrySet().iterator();
             while (iterator.hasNext()) {
                 Map.Entry<Long, FutureImpl<?>> elem = iterator.next();
                 if (elem != null) {
                     FutureImpl<?> future = elem.getValue();
-                    fail(future, cause);
+                    fail(future, err);
                 }
                 iterator.remove();
             }
@@ -606,6 +607,14 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         return false;
     }
 
+    /**
+     * A subclass may use this as a trigger to start retries.
+     * This method is called when state becomes ALIVE.
+     */
+    protected void onReconnect() {
+        // No-op, override.
+    }
+
     public Exception getThumbstone() {
         return thumbstone;
     }
@@ -679,6 +688,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             if (update == ALIVE) {
                 CountDownLatch latch = nextAliveLatch.getAndSet(new CountDownLatch(1));
                 latch.countDown();
+                onReconnect();
             } else if (update == CLOSED) {
                 closedLatch.countDown();
             }
@@ -706,7 +716,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                     throw new IllegalStateException("State is CLOSED.");
                 }
                 CountDownLatch latch = nextAliveLatch.get();
-                return  (getState() == ALIVE) ? null : latch;
+                /* It may happen so that an error is detected but the state is still alive.
+                 Wait for the 'next' alive state in such cases. */
+                return  (getState() == ALIVE && thumbstone == null) ? null : latch;
             }
             return null;
         }
