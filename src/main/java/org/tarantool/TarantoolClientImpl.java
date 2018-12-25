@@ -19,7 +19,6 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
-
 public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implements TarantoolClient {
     public static final CommunicationException NOT_INIT_EXCEPTION = new CommunicationException("Not connected, initializing connection");
     protected TarantoolClientConfig config;
@@ -116,8 +115,8 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
     }
 
     protected void connect(final SocketChannel channel) throws Exception {
+        DataInputStream is = new DataInputStream(cis = new ByteBufferInputStream(channel));
         try {
-            DataInputStream is = new DataInputStream(cis = new ByteBufferInputStream(channel));
             byte[] bytes = new byte[64];
             is.readFully(bytes);
             String firstLine = new String(bytes);
@@ -132,20 +131,22 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
                 readPacket(is);
                 Long code = (Long) headers.get(Key.CODE.getId());
                 if (code != 0) {
+                    is.close();
                     throw serverError(code, body.get(Key.ERROR.getId()));
                 }
             }
             this.is = is;
         } catch (IOException e) {
             try {
-                is.close();
+                if (null != is)
+                  is.close();
             } catch (IOException ignored) {
 
             }
             try {
-                cis.close();
+                if (null != cis)
+                  cis.close();
             } catch (IOException ignored) {
-
             }
             throw new CommunicationException("Couldn't connect to tarantool", e);
         }
@@ -426,9 +427,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<List<?>>> implemen
 
     @Override
     public void close() {
+
         if (connector != null) {
             connector.interrupt();
         }
+
         stopIO();
     }
 
