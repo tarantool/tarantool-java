@@ -3,6 +3,7 @@ package org.tarantool;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -61,6 +62,25 @@ public abstract class AbstractTarantoolOpsIT extends AbstractTarantoolConnectorI
 
         // Check it actually was inserted.
         checkTupleResult(consoleSelect(SPACE_NAME, 100), tup);
+
+        // Leave the database in a clean state.
+        consoleDelete(SPACE_NAME, 100);
+    }
+
+    @Test
+    public void testInsertBigInteger() {
+        BigInteger id = BigInteger.valueOf(2).pow(64).subtract(BigInteger.ONE);
+
+        List tup = Arrays.asList(id, "big");
+        List<?> res = getOps().insert(SPACE_ID, tup);
+
+        checkTupleResult(res, tup);
+
+        // Check it actually was inserted.
+        checkTupleResult(consoleSelect(SPACE_NAME, id), tup);
+
+        // Leave the database in a clean state.
+        consoleDelete(SPACE_NAME, id);
     }
 
     @Test
@@ -70,8 +90,13 @@ public abstract class AbstractTarantoolOpsIT extends AbstractTarantoolConnectorI
 
         checkTupleResult(res, tup);
 
+        List<?> id = Arrays.asList(100, "hundred");
+
         // Check it actually was inserted.
-        checkTupleResult(consoleSelect(MULTIPART_SPACE_NAME, Arrays.asList(100, "hundred")), tup);
+        checkTupleResult(consoleSelect(MULTIPART_SPACE_NAME, id), tup);
+
+        // Leave the database in a clean state.
+        consoleDelete(MULTIPART_SPACE_NAME, id);
     }
 
     @Test

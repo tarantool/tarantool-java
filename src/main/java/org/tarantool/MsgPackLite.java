@@ -30,6 +30,10 @@ public class MsgPackLite {
     protected final int MAX_31BIT = 0x7fffffff;
     protected final long MAX_32BIT = 0xffffffffL;
 
+    protected final BigInteger BI_MIN_LONG = BigInteger.valueOf(Long.MIN_VALUE);
+    protected final BigInteger BI_MAX_LONG = BigInteger.valueOf(Long.MAX_VALUE);
+    protected final BigInteger BI_MAX_64BIT = BigInteger.valueOf(2).pow(64).subtract(BigInteger.ONE);
+
     //these values are from http://wiki.msgpack.org/display/MSGPACK/Format+specification
     protected final byte MP_NULL = (byte) 0xc0;
     protected final byte MP_FALSE = (byte) 0xc2;
@@ -91,6 +95,23 @@ public class MsgPackLite {
                 out.write(MP_DOUBLE);
                 out.writeDouble((Double) item);
             } else {
+                if (item instanceof BigInteger) {
+                    BigInteger value = (BigInteger) item;
+                    boolean isPositive = value.signum() >= 0;
+                    if (isPositive && value.compareTo(BI_MAX_64BIT) > 0 ||
+                            value.compareTo(BI_MIN_LONG) < 0)
+                        throw new IllegalArgumentException(
+                            "Cannot encode BigInteger as MsgPack: out of -2^63..2^64-1 range");
+                    if (isPositive && value.compareTo(BI_MAX_LONG) > 0) {
+                        byte[] data = value.toByteArray();
+                        // data can contain leading zero bytes
+                        for (int i = 0; i < data.length - 8; ++i)
+                            assert data[i] == 0;
+                        out.write(MP_UINT64);
+                        out.write(data, data.length - 8, 8);
+                        return;
+                    }
+                }
                 long value = item instanceof Code ? ((Code) item).getId() : ((Number) item).longValue();
                 if (value >= 0) {
                     if (value <= MAX_7BIT) {
@@ -238,6 +259,10 @@ public class MsgPackLite {
             } else {
                 //this is a little bit more tricky, since we don't have unsigned longs
                 byte[] bytes = new byte[]{
+                        (byte) ((v >> 56) & 0xff),
+                        (byte) ((v >> 48) & 0xff),
+                        (byte) ((v >> 40) & 0xff),
+                        (byte) ((v >> 32) & 0xff),
                         (byte) ((v >> 24) & 0xff),
                         (byte) ((v >> 16) & 0xff),
                         (byte) ((v >> 8) & 0xff),

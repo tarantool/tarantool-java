@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.opentest4j.AssertionFailedError;
 
+import java.math.BigInteger;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -180,17 +181,21 @@ public abstract class AbstractTarantoolConnectorIT {
         }
     }
 
-    protected List<?> consoleSelect(String spaceName, Object key) {
-        StringBuilder sb = new StringBuilder("box.space.");
-        sb.append(spaceName);
-        sb.append(":select{");
+    private void appendBigInteger(StringBuilder sb, BigInteger value) {
+        sb.append(value);
+        sb.append(value.signum() >= 0 ? "ULL" : "LL");
+    }
+
+    private void appendKey(StringBuilder sb, Object key) {
         if (List.class.isAssignableFrom(key.getClass())) {
-            List parts = (List)key;
+            List parts = (List) key;
             for (int i = 0; i < parts.size(); i++) {
                 if (i != 0)
                     sb.append(", ");
                 Object k = parts.get(i);
-                if (k.getClass().isAssignableFrom(String.class)) {
+                if (k instanceof BigInteger) {
+                    appendBigInteger(sb, (BigInteger) k);
+                } else if (k instanceof String) {
                     sb.append('\'');
                     sb.append(k);
                     sb.append('\'');
@@ -198,9 +203,27 @@ public abstract class AbstractTarantoolConnectorIT {
                     sb.append(k);
                 }
             }
+        } else if (key instanceof BigInteger) {
+            appendBigInteger(sb, (BigInteger) key);
         } else {
             sb.append(key);
         }
+    }
+
+    protected List<?> consoleSelect(String spaceName, Object key) {
+        StringBuilder sb = new StringBuilder("box.space.");
+        sb.append(spaceName);
+        sb.append(":select{");
+        appendKey(sb, key);
+        sb.append("}");
+        return console.eval(sb.toString());
+    }
+
+    protected List<?> consoleDelete(String spaceName, Object key) {
+        StringBuilder sb = new StringBuilder("box.space.");
+        sb.append(spaceName);
+        sb.append(":delete{");
+        appendKey(sb, key);
         sb.append("}");
         return console.eval(sb.toString());
     }
