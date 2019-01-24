@@ -17,6 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
     private DatabaseMetaData meta;
 
@@ -212,5 +215,28 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
             assertEquals("Connection is closed.", e.getCause().getMessage());
         }
         assertEquals(3, i);
+    }
+
+    @Test
+    public void testGetDriverNameVersion() throws SQLException {
+        String name = meta.getDriverName();
+        String version = meta.getDriverVersion();
+        int majorVersion = meta.getDriverMajorVersion();
+        int minorVersion = meta.getDriverMinorVersion();
+
+        // Verify driver name.
+        assertEquals("tarantool-java", name);
+
+        // Verify driver version format.
+        // E.g. 1.7.6 or 1.7.6-SNAPSHOT.
+        Pattern p = Pattern.compile("^(?<major>\\d+)\\.(?<minor>\\d+)\\.\\d+(?:-SNAPSHOT)?$");
+        Matcher m = p.matcher(version);
+        assertTrue(m.matches());
+
+        // Verify the full version matches major/minor ones.
+        int majorVersionMatched = Integer.parseInt(m.group("major"));
+        int minorVersionMatched = Integer.parseInt(m.group("minor"));
+        assertEquals(majorVersion, majorVersionMatched);
+        assertEquals(minorVersion, minorVersionMatched);
     }
 }

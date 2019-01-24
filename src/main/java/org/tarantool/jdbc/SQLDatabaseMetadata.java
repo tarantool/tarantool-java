@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
+import org.tarantool.Version;
 import org.tarantool.JDBCBridge;
 
 @SuppressWarnings("Since15")
@@ -114,17 +115,17 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public String getDriverVersion() throws SQLException {
-        return "1.8.jdbc";
+        return Version.version;
     }
 
     @Override
     public int getDriverMajorVersion() {
-        return 1;
+        return Version.majorVersion;
     }
 
     @Override
     public int getDriverMinorVersion() {
-        return 8;
+        return Version.minorVersion;
     }
 
     @Override
