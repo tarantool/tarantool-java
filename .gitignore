@@ -4,3 +4,5 @@ out
 target
 build
 testroot
+# Vim Swap files
+*.sw[a-z]
