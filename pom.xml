@@ -6,8 +6,8 @@
     <version>1.8.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <properties>
-      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-      <junit.jupiter.version>5.3.1</junit.jupiter.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.jupiter.version>5.3.1</junit.jupiter.version>
     </properties>
     <name>Tarantool Connector for Java</name>
     <url>https://github.com/tarantool/tarantool-java</url>
@@ -24,7 +24,7 @@
         <url>https://github.com/tarantool/tarantool-java</url>
         <connection>scm:git:git://github.com/tarantool/tarantool-java.git</connection>
         <developerConnection>scm:git:git@github.com:tarantool/tarantool-java.git</developerConnection>
-      </scm>
+    </scm>
 
     <developers>
         <developer>
@@ -119,8 +119,8 @@
                     <!-- https://github.com/trautonen/coveralls-maven-plugin/issues/112 -->
                     <dependency>
                         <groupId>javax.xml.bind</groupId>
-                            <artifactId>jaxb-api</artifactId>
-                            <version>2.3.1</version>
+                        <artifactId>jaxb-api</artifactId>
+                        <version>2.3.1</version>
                     </dependency>
                 </dependencies>
             </plugin>
