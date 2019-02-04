@@ -112,6 +112,7 @@ public class ClientReconnectClusterIT {
 
     private TarantoolClientImpl makeClient(String...addrs) {
         TarantoolClusterClientConfig config = makeClusterClientConfig();
-        return new TarantoolClusterClient(config, addrs);
+        config.slaveHosts = addrs;
+        return new TarantoolClusterClient(config);
     }
 }

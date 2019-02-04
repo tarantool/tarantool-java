@@ -24,13 +24,13 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     /**
      * Constructs an instance.
      *
-     * @param addrs Array of addresses in a form of [host]:[port].
+     * @param slaveHosts Array of addresses in a form of [host]:[port].
      */
-    public RoundRobinSocketProviderImpl(String... addrs) {
-        if (addrs == null || addrs.length == 0)
-            throw new IllegalArgumentException("addrs is null or empty.");
+    public RoundRobinSocketProviderImpl(String[] slaveHosts) {
+        if (slaveHosts == null || slaveHosts.length == 0)
+            throw new IllegalArgumentException("slaveHosts is null or empty.");
 
-        this.addrs = Arrays.copyOf(addrs, addrs.length);
+        this.addrs = Arrays.copyOf(slaveHosts, slaveHosts.length);
 
         sockAddrs = new InetSocketAddress[this.addrs.length];
 

@@ -25,10 +25,9 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
     /**
      * @param config Configuration.
-     * @param addrs Array of addresses in the form of [host]:[port].
      */
-    public TarantoolClusterClient(TarantoolClusterClientConfig config, String... addrs) {
-        this(config, new RoundRobinSocketProviderImpl(addrs).setTimeout(config.operationExpiryTimeMillis));
+    public TarantoolClusterClient(TarantoolClusterClientConfig config) {
+        this(config, new RoundRobinSocketProviderImpl(config.slaveHosts).setTimeout(config.operationExpiryTimeMillis));
     }
 
     /**
@@ -40,6 +39,10 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
         this.executor = config.executor == null ?
             Executors.newSingleThreadExecutor() : config.executor;
+    }
+
+    private void refreshServerList() {
+
     }
 
     @Override
