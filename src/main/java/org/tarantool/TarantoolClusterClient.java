@@ -1,5 +1,9 @@
 package org.tarantool;
 
+import org.tarantool.server.*;
+
+import java.io.*;
+import java.nio.channels.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -23,11 +27,21 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     /* Collection of operations to be retried. */
     private ConcurrentHashMap<Long, ExpirableOp<?>> retries = new ConcurrentHashMap<Long, ExpirableOp<?>>();
 
+    private final String[] slaveHosts;
+    private final String[] masterHosts;
+
+    private final SocketChannelProvider masterHostsSocketProvider;
+
     /**
      * @param config Configuration.
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config) {
         this(config, new RoundRobinSocketProviderImpl(config.slaveHosts).setTimeout(config.operationExpiryTimeMillis));
+
+        masterHostsSocketProvider = new RoundRobinSocketProviderImpl(config.masterHosts);
+
+        slaveHosts = config.slaveHosts;
+        masterHosts = config.masterHosts;
     }
 
     /**
@@ -41,7 +55,17 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
             Executors.newSingleThreadExecutor() : config.executor;
     }
 
-    private void refreshServerList() {
+    /**
+     *
+     * @param lastError
+     * @throws CommunicationException incase of communication exception
+     */
+    private void refreshServerList(Exception lastError) {
+
+        SocketChannel socketChannel = masterHostsSocketProvider.get(0, lastError);
+
+        BinaryProtoUtils.readPacket(socketChannel);
+
 
     }
 

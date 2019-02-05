@@ -25,7 +25,7 @@ public abstract class BinaryProtoUtils {
     private final static int DEFAULT_INITIAL_REQUEST_SIZE = 4096;
 
 
-    private TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
+    public static TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
 
         int size = channel.socket().getInputStream().read();
         ByteBuffer msgBuffer = ByteBuffer.allocate(size - 1);
@@ -44,7 +44,7 @@ public abstract class BinaryProtoUtils {
     }
 
 
-    protected static ByteBuffer createAuthPacket(String username, final String password, String salt) throws IOException {
+    public static ByteBuffer createAuthPacket(String username, final String password, String salt) throws IOException {
         final MessageDigest sha1;
         try {
             sha1 = MessageDigest.getInstance("SHA-1");
@@ -73,11 +73,11 @@ public abstract class BinaryProtoUtils {
         return createPacket(DEFAULT_INITIAL_REQUEST_SIZE, Code.AUTH, 0L, null, Key.USER_NAME, username, Key.TUPLE, auth);
     }
 
-    protected static ByteBuffer createPacket(Code code, Long syncId, Long schemaId, Object... args) throws IOException {
+    public static ByteBuffer createPacket(Code code, Long syncId, Long schemaId, Object... args) throws IOException {
         return createPacket(DEFAULT_INITIAL_REQUEST_SIZE, code, syncId, schemaId, args);
     }
 
-    protected static ByteBuffer createPacket(int initialRequestSize, Code code, Long syncId, Long schemaId, Object... args) throws IOException {
+    public static ByteBuffer createPacket(int initialRequestSize, Code code, Long syncId, Long schemaId, Object... args) throws IOException {
 //        TarantoolClientImpl.ByteArrayOutputStream bos = new TarantoolClientImpl.ByteArrayOutputStream(initialRequestSize);
         ByteArrayOutputStream bos = new ByteArrayOutputStream(initialRequestSize);
         bos.write(new byte[5]);
@@ -104,7 +104,7 @@ public abstract class BinaryProtoUtils {
         return buffer;
     }
 
-    public MsgPackLite getMsgPackLite() {
+    private static MsgPackLite getMsgPackLite() {
         return MsgPackLite.INSTANCE;
     }
 }
