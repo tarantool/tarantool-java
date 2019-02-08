@@ -1,24 +1,26 @@
 package org.tarantool;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.channels.SocketChannel;
-import java.util.Arrays;
+import org.tarantool.server.*;
+
+import java.io.*;
+import java.net.*;
+import java.nio.channels.*;
 
 /**
  * Basic reconnection strategy that changes addresses in a round-robin fashion.
  * To be used with {@link TarantoolClientImpl}.
  */
 public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
+
     /** Timeout to establish socket connection with an individual server. */
     private int timeout; // 0 is infinite.
+
     /** Limit of retries. */
     private int retriesLimit = -1; // No-limit.
-    /** Server addresses as configured. */
-    private final String[] addrs;
-    /** Socket addresses. */
-    private final InetSocketAddress[] sockAddrs;
-    /** Current position within {@link #sockAddrs} array. */
+
+    private final TarantoolNode[] nodes;
+
+    /** Current position within {@link #nodes} array. */
     private int pos;
 
     /**
@@ -27,23 +29,22 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
      * @param slaveHosts Array of addresses in a form of [host]:[port].
      */
     public RoundRobinSocketProviderImpl(String[] slaveHosts) {
-        if (slaveHosts == null || slaveHosts.length == 0)
-            throw new IllegalArgumentException("slaveHosts is null or empty.");
+        if (slaveHosts == null || slaveHosts.length < 1) {
+            throw new IllegalArgumentException("slave hosts is null ot empty");
+        }
 
-        this.addrs = Arrays.copyOf(slaveHosts, slaveHosts.length);
-
-        sockAddrs = new InetSocketAddress[this.addrs.length];
-
-        for (int i = 0; i < this.addrs.length; i++) {
-            sockAddrs[i] = parseAddress(this.addrs[i]);
+        nodes = new TarantoolNode[slaveHosts.length];
+        for (int i = 0; i < slaveHosts.length; i++) {
+            String slaveHostAddress = slaveHosts[i];
+            nodes[i] = TarantoolNode.create(slaveHostAddress);
         }
     }
 
     /**
-     * @return Configured addresses in a form of [host]:[port].
+     * @return Non-empty list of round-robined nodes
      */
-    public String[] getAddresses() {
-        return this.addrs;
+    public TarantoolNode[] getNodes() {
+        return nodes;
     }
 
     /**
@@ -107,8 +108,9 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
         while (!Thread.currentThread().isInterrupted()) {
             SocketChannel channel = null;
             try {
-                channel = SocketChannel.open();
                 InetSocketAddress addr = getNextSocketAddress();
+
+                channel = SocketChannel.open();
                 channel.socket().connect(addr, timeout);
                 return channel;
             } catch (IOException e) {
@@ -141,15 +143,15 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
      * @return Number of configured addresses.
      */
     protected int getAddressCount() {
-        return sockAddrs.length;
+        return nodes.length;
     }
 
     /**
      * @return Socket address to use for the next reconnection attempt.
      */
     protected InetSocketAddress getNextSocketAddress() {
-        InetSocketAddress res = sockAddrs[pos];
-        pos = (pos + 1) % sockAddrs.length;
+        InetSocketAddress res = nodes[pos].getSocketAddress();
+        pos = (pos + 1) % nodes.length;
         return res;
     }
 

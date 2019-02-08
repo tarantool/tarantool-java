@@ -18,8 +18,8 @@ public class TarantoolClusterClientConfig extends TarantoolClientConfig {
     public String[] slaveHosts;
 
     /**
-     * Array of addresses of tarantool instances that can act as providers of slaveHostList
+     * Addresses of tarantool instances that can act as providers of slaveHostList
      */
-    public String[] masterHosts;
+    public String masterHosts;
 
 }

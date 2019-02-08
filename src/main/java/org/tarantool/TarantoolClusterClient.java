@@ -4,8 +4,7 @@ import org.tarantool.server.*;
 
 import java.io.*;
 import java.nio.channels.*;
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -28,9 +27,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     private ConcurrentHashMap<Long, ExpirableOp<?>> retries = new ConcurrentHashMap<Long, ExpirableOp<?>>();
 
     private final String[] slaveHosts;
-    private final String[] masterHosts;
-
-    private final SocketChannelProvider masterHostsSocketProvider;
+    private final String masterHosts;
 
     /**
      * @param config Configuration.
@@ -38,7 +35,6 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     public TarantoolClusterClient(TarantoolClusterClientConfig config) {
         this(config, new RoundRobinSocketProviderImpl(config.slaveHosts).setTimeout(config.operationExpiryTimeMillis));
 
-        masterHostsSocketProvider = new RoundRobinSocketProviderImpl(config.masterHosts);
 
         slaveHosts = config.slaveHosts;
         masterHosts = config.masterHosts;
@@ -67,6 +63,15 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         BinaryProtoUtils.readPacket(socketChannel);
 
 
+    }
+
+    /**
+     * Получает список хостов
+     * @param serverChannel
+     * @return
+     */
+    private List<String> hostnames(SocketChannel serverChannel) {
+        //todo
     }
 
     @Override
