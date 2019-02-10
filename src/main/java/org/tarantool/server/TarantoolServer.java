@@ -45,7 +45,7 @@ public class TarantoolServer {
     }
 
     protected void connect() throws Exception {
-        connect(socketProvider.get(0));
+        connect(socketProvider.get(0, null));
     }
 
     public static final class CountingInputStream extends DataInputStream {
@@ -109,6 +109,25 @@ public class TarantoolServer {
         return readPacket(dis);
     }
 
+    @Deprecated // use org.tarantool.server.BinaryProtoUtils.readPacket
+    private TarantoolBinaryPackage readPacket(CountingInputStream countingInputStream) throws IOException {
+        int size = ((Number) getMsgPackLite().unpack(countingInputStream)).intValue();
+
+        long mark = countingInputStream.getBytesRead();
+        Map<Integer, Object> headers = (Map<Integer, Object>) getMsgPackLite().unpack(countingInputStream);
+
+        Map<Integer, Object> body = null;
+        if (countingInputStream.getBytesRead() - mark < size) {
+            body = (Map<Integer, Object>) getMsgPackLite().unpack(countingInputStream);
+        }
+        countingInputStream.skipBytes((int) (countingInputStream.getBytesRead() - mark - size));
+
+        return new TarantoolBinaryPackage(headers, body);
+    }
+
+    private static MsgPackLite getMsgPackLite() {
+        return MsgPackLite.INSTANCE;
+    }
 
     public void writeFully(ByteBuffer buffer) throws IOException {
         writeFully(channel, buffer);

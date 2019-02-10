@@ -1,6 +1,11 @@
 package org.tarantool.server;
 
+import org.tarantool.CommunicationException;
+
+import java.io.IOException;
 import java.net.*;
+import java.nio.channels.SocketChannel;
+import java.util.Objects;
 
 /**
  * Holds info about a tarantool node.
@@ -18,6 +23,57 @@ public class TarantoolNode {
      */
     public InetSocketAddress getSocketAddress() {
         return socketAddress;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        TarantoolNode node = (TarantoolNode) o;
+        return socketAddress.equals(node.socketAddress);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(socketAddress);
+    }
+
+    @Deprecated
+    private SocketChannel socketChannel;
+    /**
+     * Opens a socket connection channel to the tarantool node or returns an opened one
+     * @return
+     */
+    @Deprecated //it's bad to open socket at level of this class
+    public SocketChannel getSocketChannel(Integer timeout) {
+        if (socketChannel == null) {
+            socketChannel = openSocketChannel(timeout);
+        }
+
+        return socketChannel;
+    }
+
+    @Deprecated //it's bad to open socket at level of this class
+    private SocketChannel openSocketChannel(Integer timeout) {
+        SocketChannel result = null;
+        try {
+            result = SocketChannel.open();
+
+            if (timeout != null) {
+                result.socket().connect(socketAddress, timeout);
+            } else {
+                result.connect(socketAddress);
+            }
+            return result;
+        } catch (Exception e) {
+            if (result != null) {
+                try {
+                    result.close();
+                } catch (IOException ignored) {
+                }
+            }
+            throw new CommunicationException("Failed to connect to node " + this.toString(), e);
+        }
     }
 
     /**
@@ -65,7 +121,21 @@ public class TarantoolNode {
     private static InetSocketAddress parseAddress(String addr) {
         int idx = addr.indexOf(':');
         String host = (idx < 0) ? addr : addr.substring(0, idx);
-        int port = (idx < 0) ? 3301 : Integer.parseInt(addr.substring(idx + 1));
+
+        int port;
+        try {
+            port = (idx < 0) ? 3301 : Integer.parseInt(addr.substring(idx + 1));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Exception while parsing port in address '" + addr + "'", e);
+        }
+
         return new InetSocketAddress(host, port);
+    }
+
+    @Override
+    public String toString() {
+        return "TarantoolNode{" +
+                "socketAddress=" + socketAddress.getHostString() + ":" + socketAddress.getPort() +
+                '}';
     }
 }

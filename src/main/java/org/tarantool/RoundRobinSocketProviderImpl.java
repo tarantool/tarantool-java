@@ -5,6 +5,12 @@ import org.tarantool.server.*;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Basic reconnection strategy that changes addresses in a round-robin fashion.
@@ -18,7 +24,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     /** Limit of retries. */
     private int retriesLimit = -1; // No-limit.
 
-    private final TarantoolNode[] nodes;
+    private TarantoolNode[] nodes;
 
     /** Current position within {@link #nodes} array. */
     private int pos;
@@ -33,12 +39,32 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
             throw new IllegalArgumentException("slave hosts is null ot empty");
         }
 
+        updateNodes(slaveHosts);
+    }
+
+    private void updateNodes(String[] slaveHosts) {
+        //todo add read-write lock
         nodes = new TarantoolNode[slaveHosts.length];
         for (int i = 0; i < slaveHosts.length; i++) {
             String slaveHostAddress = slaveHosts[i];
             nodes[i] = TarantoolNode.create(slaveHostAddress);
         }
+
+        pos = 0;
     }
+
+
+    public void updateNodes(List<TarantoolNode> slaveHosts) {
+        if (slaveHosts == null) {
+            throw new IllegalArgumentException("slaveHosts can not be null");
+        }
+        //todo add read-write lock
+
+        this.nodes = (TarantoolNode[]) slaveHosts.toArray();
+
+        pos = 0;
+    }
+
 
     /**
      * @return Non-empty list of round-robined nodes
@@ -155,18 +181,8 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
         return res;
     }
 
-    /**
-     * Parse a string address in the form of [host]:[port]
-     * and builds a socket address.
-     *
-     * @param addr Server address.
-     * @return Socket address.
-     */
-    protected InetSocketAddress parseAddress(String addr) {
-        int idx = addr.indexOf(':');
-        String host = (idx < 0) ? addr : addr.substring(0, idx);
-        int port = (idx < 0) ? 3301 : Integer.parseInt(addr.substring(idx + 1));
-        return new InetSocketAddress(host, port);
+    protected TarantoolNode getCurrentNode() {
+        return nodes[pos];
     }
 
     /**

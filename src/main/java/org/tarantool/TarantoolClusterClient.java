@@ -1,9 +1,9 @@
 package org.tarantool;
 
+import org.tarantool.cluster.ClusterTopologyDiscoverer;
+import org.tarantool.cluster.ClusterTopologyFromShardDiscovererImpl;
 import org.tarantool.server.*;
 
-import java.io.*;
-import java.nio.channels.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,18 +26,17 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     /* Collection of operations to be retried. */
     private ConcurrentHashMap<Long, ExpirableOp<?>> retries = new ConcurrentHashMap<Long, ExpirableOp<?>>();
 
-    private final String[] slaveHosts;
-    private final String masterHosts;
+    private final Collection<TarantoolNode> slaveHosts;
 
+    private final TarantoolNode infoHost;
+    private final Integer infoHostConnectionTimeout;
+    private final ClusterTopologyDiscoverer topologyDiscoverer;
     /**
      * @param config Configuration.
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config) {
         this(config, new RoundRobinSocketProviderImpl(config.slaveHosts).setTimeout(config.operationExpiryTimeMillis));
 
-
-        slaveHosts = config.slaveHosts;
-        masterHosts = config.masterHosts;
     }
 
     /**
@@ -49,29 +48,49 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
         this.executor = config.executor == null ?
             Executors.newSingleThreadExecutor() : config.executor;
+        this.infoHost = TarantoolNode.create(config.infoHost);
+
+        this.infoHostConnectionTimeout = config.infoHostConnectionTimeout;
+        this.topologyDiscoverer = new ClusterTopologyFromShardDiscovererImpl(config);
+
+        slaveHosts = topologyDiscoverer.discoverTarantoolNodes(this.infoHost, infoHostConnectionTimeout);
     }
 
     /**
-     *
-     * @param lastError
-     * @throws CommunicationException incase of communication exception
+     * @param infoNode a node from which a topology of the cluster is discovered.
+     * @throws CommunicationException in case of communication with {@code infoNode} exception
+     * @throws IllegalArgumentException in case when the info node returned invalid address
      */
-    private void refreshServerList(Exception lastError) {
+    private Collection<TarantoolNode> refreshServerList(TarantoolNode infoNode) {
+        List<TarantoolNode> newServerList = topologyDiscoverer
+                .discoverTarantoolNodes(infoNode, infoHostConnectionTimeout);
 
-        SocketChannel socketChannel = masterHostsSocketProvider.get(0, lastError);
+        writeLock.lock();
+//        todo add a read lock
+        try {
 
-        BinaryProtoUtils.readPacket(socketChannel);
+            RoundRobinSocketProviderImpl rSocketProvider = (RoundRobinSocketProviderImpl) this.socketProvider;
+
+            TarantoolNode currentNode = rSocketProvider.getCurrentNode();
+
+            int sameNodeIndex = newServerList.indexOf(currentNode);
+            if (sameNodeIndex != -1) {
+                Collections.swap(newServerList, 0, sameNodeIndex);
+                rSocketProvider.updateNodes(newServerList);
+            } else {
+                rSocketProvider.updateNodes(newServerList);
+                die("The server list have been changed.", null);
+                //todo
+            }
+
+            rSocketProvider.updateNodes(newServerList);
 
 
-    }
+        } finally {
+            writeLock.unlock();
+        }
 
-    /**
-     * Получает список хостов
-     * @param serverChannel
-     * @return
-     */
-    private List<String> hostnames(SocketChannel serverChannel) {
-        //todo
+        return newServerList;
     }
 
     @Override

@@ -2,6 +2,7 @@ package org.tarantool;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -72,6 +73,14 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             }
         }
     });
+
+    public TarantoolClientImpl(InetSocketAddress socketAddress, TarantoolClientConfig config) {
+        this(new SimpleSocketChannelProvider(socketAddress), config);
+    }
+
+    public TarantoolClientImpl(String address, TarantoolClientConfig config) {
+        this(new SimpleSocketChannelProvider(address), config);
+    }
 
     public TarantoolClientImpl(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
         super();
