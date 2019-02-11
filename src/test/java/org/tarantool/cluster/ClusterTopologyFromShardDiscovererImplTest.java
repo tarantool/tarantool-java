@@ -18,9 +18,9 @@ class ClusterTopologyFromShardDiscovererImplTest {
         clientConfig.username = "storage";
         clientConfig.password = "storage";
 
-        Collection<TarantoolNode> tarantoolNodes =
-                new ClusterTopologyFromShardDiscovererImpl(clientConfig)
-                        .discoverTarantoolNodes(tarantoolNode, 5000);
+//        Collection<TarantoolNode> tarantoolNodes =
+//                new ClusterTopologyFromShardDiscovererImpl(clientConfig)
+//                        .discoverTarantoolNodes(tarantoolNode, 5000);
         int i = 0;
     }
 }
