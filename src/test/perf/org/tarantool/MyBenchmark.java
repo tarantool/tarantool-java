@@ -7,9 +7,46 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
 
-import java.util.concurrent.TimeUnit;
+import java.nio.channels.*;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class MyBenchmark {
+
+    private static class DodgeSocketChannelProvider implements SocketChannelProvider {
+
+        private final Integer defaultSocketQueueSize;
+
+        private DodgeSocketChannelProvider(Integer defaultSocketQueueSize) {
+            this.defaultSocketQueueSize = defaultSocketQueueSize;
+        }
+
+        @Override
+        public SocketChannel get(int retryNumber, Throwable lastError) {
+            return new DodgeSocketChannel(defaultSocketQueueSize);
+        }
+    }
+
+    @State(Scope.Benchmark)
+    public static class SpeedOfWriteAndReadState {
+
+        public final TarantoolClientImpl tarantoolClient;
+
+        public SpeedOfWriteAndReadState() {
+            TarantoolClientConfig config = new TarantoolClientConfig();
+            this.tarantoolClient = new TarantoolClientImpl(new DodgeSocketChannelProvider(10), config);
+        }
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.Throughput) @OutputTimeUnit(TimeUnit.MINUTES)
+    public void measureSpeedOfWriteAndReadViaSharedBuffer(SpeedOfWriteAndReadState state) {
+        try {
+            state.tarantoolClient.asyncOps().insert(1, Arrays.asList("a", "b")).get();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Exception occurred while benchmarking", e);
+        }
+    }
 
     @State(Scope.Thread)
     public static class MyState {
@@ -22,6 +59,7 @@ public class MyBenchmark {
     @BenchmarkMode(Mode.Throughput) @OutputTimeUnit(TimeUnit.MINUTES)
     public void testMethod(MyState state) {
         state.sum = state.a + state.b;
+        System.out.println("Run from: " + Thread.currentThread().getName());
     }
 
 }
