@@ -7,10 +7,7 @@ import org.tarantool.Key;
 import org.tarantool.MsgPackLite;
 import org.tarantool.server.TarantoolServer.CountingInputStream;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
@@ -24,6 +21,21 @@ public abstract class BinaryProtoUtils {
 
     private final static int DEFAULT_INITIAL_REQUEST_SIZE = 4096;
 
+
+    public static TarantoolBinaryPackage readPacket(InputStream inputStream) throws IOException {
+        int size = inputStream.read();
+
+        CountInputStreamImpl msgStream = new CountInputStreamImpl(inputStream);
+        Map<Integer, Object> headers = (Map<Integer, Object>) getMsgPackLite().unpack(msgStream);
+
+
+        Map<Integer, Object> body = null;
+        if (msgStream.getBytesRead() < size) {
+            body = (Map<Integer, Object>) getMsgPackLite().unpack(msgStream);
+        }
+
+        return new TarantoolBinaryPackage(headers, body);
+    }
 
     public static TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
 

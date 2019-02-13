@@ -3,9 +3,9 @@ package org.tarantool;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.Socket;
-import java.net.SocketException;
+import java.net.*;
 import java.nio.ByteBuffer;
+import java.nio.channels.*;
 import java.util.List;
 import java.util.Map;
 
@@ -13,9 +13,14 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
     protected InputStream in;
     protected OutputStream out;
     protected Socket socket;
+    protected SocketChannel channel;
 
 
     public TarantoolConnection(String username, String password, Socket socket) throws IOException {
+
+    }
+
+    public TarantoolConnection(String username, String password, InetSocketAddress address) throws IOException {
         super(username, password, socket);
         this.socket = socket;
         this.out = socket.getOutputStream();

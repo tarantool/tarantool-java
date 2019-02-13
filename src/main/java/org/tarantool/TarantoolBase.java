@@ -1,10 +1,12 @@
 package org.tarantool;
 
+import org.tarantool.server.*;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.Socket;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
@@ -37,9 +39,10 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
     public TarantoolBase() {
     }
 
-    public TarantoolBase(String username, String password, Socket socket) {
+    public TarantoolBase(String username, String password, SocketAddress address) {
         super();
         try {
+            Socket socket = Socket.
             this.is = new DataInputStream(cis = new CountInputStreamImpl(socket.getInputStream()));
             byte[] bytes = new byte[64];
             is.readFully(bytes);
@@ -128,6 +131,10 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
         buffer.put(0, (byte) 0xce);
         buffer.putInt(1, bos.size() - 5);
         return buffer;
+    }
+
+    protected TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
+        return BinaryProtoUtils.readPacket(channel);
     }
 
     protected void readPacket(DataInputStream is) throws IOException {
