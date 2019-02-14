@@ -39,10 +39,11 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
     public TarantoolBase() {
     }
 
-    public TarantoolBase(String username, String password, SocketAddress address) {
+    public TarantoolBase(String username, String password, Socket socket) {
         super();
         try {
-            Socket socket = Socket.
+//            Socket socket = Socket.
+
             this.is = new DataInputStream(cis = new CountInputStreamImpl(socket.getInputStream()));
             byte[] bytes = new byte[64];
             is.readFully(bytes);

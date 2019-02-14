@@ -1,11 +1,6 @@
 package org.tarantool;
 
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.OutputTimeUnit;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.*;
 
 import java.nio.channels.*;
 import java.util.*;
@@ -30,18 +25,28 @@ public class MyBenchmark {
     @State(Scope.Benchmark)
     public static class SpeedOfWriteAndReadState {
 
-        public final TarantoolClientImpl tarantoolClient;
+        public TarantoolClientImpl tarantoolClient;
 
-        public SpeedOfWriteAndReadState() {
+        @Setup(Level.Invocation)
+        public void init() {
+            System.out.println("INIT BENCHMARK");
             TarantoolClientConfig config = new TarantoolClientConfig();
             this.tarantoolClient = new TarantoolClientImpl(new DodgeSocketChannelProvider(10), config);
+        }
+
+        @TearDown(Level.Invocation)
+        public void tearDown() {
+            System.out.println("TEARDOWN BENCHMARK");
+            tarantoolClient.close();
         }
     }
 
     @Benchmark
-    @BenchmarkMode(Mode.Throughput) @OutputTimeUnit(TimeUnit.MINUTES)
+    @BenchmarkMode(Mode.Throughput)
+    @OutputTimeUnit(TimeUnit.MINUTES)
     public void measureSpeedOfWriteAndReadViaSharedBuffer(SpeedOfWriteAndReadState state) {
         try {
+            System.out.println("RUN BENCHMARK. state is " + state);
             state.tarantoolClient.asyncOps().insert(1, Arrays.asList("a", "b")).get();
         } catch (Exception e) {
             throw new IllegalArgumentException("Exception occurred while benchmarking", e);

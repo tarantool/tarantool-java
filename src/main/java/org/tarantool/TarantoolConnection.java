@@ -1,5 +1,7 @@
 package org.tarantool;
 
+import org.tarantool.server.*;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -17,10 +19,6 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
 
 
     public TarantoolConnection(String username, String password, Socket socket) throws IOException {
-
-    }
-
-    public TarantoolConnection(String username, String password, InetSocketAddress address) throws IOException {
         super(username, password, socket);
         this.socket = socket;
         this.out = socket.getOutputStream();
@@ -30,10 +28,15 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
     @Override
     protected List<?> exec(Code code, Object... args) {
         try {
-            ByteBuffer packet = createPacket(code, syncId.incrementAndGet(), null, args);
+            ByteBuffer packet = BinaryProtoUtils.createPacket(code, syncId.incrementAndGet(), null, args);
+
             out.write(packet.array(), 0, packet.remaining());
             out.flush();
-            readPacket(is);
+
+            TarantoolBinaryPackage responsePackage = BinaryProtoUtils.readPacket(is);
+
+            Map<Integer, Object> headers = responsePackage.getHeaders();
+            Map<Integer, Object> body = responsePackage.getBody();
             Long c = (Long) headers.get(Key.CODE.getId());
             if (c == 0) {
                 return (List) body.get(Key.DATA.getId());

@@ -1,7 +1,8 @@
 package org.tarantool;
 
-import java.io.DataInputStream;
-import java.io.IOException;
+import org.tarantool.server.*;
+
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -295,7 +296,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     protected void write(Code code, Long syncId, Long schemaId, Object... args)
             throws Exception {
-        ByteBuffer buffer = createPacket(code, syncId, schemaId, args);
+        ByteBuffer buffer = BinaryProtoUtils.createPacket(code, syncId, schemaId, args);
 
         if (directWrite(buffer)) {
             return;
@@ -461,6 +462,10 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         } catch (InterruptedException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    protected void writeFully(OutputStream stream, ByteBuffer buffer) throws IOException {
+//        stream.write(bu.ar); //todo?
     }
 
     protected void writeFully(SocketChannel channel, ByteBuffer buffer) throws IOException {
