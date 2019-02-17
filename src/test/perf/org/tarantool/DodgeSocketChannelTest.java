@@ -3,19 +3,31 @@ package org.tarantool;
 import org.junit.jupiter.api.*;
 
 import java.io.*;
-import java.net.*;
 import java.nio.*;
-import java.nio.channels.*;
-import java.nio.channels.spi.*;
-import java.util.*;
-import java.util.concurrent.*;
 
 public class DodgeSocketChannelTest {
+
+
+    @Test
+    void testReadWellcome() throws IOException {
+        DodgeSocketChannel dodgeSocketChannel = new DodgeSocketChannel(10);
+
+        ByteBuffer buffer = readWellcome(dodgeSocketChannel);
+
+        Assertions.assertEquals(DodgeSocketChannel.FAKE_WELCOME_STRING, new String(buffer.array()));
+    }
+
+    private ByteBuffer readWellcome(DodgeSocketChannel dodgeSocketChannel) throws IOException {
+        ByteBuffer buffer = ByteBuffer.wrap(new byte[DodgeSocketChannel.FAKE_WELCOME_STRING.length()]);
+        dodgeSocketChannel.read(buffer);
+        return buffer;
+    }
 
     @Test
     void testCorrectDodge() throws IOException {
         DodgeSocketChannel dodgeSocketChannel = new DodgeSocketChannel(10);
 
+        readWellcome(dodgeSocketChannel);
 
         dodgeSocketChannel.write(ByteBuffer.wrap("one".getBytes()));
         dodgeSocketChannel.write(ByteBuffer.wrap("two".getBytes()));

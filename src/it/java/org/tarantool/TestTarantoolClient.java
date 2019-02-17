@@ -1,5 +1,7 @@
 package org.tarantool;
 
+import org.tarantool.server.TarantoolBinaryPackage;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -56,16 +58,6 @@ public class TestTarantoolClient {
         }
 
         @Override
-        protected void writeFully(SocketChannel channel, ByteBuffer buffer) throws IOException {
-            try {
-                Thread.sleep(1L);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            super.writeFully(channel, buffer);
-        }
-
-        @Override
         protected void configureThreads(String threadName) {
             super.configureThreads(threadName);
             reader.setDaemon(true);
@@ -81,14 +73,14 @@ public class TestTarantoolClient {
         }
 
         @Override
-        protected void complete(long code, CompletableFuture<?> q) {
-            super.complete(code, q);
+        protected void complete(TarantoolBinaryPackage pack, CompletableFuture<?> q) {
+            super.complete(pack, q);
+            Long code = pack.getCode();
             if (code != 0) {
                 System.out.println(code);
             }
             s.release();
         }
-
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, ExecutionException, SQLException {

@@ -1,13 +1,17 @@
 package org.tarantool.server;
 
 import org.tarantool.Base64;
+import org.tarantool.ByteBufferInputStream;
 import org.tarantool.Code;
+import org.tarantool.CommunicationException;
 import org.tarantool.CountInputStreamImpl;
 import org.tarantool.Key;
 import org.tarantool.MsgPackLite;
-import org.tarantool.server.TarantoolServer.CountingInputStream;
+import org.tarantool.TarantoolException;
 
 import java.io.*;
+import java.net.Socket;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
@@ -20,7 +24,7 @@ import java.util.Map;
 public abstract class BinaryProtoUtils {
 
     private final static int DEFAULT_INITIAL_REQUEST_SIZE = 4096;
-
+    public static final String WELCOME = "Tarantool ";
 
     public static TarantoolBinaryPackage readPacket(InputStream inputStream) throws IOException {
         int size = inputStream.read();
@@ -37,19 +41,138 @@ public abstract class BinaryProtoUtils {
         return new TarantoolBinaryPackage(headers, body);
     }
 
+    /**
+     *
+     * Connects to a tarantool node described by {@code socket}. Performs an authentication if required
+     *
+     * @param socket a socket channel to tarantool node
+     * @param username auth username
+     * @param password auth password
+     * @return object with information about a connection/
+     * @throws IOException in case of any IO fails
+     * @throws CommunicationException when welcome string is invalid
+     * @throws TarantoolException in case of failed authentication
+     */
+    public static TarantoolNodeInfo connect(Socket socket, String username, String password) throws IOException {
+        byte[] inputBytes = new byte[64];
+
+        InputStream inputStream = socket.getInputStream();
+        inputStream.read(inputBytes);
+
+        String firstLine = new String(inputBytes);
+        if (!firstLine.startsWith(WELCOME)) {
+            String errMsg = "Failed to connect to node " + socket.getRemoteSocketAddress().toString() + ":" +
+                    " Welcome message should starts with tarantool but starts with '" + firstLine + "'";
+            throw new CommunicationException(errMsg, new IllegalStateException("Invalid welcome packet"));
+        }
+
+        String serverVersion = firstLine.substring(WELCOME.length());
+
+        inputStream.read(inputBytes);
+        String salt = new String(inputBytes);
+        if (username != null && password != null) {
+            ByteBuffer authPacket = createAuthPacket(username, password, salt);
+
+            OutputStream os = socket.getOutputStream();
+            os.write(authPacket.array(), 0, authPacket.remaining());
+            os.flush();
+
+            TarantoolBinaryPackage responsePackage = readPacket(socket.getInputStream());
+            Long code = (Long) responsePackage.getHeaders().get(Key.CODE.getId());
+            if (code != 0) {
+                Object error = responsePackage.getBody().get(Key.ERROR.getId());
+                throw new TarantoolException(code, error instanceof String ? (String) error : new String((byte[]) error));
+            }
+        }
+
+        return new TarantoolNodeInfo(salt, serverVersion);
+    }
+
+    /**
+     *
+     * Connects to a tarantool node described by {@code socketChannel}. Performs an authentication if required
+     *
+     * @param channel a socket channel to tarantool node
+     * @param username auth username
+     * @param password auth password
+     * @return object with information about a connection/
+     * @throws IOException in case of any IO fails
+     * @throws CommunicationException when welcome string is invalid
+     * @throws TarantoolException in case of failed authentication
+     */
+    public static TarantoolNodeInfo connect(SocketChannel channel, String username, String password) throws IOException {
+        ByteBuffer welcomeBytes = ByteBuffer.wrap(new byte[64]);
+        channel.read(welcomeBytes);
+
+        String firstLine = new String(welcomeBytes.array());
+        if (!firstLine.startsWith(WELCOME)) {
+            String errMsg = "Failed to connect to node " + channel.getRemoteAddress().toString() + ":" +
+                    " Welcome message should starts with tarantool but starts with '" + firstLine + "'";
+            throw new CommunicationException(errMsg, new IllegalStateException("Invalid welcome packet"));
+        }
+        String serverVersion = firstLine.substring(WELCOME.length());
+
+        welcomeBytes.clear();
+        channel.read(welcomeBytes);
+        String salt = new String(welcomeBytes.array());
+        if (username != null && password != null) {
+            ByteBuffer authPacket = createAuthPacket(username, password, salt);
+            writeFully(channel, authPacket);
+            TarantoolBinaryPackage authResponse = readPacket(channel);
+            Long code = (Long) authResponse.getHeaders().get(Key.CODE.getId());
+            if (code != 0) {
+                Object error = authResponse.getBody().get(Key.ERROR.getId());
+                throw new TarantoolException(code, error instanceof String ? (String) error : new String((byte[]) error));
+            }
+        }
+
+        return new TarantoolNodeInfo(salt, serverVersion);
+    }
+
+    public static void writeFully(OutputStream stream, ByteBuffer buffer) throws IOException {
+        stream.write(buffer.array());
+        stream.flush();
+    }
+
+    public static void writeFully(SocketChannel channel, ByteBuffer buffer) throws IOException {
+        long code = 0;
+        while (buffer.remaining() > 0 && (code = channel.write(buffer)) > -1) {
+        }
+        if (code < 0) {
+            throw new SocketException("write failed code: " + code);
+        }
+    }
+
     public static TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
 
-        int size = channel.socket().getInputStream().read();
+//        int size = channel.socket().getInputStream().read();
+        InputStream inputStream = channel.socket().getInputStream();
+
+        int size = ((Number) getMsgPackLite().unpack(inputStream)).intValue();
         ByteBuffer msgBuffer = ByteBuffer.allocate(size - 1);
         channel.read(msgBuffer);
 
         CountInputStreamImpl msgStream = new CountInputStreamImpl(new ByteArrayInputStream(msgBuffer.array()));
-        Map<Integer, Object> headers = (Map<Integer, Object>) getMsgPackLite().unpack(msgStream);
 
+        Object unpackedHeaders = getMsgPackLite().unpack(msgStream);
+        if (!(unpackedHeaders instanceof Map)) {
+            //noinspection ConstantConditions
+            throw new CommunicationException("Error while unpacking headers of tarantool response: " +
+                    "expected type Map but was " + unpackedHeaders != null ? unpackedHeaders.getClass().toString() : "null");
+        }
+        //noinspection unchecked (checked above)
+        Map<Integer, Object> headers = (Map<Integer, Object>) unpackedHeaders;
 
         Map<Integer, Object> body = null;
         if (msgStream.getBytesRead() < size) {
-            body = (Map<Integer, Object>) getMsgPackLite().unpack(msgStream);
+            Object unpackedBody = getMsgPackLite().unpack(msgStream);
+            if (!(unpackedBody instanceof Map)) {
+                //noinspection ConstantConditions
+                throw new CommunicationException("Error while unpacking body of tarantool response: " +
+                        "expected type Map but was " + unpackedBody != null ? unpackedBody.getClass().toString() : "null");
+            }
+            //noinspection unchecked (checked above)
+            body = (Map<Integer, Object>) unpackedBody;
         }
 
         return new TarantoolBinaryPackage(headers, body);

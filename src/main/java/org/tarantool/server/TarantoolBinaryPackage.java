@@ -1,5 +1,7 @@
 package org.tarantool.server;
 
+import org.tarantool.Key;
+
 import java.util.Map;
 
 public class TarantoolBinaryPackage {
@@ -14,6 +16,19 @@ public class TarantoolBinaryPackage {
     public TarantoolBinaryPackage(Map<Integer, Object> headers) {
         this.headers = headers;
         body = null;
+    }
+
+    public Long getCode() {
+        Object potenticalCode = headers.get(Key.CODE.getId());
+
+        if (!(potenticalCode instanceof Long)) {
+            //noinspection ConstantConditions
+            throw new IllegalStateException("A value contained in the header by key '" + Key.CODE.name() + "'" +
+                    " is not instance of Long class: " +
+                    potenticalCode != null ? potenticalCode.getClass().toString() : "null");
+        }
+
+        return (Long) potenticalCode;
     }
 
     public Map<Integer, Object> getHeaders() {

@@ -8,6 +8,7 @@ import java.util.ListIterator;
 import java.util.Map;
 
 import org.tarantool.jdbc.SQLResultSet;
+import org.tarantool.server.TarantoolBinaryPackage;
 
 public class JDBCBridge {
     public static final JDBCBridge EMPTY = new JDBCBridge(Collections.<TarantoolBase.SQLMetaData>emptyList(), Collections.<List<Object>>emptyList());
@@ -16,8 +17,8 @@ public class JDBCBridge {
     final Map<String,Integer> columnsByName;
     final List<List<Object>> rows;
 
-    protected JDBCBridge(TarantoolConnection connection) {
-        this(connection.getSQLMetadata(),connection.getSQLData());
+    protected JDBCBridge(TarantoolBinaryPackage pack) {
+        this(SqlProtoUtils.getSQLMetadata(pack), SqlProtoUtils.getSQLData(pack));
     }
 
     protected JDBCBridge(List<TarantoolBase.SQLMetaData> sqlMetadata, List<List<Object>> rows) {
@@ -30,8 +31,8 @@ public class JDBCBridge {
     }
 
     public static JDBCBridge query(TarantoolConnection connection, String sql, Object ... params) {
-        connection.sql(sql, params);
-        return new JDBCBridge(connection);
+        TarantoolBinaryPackage pack = connection.sql(sql, params);
+        return new JDBCBridge(pack);
     }
 
     public static int update(TarantoolConnection connection, String sql, Object ... params) {
@@ -47,10 +48,10 @@ public class JDBCBridge {
     }
 
     public static Object execute(TarantoolConnection connection, String sql, Object ... params) {
-        connection.sql(sql, params);
-        Long rowCount = connection.getSqlRowCount();
+        TarantoolBinaryPackage pack = connection.sql(sql, params);
+        Long rowCount = SqlProtoUtils.getSqlRowCount(pack);
         if(rowCount == null) {
-            return new SQLResultSet(new JDBCBridge(connection));
+            return new SQLResultSet(new JDBCBridge(pack));
         }
         return rowCount.intValue();
     }

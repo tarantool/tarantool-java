@@ -12,6 +12,10 @@ public class DodgeSocketChannel extends SocketChannel {
 
     private ArrayBlockingQueue<byte[]> blockingQueue;
 
+    public static String FAKE_WELCOME_STRING = "Tarantool 1.10.2 (Binary) 53b5547d-0560-4383-b303-4861572d4517\n" +
+            "1bsTc5Ibljs94bsexVze+ZngV1vBJcstoYDxSTa9h8k=";
+    private boolean isWellcomePerformed = false;
+
     public DodgeSocketChannel(Integer queueSize) {
         super(null);
         this.blockingQueue = new ArrayBlockingQueue<>(queueSize);
@@ -88,6 +92,19 @@ public class DodgeSocketChannel extends SocketChannel {
 
     @Override
     public int read(ByteBuffer dst) throws IOException {
+        synchronized (this) {
+            if (isWellcomePerformed) {
+                return dodgeRead(dst);
+            } else {
+                byte[] bytes = FAKE_WELCOME_STRING.getBytes();
+                dst.put(bytes);
+                isWellcomePerformed = true;
+                return bytes.length;
+            }
+        }
+    }
+
+    private int dodgeRead(ByteBuffer dst) {
         try {
             byte[] bytes = blockingQueue.take();
             dst.put(bytes);
@@ -104,8 +121,12 @@ public class DodgeSocketChannel extends SocketChannel {
 
     @Override
     public int write(ByteBuffer src) throws IOException {
-        blockingQueue.add(src.array());
-        return src.array().length;
+        synchronized (this) {
+            if (isWellcomePerformed) {
+                blockingQueue.add(src.array());
+            }
+            return src.array().length;
+        }
 //        throw new UnsupportedOperationException("This operation is not implemented");
     }
 

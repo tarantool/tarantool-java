@@ -7,7 +7,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.*;
 import java.nio.ByteBuffer;
-import java.nio.channels.*;
 import java.util.List;
 import java.util.Map;
 
@@ -15,7 +14,6 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
     protected InputStream in;
     protected OutputStream out;
     protected Socket socket;
-    protected SocketChannel channel;
 
 
     public TarantoolConnection(String username, String password, Socket socket) throws IOException {
@@ -27,22 +25,28 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
 
     @Override
     protected List<?> exec(Code code, Object... args) {
+        TarantoolBinaryPackage responsePackage = writeAndRead(code, args);
+        return (List) responsePackage.getBody().get(Key.DATA.getId());
+    }
+
+    protected TarantoolBinaryPackage writeAndRead(Code code, Object... args) {
         try {
             ByteBuffer packet = BinaryProtoUtils.createPacket(code, syncId.incrementAndGet(), null, args);
 
             out.write(packet.array(), 0, packet.remaining());
             out.flush();
 
-            TarantoolBinaryPackage responsePackage = BinaryProtoUtils.readPacket(is);
+            TarantoolBinaryPackage responsePackage = BinaryProtoUtils.readPacket(in);
 
             Map<Integer, Object> headers = responsePackage.getHeaders();
             Map<Integer, Object> body = responsePackage.getBody();
             Long c = (Long) headers.get(Key.CODE.getId());
-            if (c == 0) {
-                return (List) body.get(Key.DATA.getId());
-            } else {
+
+            if (c != 0) {
                 throw serverError(c, body.get(Key.ERROR.getId()));
             }
+
+            return responsePackage;
         } catch (IOException e) {
             close();
             throw new CommunicationException("Couldn't execute query", e);
@@ -69,21 +73,20 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
         }
     }
 
-
     @Override
     public Long update(String sql, Object... bind) {
-        sql(sql, bind);
-        return getSqlRowCount();
+        TarantoolBinaryPackage pack = sql(sql, bind);
+        return SqlProtoUtils.getSqlRowCount(pack);
     }
 
     @Override
     public List<Map<String, Object>> query(String sql, Object... bind) {
-        sql(sql, bind);
-        return readSqlResult((List<List<?>>) body.get(Key.DATA));
+        TarantoolBinaryPackage pack = sql(sql, bind);
+        return SqlProtoUtils.readSqlResult(pack);
     }
 
-    protected void sql(String sql, Object[] bind) {
-        exec(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, bind);
+    protected TarantoolBinaryPackage sql(String sql, Object[] bind) {
+        return writeAndRead(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, bind);
     }
 
     public boolean isClosed() {

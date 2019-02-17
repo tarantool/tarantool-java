@@ -5,6 +5,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.function.ThrowingConsumer;
 import org.tarantool.CommunicationException;
 import org.tarantool.TarantoolConnection;
+import org.tarantool.server.TarantoolBinaryPackage;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -297,8 +298,8 @@ public class JdbcExceptionHandlingTest {
             super(null, null, mock(Socket.class));
         }
         @Override
-        protected void sql(String sql, Object[] bind) {
-            super.sql(sql, bind);
+        protected TarantoolBinaryPackage sql(String sql, Object[] bind) {
+            return super.sql(sql, bind);
         }
     }
 }
