@@ -146,6 +146,7 @@ public abstract class BinaryProtoUtils {
     public static TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
 
         channel.configureBlocking(false);
+        //todo get rid of this because SelectorProvider.provider().openSelector() creates two pipes and socket in the /proc/fd
         SelectorChannelReadHelper bufferReader = new SelectorChannelReadHelper(channel);
 
         ByteBuffer buffer = ByteBuffer.allocate(LENGTH_OF_SIZE_MESSAGE);

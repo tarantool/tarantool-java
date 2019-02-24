@@ -42,9 +42,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     protected SocketChannel channel;
     protected ByteBuffer sharedBuffer;
     protected ByteBuffer writerBuffer;
-    protected ReentrantLock bufferLock = new ReentrantLock(false);
-    protected Condition bufferNotEmpty = bufferLock.newCondition();
-    protected Condition bufferEmpty = bufferLock.newCondition();
+    protected ReentrantLock writerBufferLock = new ReentrantLock(false);
+    protected Condition writerBufferNotEmpty = writerBufferLock.newCondition();
+    protected Condition writerBufferEmpty = writerBufferLock.newCondition();
     protected ReentrantLock writeLock = new ReentrantLock(true);
 
     /**
@@ -149,12 +149,13 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             throw new CommunicationException("Couldn't connect to tarantool", e);
         }
         channel.configureBlocking(false);
+
         this.channel = channel;
-        bufferLock.lock();
+        writerBufferLock.lock();
         try {
             sharedBuffer.clear();
         } finally {
-            bufferLock.unlock();
+            writerBufferLock.unlock();
         }
         this.thumbstone = null;
         startThreads(channel.socket().getRemoteSocketAddress().toString());
@@ -250,12 +251,12 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             }
         }
 
-        bufferLock.lock();
+        writerBufferLock.lock();
         try {
             sharedBuffer.clear();
-            bufferEmpty.signalAll();
+            writerBufferEmpty.signalAll();
         } finally {
-            bufferLock.unlock();
+            writerBufferLock.unlock();
         }
         stopIO();
     }
@@ -277,7 +278,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     protected void sharedWrite(ByteBuffer buffer) throws InterruptedException, TimeoutException {
         long start = System.currentTimeMillis();
-        if (bufferLock.tryLock(config.writeTimeoutMillis, TimeUnit.MILLISECONDS)) {
+        if (writerBufferLock.tryLock(config.writeTimeoutMillis, TimeUnit.MILLISECONDS)) {
             try {
                 int rem = buffer.remaining();
                 stats.sharedMaxPacketSize = Math.max(stats.sharedMaxPacketSize, rem);
@@ -288,7 +289,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                     stats.sharedEmptyAwait++;
                     long remaining = config.writeTimeoutMillis - (System.currentTimeMillis() - start);
                     try {
-                        if (remaining < 1 || !bufferEmpty.await(remaining, TimeUnit.MILLISECONDS)) {
+                        if (remaining < 1 || !writerBufferEmpty.await(remaining, TimeUnit.MILLISECONDS)) {
                             stats.sharedEmptyAwaitTimeouts++;
                             throw new TimeoutException(config.writeTimeoutMillis + "ms is exceeded while waiting for empty buffer you could configure write timeout it in TarantoolConfig");
                         }
@@ -298,10 +299,10 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 }
                 sharedBuffer.put(buffer);
                 wait.incrementAndGet();
-                bufferNotEmpty.signalAll();
+                writerBufferNotEmpty.signalAll();
                 stats.buffered++;
             } finally {
-                bufferLock.unlock();
+                writerBufferLock.unlock();
             }
         } else {
             stats.sharedWriteLockTimeouts++;
@@ -361,17 +362,17 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         writerBuffer.clear();
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                bufferLock.lock();
+                writerBufferLock.lock();
                 try {
                     while (sharedBuffer.position() == 0) {
-                        bufferNotEmpty.await();
+                        writerBufferNotEmpty.await();
                     }
                     sharedBuffer.flip();
                     writerBuffer.put(sharedBuffer);
                     sharedBuffer.clear();
-                    bufferEmpty.signalAll();
+                    writerBufferEmpty.signalAll();
                 } finally {
-                    bufferLock.unlock();
+                    writerBufferLock.unlock();
                 }
                 writerBuffer.flip();
                 writeLock.lock();

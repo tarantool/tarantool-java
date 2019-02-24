@@ -1,5 +1,7 @@
 package org.tarantool.server;
 
+import org.tarantool.CommunicationException;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -22,11 +24,17 @@ class SelectorChannelReadHelper {
     }
 
     public void readFully(ByteBuffer buffer) throws IOException {
-        channel.read(buffer);
+        int n = channel.read(buffer);
+        if (n < 0) {
+            throw new CommunicationException("Channel read failed " + n);
+        }
 
         while (buffer.remaining() > 0) {
             selector.select();//todo think about read timeout
-            channel.read(buffer);
+            n = channel.read(buffer);
+            if (n < 0) {
+                throw new CommunicationException("Channel read failed " + n);
+            }
         }
     }
 
