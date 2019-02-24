@@ -4,6 +4,7 @@ import org.tarantool.Base64;
 import org.tarantool.ByteBufferInputStream;
 import org.tarantool.Code;
 import org.tarantool.CommunicationException;
+import org.tarantool.CountInputStream;
 import org.tarantool.CountInputStreamImpl;
 import org.tarantool.Key;
 import org.tarantool.MsgPackLite;
@@ -42,16 +43,15 @@ public abstract class BinaryProtoUtils {
     }
 
     /**
-     *
      * Connects to a tarantool node described by {@code socket}. Performs an authentication if required
      *
-     * @param socket a socket channel to tarantool node
+     * @param socket   a socket channel to tarantool node
      * @param username auth username
      * @param password auth password
      * @return object with information about a connection/
-     * @throws IOException in case of any IO fails
+     * @throws IOException            in case of any IO fails
      * @throws CommunicationException when welcome string is invalid
-     * @throws TarantoolException in case of failed authentication
+     * @throws TarantoolException     in case of failed authentication
      */
     public static TarantoolNodeInfo connect(Socket socket, String username, String password) throws IOException {
         byte[] inputBytes = new byte[64];
@@ -89,16 +89,15 @@ public abstract class BinaryProtoUtils {
     }
 
     /**
-     *
      * Connects to a tarantool node described by {@code socketChannel}. Performs an authentication if required
      *
-     * @param channel a socket channel to tarantool node
+     * @param channel  a socket channel to tarantool node
      * @param username auth username
      * @param password auth password
      * @return object with information about a connection/
-     * @throws IOException in case of any IO fails
+     * @throws IOException            in case of any IO fails
      * @throws CommunicationException when welcome string is invalid
-     * @throws TarantoolException in case of failed authentication
+     * @throws TarantoolException     in case of failed authentication
      */
     public static TarantoolNodeInfo connect(SocketChannel channel, String username, String password) throws IOException {
         ByteBuffer welcomeBytes = ByteBuffer.wrap(new byte[64]);
@@ -143,18 +142,24 @@ public abstract class BinaryProtoUtils {
         }
     }
 
+    public static final int LENGTH_OF_SIZE_MESSAGE = 5;
     public static TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
 
-//        int size = channel.socket().getInputStream().read();
-        InputStream inputStream = channel.socket().getInputStream();
+        channel.configureBlocking(false);
+        SelectorChannelReadHelper bufferReader = new SelectorChannelReadHelper(channel);
 
-        int size = ((Number) getMsgPackLite().unpack(inputStream)).intValue();
-        ByteBuffer msgBuffer = ByteBuffer.allocate(size - 1);
-        channel.read(msgBuffer);
+        ByteBuffer buffer = ByteBuffer.allocate(LENGTH_OF_SIZE_MESSAGE);
+        bufferReader.readFully(buffer);
 
-        CountInputStreamImpl msgStream = new CountInputStreamImpl(new ByteArrayInputStream(msgBuffer.array()));
+        buffer.flip();
+        int size = ((Number) getMsgPackLite().unpack(new ByteBufferBackedInputStream(buffer))).intValue();
 
-        Object unpackedHeaders = getMsgPackLite().unpack(msgStream);
+        buffer = ByteBuffer.allocate(size);
+        bufferReader.readFully(buffer);
+
+        buffer.flip();
+        ByteBufferBackedInputStream msgBytesStream = new ByteBufferBackedInputStream(buffer);
+        Object unpackedHeaders = getMsgPackLite().unpack(msgBytesStream);
         if (!(unpackedHeaders instanceof Map)) {
             //noinspection ConstantConditions
             throw new CommunicationException("Error while unpacking headers of tarantool response: " +
@@ -164,8 +169,44 @@ public abstract class BinaryProtoUtils {
         Map<Integer, Object> headers = (Map<Integer, Object>) unpackedHeaders;
 
         Map<Integer, Object> body = null;
-        if (msgStream.getBytesRead() < size) {
-            Object unpackedBody = getMsgPackLite().unpack(msgStream);
+        if (msgBytesStream.hasAvailable()) {
+            Object unpackedBody = getMsgPackLite().unpack(msgBytesStream);
+            if (!(unpackedBody instanceof Map)) {
+                //noinspection ConstantConditions
+                throw new CommunicationException("Error while unpacking body of tarantool response: " +
+                        "expected type Map but was " + unpackedBody != null ? unpackedBody.getClass().toString() : "null");
+            }
+            //noinspection unchecked (checked above)
+            body = (Map<Integer, Object>) unpackedBody;
+        }
+
+        return new TarantoolBinaryPackage(headers, body);
+    }
+
+    @Deprecated
+    public static TarantoolBinaryPackage readPacketOld(SocketChannel channel) throws IOException {
+        CountInputStream inputStream = new ByteBufferInputStream(channel);
+        return readPacket(inputStream);
+    }
+
+    @Deprecated
+    private static TarantoolBinaryPackage readPacket(CountInputStream inputStream) throws IOException {
+        int size = ((Number) getMsgPackLite().unpack(inputStream)).intValue();
+
+        long mark = inputStream.getBytesRead();
+
+        Object unpackedHeaders = getMsgPackLite().unpack(inputStream);
+        if (!(unpackedHeaders instanceof Map)) {
+            //noinspection ConstantConditions
+            throw new CommunicationException("Error while unpacking headers of tarantool response: " +
+                    "expected type Map but was " + unpackedHeaders != null ? unpackedHeaders.getClass().toString() : "null");
+        }
+        //noinspection unchecked (checked above)
+        Map<Integer, Object> headers = (Map<Integer, Object>) unpackedHeaders;
+
+        Map<Integer, Object> body = null;
+        if (inputStream.getBytesRead() - mark < size) {
+            Object unpackedBody = getMsgPackLite().unpack(inputStream);
             if (!(unpackedBody instanceof Map)) {
                 //noinspection ConstantConditions
                 throw new CommunicationException("Error while unpacking body of tarantool response: " +

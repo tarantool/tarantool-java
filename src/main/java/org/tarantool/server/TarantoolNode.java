@@ -91,7 +91,7 @@ public class TarantoolNode {
 
 
     /**
-     * @param address hostname addess as String
+     * @param address hostname address as String
      *
      * @throws IllegalArgumentException if the port parameter is outside the range
      *                                  of valid port values, or if the hostname parameter is <TT>null</TT>.

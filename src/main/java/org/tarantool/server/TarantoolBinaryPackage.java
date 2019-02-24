@@ -2,6 +2,7 @@ package org.tarantool.server;
 
 import org.tarantool.Key;
 
+import java.util.Collections;
 import java.util.Map;
 
 public class TarantoolBinaryPackage {
@@ -37,5 +38,9 @@ public class TarantoolBinaryPackage {
 
     public Map<Integer, Object> getBody() {
         return body;
+    }
+
+    public boolean hasBody() {
+        return body != null && body.size() > 0;
     }
 }

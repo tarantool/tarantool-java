@@ -2,7 +2,6 @@ package org.tarantool.server;
 
 import org.tarantool.ByteBufferInputStream;
 import org.tarantool.CommunicationException;
-import org.tarantool.CountInputStream;
 import org.tarantool.Key;
 import org.tarantool.MsgPackLite;
 import org.tarantool.SocketChannelProvider;
@@ -29,12 +28,25 @@ public class TarantoolServer {
 
     private MsgPackLite msgPackLite = MsgPackLite.INSTANCE;
 
+    public static void connect(TarantoolNode node, String username, String password) {
+        SocketChannel channel;
+        try {
+            channel = SocketChannel.open(node.getSocketAddress());
+        } catch (IOException e) {
+            throw new CommunicationException("Exception occurred while connecting to node " + node, e);
+        }
+//todo
+//        TarantoolNodeInfo nodeInfo = BinaryProtoUtils.connect(channel, username, password);
+//        this.salt = nodeInfo.getSalt();
+//        this.serverVersion = nodeInfo.getServerVersion();
+    }
+
     /**
      * Connection state
      */
     protected String salt;
 
-    public TarantoolServer(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
+    private TarantoolServer(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
         this.socketProvider = socketProvider;
 
         this.config = config;

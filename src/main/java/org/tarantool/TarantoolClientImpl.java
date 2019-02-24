@@ -397,11 +397,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         if (q != null) {
             long code = pack.getCode();
             if (code == 0) {
-                List<?> data = (List<?>) pack.getBody().get(Key.DATA.getId());
 
                 if (code == Code.EXECUTE.getId()) {
                     completeSql(q, pack);
                 } else {
+                    List<?> data = (List<?>) pack.getBody().get(Key.DATA.getId());
                     ((CompletableFuture) q).complete(data);
                 }
             } else {
