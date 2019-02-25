@@ -1,16 +1,10 @@
 package org.tarantool.cluster;
 
-import org.tarantool.CommunicationException;
-import org.tarantool.TarantoolClientConfig;
 import org.tarantool.TarantoolClientImpl;
-import org.tarantool.TarantoolClusterClient;
 import org.tarantool.TarantoolClusterClientConfig;
-import org.tarantool.server.BinaryProtoUtils;
-import org.tarantool.server.TarantoolNode;
+import org.tarantool.server.TarantoolNodeInfo;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -25,8 +19,8 @@ public class ClusterTopologyFromShardDiscovererImpl implements ClusterTopologyDi
     }
 
     @Override
-    public List<TarantoolNode> discoverTarantoolNodes(TarantoolNode infoNode,
-                                                            Integer infoHostConnectionTimeout) {
+    public List<TarantoolNodeInfo> discoverTarantoolNodes(TarantoolNodeInfo infoNode,
+                                                          Integer infoHostConnectionTimeout) {
 
         List<?> list = new TarantoolClientImpl(infoNode.getSocketAddress(), clientConfig)
                 .syncOps()
@@ -36,7 +30,7 @@ public class ClusterTopologyFromShardDiscovererImpl implements ClusterTopologyDi
 
         Map shardHash2DescriptionMap = (Map) getValue(funcResult, "sharding");
 
-        List<TarantoolNode> result = new ArrayList<>();
+        List<TarantoolNodeInfo> result = new ArrayList<>();
 
 
         for (Object shardHash2Description : shardHash2DescriptionMap.entrySet()) {
@@ -45,7 +39,7 @@ public class ClusterTopologyFromShardDiscovererImpl implements ClusterTopologyDi
 
             for (Object replica : replicas.entrySet()) {
                 Object replicaUri = getValue(((Map.Entry) replica).getValue(), "uri");
-                result.add(TarantoolNode.create(parseReplicaUri(replicaUri.toString())));
+                result.add(TarantoolNodeInfo.create(parseReplicaUri(replicaUri.toString())));
             }
         }
 

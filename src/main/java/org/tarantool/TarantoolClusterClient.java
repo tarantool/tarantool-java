@@ -26,9 +26,9 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     /* Collection of operations to be retried. */
     private ConcurrentHashMap<Long, ExpirableOp<?>> retries = new ConcurrentHashMap<Long, ExpirableOp<?>>();
 
-    private final Collection<TarantoolNode> slaveHosts;
+    private final Collection<TarantoolNodeInfo> slaveHosts;
 
-    private final TarantoolNode infoHost;
+    private final TarantoolNodeInfo infoHost;
     private final Integer infoHostConnectionTimeout;
     private final ClusterTopologyDiscoverer topologyDiscoverer;
     /**
@@ -48,7 +48,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
         this.executor = config.executor == null ?
             Executors.newSingleThreadExecutor() : config.executor;
-        this.infoHost = TarantoolNode.create(config.infoHost);
+        this.infoHost = TarantoolNodeInfo.create(config.infoHost);
 
         this.infoHostConnectionTimeout = config.infoHostConnectionTimeout;
         this.topologyDiscoverer = new ClusterTopologyFromShardDiscovererImpl(config);
@@ -61,8 +61,8 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
      * @throws CommunicationException in case of communication with {@code infoNode} exception
      * @throws IllegalArgumentException in case when the info node returned invalid address
      */
-    private Collection<TarantoolNode> refreshServerList(TarantoolNode infoNode) {
-        List<TarantoolNode> newServerList = topologyDiscoverer
+    private Collection<TarantoolNodeInfo> refreshServerList(TarantoolNodeInfo infoNode) {
+        List<TarantoolNodeInfo> newServerList = topologyDiscoverer
                 .discoverTarantoolNodes(infoNode, infoHostConnectionTimeout);
 
         writeLock.lock();
@@ -71,7 +71,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
             RoundRobinSocketProviderImpl rSocketProvider = (RoundRobinSocketProviderImpl) this.socketProvider;
 
-            TarantoolNode currentNode = rSocketProvider.getCurrentNode();
+            TarantoolNodeInfo currentNode = rSocketProvider.getCurrentNode();
 
             int sameNodeIndex = newServerList.indexOf(currentNode);
             if (sameNodeIndex != -1) {

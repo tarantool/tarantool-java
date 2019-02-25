@@ -1,9 +1,9 @@
 package org.tarantool.cluster;
 
-import org.tarantool.server.TarantoolNode;
+import org.tarantool.server.TarantoolNodeInfo;
 
 import java.util.List;
 
 public interface ClusterTopologyDiscoverer {
-    List<TarantoolNode> discoverTarantoolNodes(TarantoolNode infoNode, Integer infoHostConnectionTimeout);
+    List<TarantoolNodeInfo> discoverTarantoolNodes(TarantoolNodeInfo infoNode, Integer infoHostConnectionTimeout);
 }

@@ -5,12 +5,7 @@ import org.tarantool.server.*;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Basic reconnection strategy that changes addresses in a round-robin fashion.
@@ -24,7 +19,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     /** Limit of retries. */
     private int retriesLimit = -1; // No-limit.
 
-    private TarantoolNode[] nodes;
+    private TarantoolNodeInfo[] nodes;
 
     /** Current position within {@link #nodes} array. */
     private int pos;
@@ -44,23 +39,23 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
 
     private void updateNodes(String[] slaveHosts) {
         //todo add read-write lock
-        nodes = new TarantoolNode[slaveHosts.length];
+        nodes = new TarantoolNodeInfo[slaveHosts.length];
         for (int i = 0; i < slaveHosts.length; i++) {
             String slaveHostAddress = slaveHosts[i];
-            nodes[i] = TarantoolNode.create(slaveHostAddress);
+            nodes[i] = TarantoolNodeInfo.create(slaveHostAddress);
         }
 
         pos = 0;
     }
 
 
-    public void updateNodes(List<TarantoolNode> slaveHosts) {
+    public void updateNodes(List<TarantoolNodeInfo> slaveHosts) {
         if (slaveHosts == null) {
             throw new IllegalArgumentException("slaveHosts can not be null");
         }
         //todo add read-write lock
 
-        this.nodes = (TarantoolNode[]) slaveHosts.toArray();
+        this.nodes = (TarantoolNodeInfo[]) slaveHosts.toArray();
 
         pos = 0;
     }
@@ -69,7 +64,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     /**
      * @return Non-empty list of round-robined nodes
      */
-    public TarantoolNode[] getNodes() {
+    public TarantoolNodeInfo[] getNodes() {
         return nodes;
     }
 
@@ -102,7 +97,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
 
     /**
      * Sets maximum amount of reconnect attempts to be made before an exception is raised.
-     * The retry count is maintained by a {@link #get(int, Throwable)} caller
+     * The retry count is maintained by a {@link #getNext(int, Throwable)} caller
      * when a socket level connection was established.
      *
      * Negative value means unlimited.
@@ -125,10 +120,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
 
     /** {@inheritDoc} */
     @Override
-    public SocketChannel get(int retryNumber, Throwable lastError) {
-        if (areRetriesExhausted(retryNumber)) {
-            throw new CommunicationException("Connection retries exceeded.", lastError);
-        }
+    public SocketChannel getNext() {
         int attempts = getAddressCount();
         long deadline = System.currentTimeMillis() + timeout * attempts;
         while (!Thread.currentThread().isInterrupted()) {
@@ -181,20 +173,8 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
         return res;
     }
 
-    protected TarantoolNode getCurrentNode() {
+    protected TarantoolNodeInfo getCurrentNode() {
         return nodes[pos];
     }
 
-    /**
-     * Provides a decision on whether retries limit is hit.
-     *
-     * @param retries Current count of retries.
-     * @return {@code true} if retries are exhausted.
-     */
-    private boolean areRetriesExhausted(int retries) {
-        int limit = getRetriesLimit();
-        if (limit < 0)
-            return false;
-        return retries >= limit;
-    }
 }

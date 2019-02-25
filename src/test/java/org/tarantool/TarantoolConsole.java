@@ -168,7 +168,7 @@ public abstract class TarantoolConsole implements Closeable {
         final Socket socket;
 
         TarantoolTcpConsole(String host, int port) {
-            socket = new TestSocketChannelProvider(host, port, TIMEOUT).get(1, null).socket();
+            socket = new TestSocketChannelProvider(host, port, TIMEOUT).getNext(1, null).socket();
             try {
                 reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 writer = new OutputStreamWriter(socket.getOutputStream());

@@ -96,7 +96,7 @@ public class TestTarantoolClient {
         //config.sharedBufferSize = 0;
         SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
             @Override
-            public SocketChannel get(int retryNumber, Throwable lastError) {
+            public SocketChannel getNext(int retryNumber, Throwable lastError) {
                 if (lastError != null) {
                     lastError.printStackTrace(System.out);
                 }

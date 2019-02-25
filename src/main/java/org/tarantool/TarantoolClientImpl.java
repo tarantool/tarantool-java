@@ -32,6 +32,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
      * External
      */
     protected SocketChannelProvider socketProvider;
+
+    /**
+     * Max amount of one by one reconnect attempts
+     */
+    protected int reconnectRetriesLimit = -1; // No-limit.
     protected volatile Exception thumbstone;
 
     protected Map<Long, CompletableFuture<?>> futures;
@@ -75,7 +80,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     });
 
     public TarantoolClientImpl(InetSocketAddress socketAddress, TarantoolClientConfig config) {
-        this(new SimpleSocketChannelProvider(socketAddress), config);
+        this(new SimpleSocketChannelProvider(socketAddress, config.username, config.password), config);
     }
 
     public TarantoolClientImpl(String address, TarantoolClientConfig config) {
@@ -123,7 +128,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         SocketChannel channel;
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                channel = socketProvider.get(retry++, lastError == NOT_INIT_EXCEPTION ? null : lastError);
+                if (areRetriesExhausted(retry)) {
+                    Throwable cause = lastError == NOT_INIT_EXCEPTION ? null : lastError;
+                    throw new CommunicationException("Connection retries exceeded.", cause);
+                }
+                channel = socketProvider.getNext();
             } catch (Exception e) {
                 close(e);
                 return;
@@ -140,11 +149,22 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     }
 
+    /**
+     * Provides a decision on whether retries limit is hit.
+     *
+     * @param retries Current count of retries.
+     * @return {@code true} if retries are exhausted.
+     */
+    private boolean areRetriesExhausted(int retries) {
+        int limit = reconnectRetriesLimit;
+        if (limit < 0)
+            return false;
+        return retries >= limit;
+    }
+
     protected void connect(final SocketChannel channel) throws Exception {
         try {
-            TarantoolNodeInfo nodeInfo = BinaryProtoUtils.connect(channel, config.username, config.password);
-            this.salt = nodeInfo.getSalt();
-            this.serverVersion = nodeInfo.getServerVersion();
+            this.currentNodeInfo = BinaryProtoUtils.connect(channel, config.username, config.password);
         } catch (IOException e) {
             throw new CommunicationException("Couldn't connect to tarantool", e);
         }
@@ -319,7 +339,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                     if (rem > initialRequestSize) {
                         stats.directPacketSizeGrowth++;
                     }
-                    BinaryProtoUtils.writeFully(channel, buffer);
+                    BinaryProtoUtils.writeFully(getReadChannel(), buffer);
                     stats.directWrite++;
                     wait.incrementAndGet();
                 } finally {
@@ -334,11 +354,19 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         return false;
     }
 
+    private SocketChannel getWriteChannel() {
+        return channel;
+    }
+
+    private SocketChannel getReadChannel() {
+        return channel;
+    }
+
     protected void readThread() {
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    TarantoolBinaryPackage pack = BinaryProtoUtils.readPacket(channel);
+                    TarantoolBinaryPackage pack = BinaryProtoUtils.readPacket(getReadChannel());
 
                     Map<Integer, Object> headers = pack.getHeaders();
 
@@ -377,7 +405,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 writerBuffer.flip();
                 writeLock.lock();
                 try {
-                    BinaryProtoUtils.writeFully(channel, writerBuffer);
+                    BinaryProtoUtils.writeFully(getWriteChannel(), writerBuffer);
                 } finally {
                     writeLock.unlock();
                 }

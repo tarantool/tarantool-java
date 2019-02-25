@@ -1,23 +1,21 @@
 package org.tarantool;
 
 import org.tarantool.server.BinaryProtoUtils;
-import org.tarantool.server.TarantoolNodeInfo;
+import org.tarantool.server.TarantoolNodeConnectionMeta;
 
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer, List<?>, Object, Result> {
 
-    protected String serverVersion;
     /**
      * Connection state
      */
-    protected String salt;
+    TarantoolNodeConnectionMeta currentNodeInfo;
     protected MsgPackLite msgPackLite = MsgPackLite.INSTANCE;
     protected AtomicLong syncId = new AtomicLong();
     protected int initialRequestSize = 4096;
@@ -28,9 +26,7 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
     public TarantoolBase(String username, String password, Socket socket) {
         super();
         try {
-            TarantoolNodeInfo info = BinaryProtoUtils.connect(socket, username, password);
-            this.serverVersion = info.getServerVersion();
-            this.salt = info.getSalt();
+            this.currentNodeInfo = BinaryProtoUtils.connect(socket, username, password);
         } catch (CommunicationException e) {
             close();
             throw e;
@@ -97,6 +93,9 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
     }
 
     public String getServerVersion() {
-        return serverVersion;
+        if (currentNodeInfo == null) {
+            throw new IllegalStateException("Tarantool base is not initialized");
+        }
+        return currentNodeInfo.getServerVersion();
     }
 }

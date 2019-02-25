@@ -18,7 +18,7 @@ public class TestSocketChannelProvider implements SocketChannelProvider {
     }
 
     @Override
-    public SocketChannel get(int retryNumber, Throwable lastError) {
+    public SocketChannel getNext(int retryNumber, Throwable lastError) {
         long budget = System.currentTimeMillis() + restart_timeout;
         while (!Thread.currentThread().isInterrupted()) {
             try {

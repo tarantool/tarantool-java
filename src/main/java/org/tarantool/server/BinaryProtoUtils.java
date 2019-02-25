@@ -53,7 +53,7 @@ public abstract class BinaryProtoUtils {
      * @throws CommunicationException when welcome string is invalid
      * @throws TarantoolException     in case of failed authentication
      */
-    public static TarantoolNodeInfo connect(Socket socket, String username, String password) throws IOException {
+    public static TarantoolNodeConnectionMeta connect(Socket socket, String username, String password) throws IOException {
         byte[] inputBytes = new byte[64];
 
         InputStream inputStream = socket.getInputStream();
@@ -85,7 +85,7 @@ public abstract class BinaryProtoUtils {
             }
         }
 
-        return new TarantoolNodeInfo(salt, serverVersion);
+        return new TarantoolNodeConnectionMeta(salt, serverVersion);
     }
 
     /**
@@ -99,7 +99,7 @@ public abstract class BinaryProtoUtils {
      * @throws CommunicationException when welcome string is invalid
      * @throws TarantoolException     in case of failed authentication
      */
-    public static TarantoolNodeInfo connect(SocketChannel channel, String username, String password) throws IOException {
+    public static TarantoolNodeConnectionMeta connect(SocketChannel channel, String username, String password) throws IOException {
         ByteBuffer welcomeBytes = ByteBuffer.wrap(new byte[64]);
         channel.read(welcomeBytes);
 
@@ -125,7 +125,7 @@ public abstract class BinaryProtoUtils {
             }
         }
 
-        return new TarantoolNodeInfo(salt, serverVersion);
+        return new TarantoolNodeConnectionMeta(salt, serverVersion);
     }
 
     public static void writeFully(OutputStream stream, ByteBuffer buffer) throws IOException {
@@ -146,7 +146,7 @@ public abstract class BinaryProtoUtils {
     public static TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
 
         channel.configureBlocking(false);
-        //todo get rid of this because SelectorProvider.provider().openSelector() creates two pipes and socket in the /proc/fd
+        //todo getNext rid of this because SelectorProvider.provider().openSelector() creates two pipes and socket in the /proc/fd
         SelectorChannelReadHelper bufferReader = new SelectorChannelReadHelper(channel);
 
         ByteBuffer buffer = ByteBuffer.allocate(LENGTH_OF_SIZE_MESSAGE);

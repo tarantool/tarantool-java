@@ -87,11 +87,11 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         final CountDownLatch latch = new CountDownLatch(2);
         SocketChannelProvider provider = new SocketChannelProvider() {
             @Override
-            public SocketChannel get(int retryNumber, Throwable lastError) {
+            public SocketChannel getNext(int retryNumber, Throwable lastError) {
                 if (lastError == null) {
                     latch.countDown();
                 }
-                return socketChannelProvider.get(retryNumber, lastError);
+                return socketChannelProvider.getNext(retryNumber, lastError);
             }
         };
 

@@ -6,9 +6,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class TarantoolNodeTest {
+class TarantoolNodeInfoTest {
 
-    @DisplayName("Test that a TarantoolNode throws an illegal argument exception" +
+    @DisplayName("Test that a TarantoolNodeInfo throws an illegal argument exception" +
             "in case when it's being created with wrong address string")
     @ParameterizedTest
     @ValueSource(strings = {
@@ -17,7 +17,7 @@ class TarantoolNodeTest {
     })
     void testThrowsExceptionInCaseOfInvalidStringAddress(String address) {
         assertThrows(IllegalArgumentException.class,
-                () -> TarantoolNode.create(address),
+                () -> TarantoolNodeInfo.create(address),
                 "We expect the code under test to throw an IllegalArgumentException, but it didn't");
     }
 }

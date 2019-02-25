@@ -17,7 +17,7 @@ public class MyBenchmark {
         }
 
         @Override
-        public SocketChannel get(int retryNumber, Throwable lastError) {
+        public SocketChannel getNext(int retryNumber, Throwable lastError) {
             return new DodgeSocketChannel(defaultSocketQueueSize);
         }
     }
