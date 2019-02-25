@@ -19,7 +19,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     /** Limit of retries. */
     private int retriesLimit = -1; // No-limit.
 
-    private TarantoolNodeInfo[] nodes;
+    private TarantoolInstanceInfo[] nodes;
 
     /** Current position within {@link #nodes} array. */
     private int pos;
@@ -39,23 +39,23 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
 
     private void updateNodes(String[] slaveHosts) {
         //todo add read-write lock
-        nodes = new TarantoolNodeInfo[slaveHosts.length];
+        nodes = new TarantoolInstanceInfo[slaveHosts.length];
         for (int i = 0; i < slaveHosts.length; i++) {
             String slaveHostAddress = slaveHosts[i];
-            nodes[i] = TarantoolNodeInfo.create(slaveHostAddress);
+            nodes[i] = TarantoolInstanceInfo.create(slaveHostAddress);
         }
 
         pos = 0;
     }
 
 
-    public void updateNodes(List<TarantoolNodeInfo> slaveHosts) {
+    public void updateNodes(List<TarantoolInstanceInfo> slaveHosts) {
         if (slaveHosts == null) {
             throw new IllegalArgumentException("slaveHosts can not be null");
         }
         //todo add read-write lock
 
-        this.nodes = (TarantoolNodeInfo[]) slaveHosts.toArray();
+        this.nodes = (TarantoolInstanceInfo[]) slaveHosts.toArray();
 
         pos = 0;
     }
@@ -64,7 +64,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     /**
      * @return Non-empty list of round-robined nodes
      */
-    public TarantoolNodeInfo[] getNodes() {
+    public TarantoolInstanceInfo[] getNodes() {
         return nodes;
     }
 
@@ -173,7 +173,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
         return res;
     }
 
-    protected TarantoolNodeInfo getCurrentNode() {
+    protected TarantoolInstanceInfo getCurrentNode() {
         return nodes[pos];
     }
 

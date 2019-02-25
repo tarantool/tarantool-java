@@ -53,7 +53,7 @@ public abstract class BinaryProtoUtils {
      * @throws CommunicationException when welcome string is invalid
      * @throws TarantoolException     in case of failed authentication
      */
-    public static TarantoolNodeConnectionMeta connect(Socket socket, String username, String password) throws IOException {
+    public static TarantoolInstanceConnectionMeta connect(Socket socket, String username, String password) throws IOException {
         byte[] inputBytes = new byte[64];
 
         InputStream inputStream = socket.getInputStream();
@@ -85,7 +85,7 @@ public abstract class BinaryProtoUtils {
             }
         }
 
-        return new TarantoolNodeConnectionMeta(salt, serverVersion);
+        return new TarantoolInstanceConnectionMeta(salt, serverVersion);
     }
 
     /**
@@ -99,7 +99,7 @@ public abstract class BinaryProtoUtils {
      * @throws CommunicationException when welcome string is invalid
      * @throws TarantoolException     in case of failed authentication
      */
-    public static TarantoolNodeConnectionMeta connect(SocketChannel channel, String username, String password) throws IOException {
+    public static TarantoolInstanceConnectionMeta connect(SocketChannel channel, String username, String password) throws IOException {
         ByteBuffer welcomeBytes = ByteBuffer.wrap(new byte[64]);
         channel.read(welcomeBytes);
 
@@ -125,7 +125,7 @@ public abstract class BinaryProtoUtils {
             }
         }
 
-        return new TarantoolNodeConnectionMeta(salt, serverVersion);
+        return new TarantoolInstanceConnectionMeta(salt, serverVersion);
     }
 
     public static void writeFully(OutputStream stream, ByteBuffer buffer) throws IOException {

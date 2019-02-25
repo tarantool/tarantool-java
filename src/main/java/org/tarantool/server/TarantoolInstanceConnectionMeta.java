@@ -1,11 +1,11 @@
 package org.tarantool.server;
 
-public class TarantoolNodeConnectionMeta {
+public class TarantoolInstanceConnectionMeta {
 
     private final String salt;
     private final String serverVersion;
 
-    public TarantoolNodeConnectionMeta(String salt, String serverVersion) {
+    public TarantoolInstanceConnectionMeta(String salt, String serverVersion) {
         this.salt = salt;
         this.serverVersion = serverVersion;
     }

@@ -84,7 +84,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     public TarantoolClientImpl(String address, TarantoolClientConfig config) {
-        this(new SimpleSocketChannelProvider(address), config);
+        this(new SimpleSocketChannelProvider(address, config.username, config.password), config);
     }
 
     public TarantoolClientImpl(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
@@ -366,7 +366,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    TarantoolBinaryPackage pack = BinaryProtoUtils.readPacket(getReadChannel());
+                    TarantoolBinaryPackage pack = socketProvider.readPackage();
+                    //todo
+//                    TarantoolBinaryPackage pack = BinaryProtoUtils.readPacket(getReadChannel());
 
                     Map<Integer, Object> headers = pack.getHeaders();
 
@@ -405,7 +407,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 writerBuffer.flip();
                 writeLock.lock();
                 try {
-                    BinaryProtoUtils.writeFully(getWriteChannel(), writerBuffer);
+                    socketProvider.writeBuffer(writerBuffer);
+                    //todo
+//                    BinaryProtoUtils.writeFully(getWriteChannel(), writerBuffer);
                 } finally {
                     writeLock.unlock();
                 }

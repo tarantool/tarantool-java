@@ -1,19 +1,18 @@
 package org.tarantool.server;
 
 import java.net.*;
-import java.nio.channels.*;
 import java.util.*;
 
 /**
- * Holds info about a tarantool node.
+ * Holds info about a tarantool instance.
  */
-public class TarantoolNodeInfo {
+public class TarantoolInstanceInfo {
 
     private final InetSocketAddress socketAddress;
     private final String username;
     private final String password;
 
-    private TarantoolNodeInfo(InetSocketAddress socketAddress, String username, String password) {
+    private TarantoolInstanceInfo(InetSocketAddress socketAddress, String username, String password) {
         this.socketAddress = socketAddress;
         this.username = username;
         this.password = password;
@@ -38,7 +37,7 @@ public class TarantoolNodeInfo {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        TarantoolNodeInfo node = (TarantoolNodeInfo) o;
+        TarantoolInstanceInfo node = (TarantoolInstanceInfo) o;
         return socketAddress.equals(node.socketAddress);
     }
 
@@ -50,14 +49,14 @@ public class TarantoolNodeInfo {
     /**
      *
      * @param socketAddress Nonnull socket address
-     * @return Instance of {@link TarantoolNodeInfo}
+     * @return Instance of {@link TarantoolInstanceInfo}
      */
-    public static TarantoolNodeInfo create(InetSocketAddress socketAddress, String username, String password) {
+    public static TarantoolInstanceInfo create(InetSocketAddress socketAddress, String username, String password) {
         if (socketAddress == null) {
             throw new IllegalArgumentException("A socket address can not be null.");
         }
 
-        return new TarantoolNodeInfo(socketAddress, username, password);
+        return new TarantoolInstanceInfo(socketAddress, username, password);
     }
 
 
@@ -70,12 +69,12 @@ public class TarantoolNodeInfo {
      *                                  permission to resolve the host name is
      *                                  denied.
      */
-    public static TarantoolNodeInfo create(String address, String username, String password) {
+    public static TarantoolInstanceInfo create(String address, String username, String password) {
         if (address == null) {
             throw new IllegalArgumentException("A hostname address can not be null.");
         }
 
-        return new TarantoolNodeInfo(parseAddress(address), username, password);
+        return new TarantoolInstanceInfo(parseAddress(address), username, password);
     }
 
     /**
@@ -105,7 +104,7 @@ public class TarantoolNodeInfo {
 
     @Override
     public String toString() {
-        return "TarantoolNodeInfo{" +
+        return "TarantoolInstanceInfo{" +
                 "socketAddress=" + socketAddress +
                 ", username='" + username + '\'' +
                 ", password='" + password + '\'' +

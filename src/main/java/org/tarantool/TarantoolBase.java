@@ -1,7 +1,7 @@
 package org.tarantool;
 
 import org.tarantool.server.BinaryProtoUtils;
-import org.tarantool.server.TarantoolNodeConnectionMeta;
+import org.tarantool.server.TarantoolInstanceConnectionMeta;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -15,7 +15,7 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
     /**
      * Connection state
      */
-    TarantoolNodeConnectionMeta currentNodeInfo;
+    TarantoolInstanceConnectionMeta currentNodeInfo;
     protected MsgPackLite msgPackLite = MsgPackLite.INSTANCE;
     protected AtomicLong syncId = new AtomicLong();
     protected int initialRequestSize = 4096;
