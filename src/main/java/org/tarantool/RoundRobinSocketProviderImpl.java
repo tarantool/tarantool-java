@@ -29,20 +29,20 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
      *
      * @param slaveHosts Array of addresses in a form of [host]:[port].
      */
-    public RoundRobinSocketProviderImpl(String[] slaveHosts) {
+    public RoundRobinSocketProviderImpl(String[] slaveHosts, String username, String password) {
         if (slaveHosts == null || slaveHosts.length < 1) {
             throw new IllegalArgumentException("slave hosts is null ot empty");
         }
 
-        updateNodes(slaveHosts);
+        updateNodes(slaveHosts, username, password);
     }
 
-    private void updateNodes(String[] slaveHosts) {
+    private void updateNodes(String[] slaveHosts, String username, String password) {
         //todo add read-write lock
         nodes = new TarantoolInstanceInfo[slaveHosts.length];
         for (int i = 0; i < slaveHosts.length; i++) {
             String slaveHostAddress = slaveHosts[i];
-            nodes[i] = TarantoolInstanceInfo.create(slaveHostAddress);
+            nodes[i] = TarantoolInstanceInfo.create(slaveHostAddress, username, password);
         }
 
         pos = 0;
@@ -120,7 +120,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
 
     /** {@inheritDoc} */
     @Override
-    public SocketChannel getNext() {
+    public SocketChannel get() {
         int attempts = getAddressCount();
         long deadline = System.currentTimeMillis() + timeout * attempts;
         while (!Thread.currentThread().isInterrupted()) {

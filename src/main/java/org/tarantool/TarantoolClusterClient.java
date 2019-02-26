@@ -35,20 +35,21 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
      * @param config Configuration.
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config) {
-        this(config, new RoundRobinSocketProviderImpl(config.slaveHosts).setTimeout(config.operationExpiryTimeMillis));
-
+//        this(config, new RoundRobinSocketProviderImpl(config.slaveHosts).setTimeout(config.operationExpiryTimeMillis));
+        this(config, new RoundRobinNodeCommunicationProvider(config.slaveHosts,
+                config.username, config.password, config.operationExpiryTimeMillis));
     }
 
     /**
      * @param provider Socket channel provider.
      * @param config Configuration.
      */
-    public TarantoolClusterClient(TarantoolClusterClientConfig config, SocketChannelProvider provider) {
+    public TarantoolClusterClient(TarantoolClusterClientConfig config, NodeCommunicationProvider provider) {
         super(provider, config);
 
         this.executor = config.executor == null ?
             Executors.newSingleThreadExecutor() : config.executor;
-        this.infoHost = TarantoolInstanceInfo.create(config.infoHost);
+        this.infoHost = TarantoolInstanceInfo.create(config.infoHost, config.username, config.password);
 
         this.infoHostConnectionTimeout = config.infoHostConnectionTimeout;
         this.topologyDiscoverer = new ClusterTopologyFromShardDiscovererImpl(config);
@@ -69,21 +70,21 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 //        todo add a read lock
         try {
 
-            RoundRobinSocketProviderImpl rSocketProvider = (RoundRobinSocketProviderImpl) this.socketProvider;
+            RoundRobinNodeCommunicationProvider cp = (RoundRobinNodeCommunicationProvider) this.communicationProvider;
 
-            TarantoolInstanceInfo currentNode = rSocketProvider.getCurrentNode();
+            TarantoolInstanceInfo currentNode = cp.getCurrentNode();
 
             int sameNodeIndex = newServerList.indexOf(currentNode);
             if (sameNodeIndex != -1) {
                 Collections.swap(newServerList, 0, sameNodeIndex);
-                rSocketProvider.updateNodes(newServerList);
+                cp.setNodes(newServerList);
             } else {
-                rSocketProvider.updateNodes(newServerList);
+                cp.setNodes(newServerList);
                 die("The server list have been changed.", null);
                 //todo
             }
 
-            rSocketProvider.updateNodes(newServerList);
+            cp.updateNodes(newServerList);
 
 
         } finally {

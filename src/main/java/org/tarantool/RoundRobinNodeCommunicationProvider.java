@@ -6,34 +6,35 @@ import org.tarantool.server.TarantoolInstanceConnection;
 import org.tarantool.server.TarantoolInstanceInfo;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.List;
+import java.util.*;
+import java.util.stream.*;
 
-public class RoundRobinSocketChannelProvider implements SocketChannelProvider {
+public class RoundRobinNodeCommunicationProvider implements NodeCommunicationProvider {
 
     /** Timeout to establish socket connection with an individual server. */
-    private int timeout; // 0 is infinite.
+    private final int timeout; // 0 is infinite.
 
     /** Limit of retries. */
     private int retriesLimit = -1; // No-limit.
 
 
     private TarantoolInstanceInfo[] nodes;
-    private TarantoolInstanceInfo currentNode;
+    private TarantoolInstanceConnection currentConnection;
 
     private int pos = 0;
 
-    public RoundRobinSocketChannelProvider(String[] slaveHosts, String username, String password) {
+    public RoundRobinNodeCommunicationProvider(String[] slaveHosts, String username, String password, int timeout) {
+        this.timeout = timeout;
         if (slaveHosts == null || slaveHosts.length < 1) {
             throw new IllegalArgumentException("slave hosts is null ot empty");
         }
 
-        updateNodes(slaveHosts, username, password);
+        setNodes(slaveHosts, username, password);
     }
 
-    private void updateNodes(String[] slaveHosts, String username, String password) {
+    private void setNodes(String[] slaveHosts, String username, String password) {
         //todo add read-write lock
         nodes = new TarantoolInstanceInfo[slaveHosts.length];
         for (int i = 0; i < slaveHosts.length; i++) {
@@ -54,7 +55,6 @@ public class RoundRobinSocketChannelProvider implements SocketChannelProvider {
 
         pos = 0;
     }
-
 
 
     /**
@@ -100,48 +100,6 @@ public class RoundRobinSocketChannelProvider implements SocketChannelProvider {
         throw new CommunicationException("Thread interrupted.", new InterruptedException());
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public SocketChannel getNext() {
-        int attempts = getAddressCount();
-        long deadline = System.currentTimeMillis() + timeout * attempts;
-        while (!Thread.currentThread().isInterrupted()) {
-            SocketChannel channel = null;
-            try {
-                TarantoolInstanceInfo tarantoolInstanceInfo = getNextNode();
-
-
-                TarantoolInstanceConnection nodeConnection = TarantoolInstanceConnection.connect(tarantoolInstanceInfo);
-
-                channel = nodeConnection.getChannel();
-
-                return channel;
-            } catch (IOException e) {
-                if (channel != null) {
-                    try {
-                        channel.close();
-                    } catch (IOException ignored) {
-                        // No-op.
-                    }
-                }
-                long now = System.currentTimeMillis();
-                if (deadline <= now) {
-                    throw new CommunicationException("Connection time out.", e);
-                }
-                if (--attempts == 0) {
-                    // Tried all addresses without any lack, but still have time.
-                    attempts = getAddressCount();
-                    try {
-                        Thread.sleep((deadline - now) / attempts);
-                    } catch (InterruptedException ignored) {
-                        Thread.currentThread().interrupt();
-                    }
-                }
-            }
-        }
-        throw new CommunicationException("Thread interrupted.", new InterruptedException());
-    }
-
     /**
      * @return Socket address to use for the next reconnection attempt.
      */
@@ -160,15 +118,10 @@ public class RoundRobinSocketChannelProvider implements SocketChannelProvider {
     }
 
 
-    private final TarantoolInstanceInfo tarantoolInstanceInfo;
-
-    private TarantoolInstanceConnection nodeConnection;
-
     @Override
     public void connect() {
-        nodeConnection = TarantoolInstanceConnection.connect(tarantoolInstanceInfo);
+        currentConnection = connectNextNode();
     }
-
 
     public void writeBuffer(ByteBuffer byteBuffer) throws IOException {
         SocketChannel channel2Write = getChannel();
@@ -180,11 +133,21 @@ public class RoundRobinSocketChannelProvider implements SocketChannelProvider {
         return BinaryProtoUtils.readPacket(channel2Read);
     }
 
-    @Override
-    public SocketChannel getChannel() {
-        if (nodeConnection == null) {
+    private SocketChannel getChannel() {
+        if (currentConnection == null) {
             throw new IllegalStateException("Not initialized");
         }
-        return nodeConnection.getChannel();
+        return currentConnection.getChannel();
+    }
+
+    @Override
+    public String getDescription() {
+        if (currentConnection != null) {
+            return currentConnection.getNodeInfo().getSocketAddress().toString();
+        } else {
+            return "Unconnected. Available nodes [" + Arrays.stream(nodes)
+                    .map(instanceInfo -> instanceInfo.getSocketAddress().toString())
+                    .collect(Collectors.joining(", "));
+        }
     }
 }

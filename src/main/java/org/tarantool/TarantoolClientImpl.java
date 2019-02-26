@@ -31,7 +31,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     /**
      * External
      */
-    protected SocketChannelProvider socketProvider;
+    protected NodeCommunicationProvider communicationProvider;
 
     /**
      * Max amount of one by one reconnect attempts
@@ -80,19 +80,19 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     });
 
     public TarantoolClientImpl(InetSocketAddress socketAddress, TarantoolClientConfig config) {
-        this(new SimpleSocketChannelProvider(socketAddress, config.username, config.password), config);
+        this(new SingleNodeCommunicationProvider(socketAddress, config.username, config.password), config);
     }
 
     public TarantoolClientImpl(String address, TarantoolClientConfig config) {
-        this(new SimpleSocketChannelProvider(address, config.username, config.password), config);
+        this(new SingleNodeCommunicationProvider(address, config.username, config.password), config);
     }
 
-    public TarantoolClientImpl(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
+    public TarantoolClientImpl(NodeCommunicationProvider communicationProvider, TarantoolClientConfig config) {
         super();
         this.thumbstone = NOT_INIT_EXCEPTION;
         this.config = config;
         this.initialRequestSize = config.defaultRequestSize;
-        this.socketProvider = socketProvider;
+        this.communicationProvider = communicationProvider;
         this.stats = new TarantoolClientStats();
         this.futures = new ConcurrentHashMap<>(config.predictedFutures);
         this.sharedBuffer = ByteBuffer.allocateDirect(config.sharedBufferSize);
@@ -125,20 +125,13 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     protected void reconnect(int retry, Throwable lastError) {
-        SocketChannel channel;
         while (!Thread.currentThread().isInterrupted()) {
-            try {
-                if (areRetriesExhausted(retry)) {
-                    Throwable cause = lastError == NOT_INIT_EXCEPTION ? null : lastError;
-                    throw new CommunicationException("Connection retries exceeded.", cause);
-                }
-                channel = socketProvider.getNext();
-            } catch (Exception e) {
-                close(e);
-                return;
+            if (areRetriesExhausted(retry)) {
+                Throwable cause = lastError == NOT_INIT_EXCEPTION ? null : lastError;
+                close(new CommunicationException("Connection retries exceeded.", cause));
             }
             try {
-                connect(channel);
+                connect(communicationProvider);
                 return;
             } catch (Exception e) {
                 closeChannel(channel);
@@ -162,15 +155,14 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         return retries >= limit;
     }
 
-    protected void connect(final SocketChannel channel) throws Exception {
+    protected void connect(final NodeCommunicationProvider communicationProvider) throws Exception {
         try {
-            this.currentNodeInfo = BinaryProtoUtils.connect(channel, config.username, config.password);
+//            this.currentNodeInfo = BinaryProtoUtils.connect(channel, config.username, config.password);
+            communicationProvider.connect();
         } catch (IOException e) {
             throw new CommunicationException("Couldn't connect to tarantool", e);
         }
-        channel.configureBlocking(false);
 
-        this.channel = channel;
         writerBufferLock.lock();
         try {
             sharedBuffer.clear();
@@ -178,7 +170,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             writerBufferLock.unlock();
         }
         this.thumbstone = null;
-        startThreads(channel.socket().getRemoteSocketAddress().toString());
+        startThreads(communicationProvider.getDescription());
     }
 
     protected void startThreads(String threadName) throws InterruptedException {
@@ -366,9 +358,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    TarantoolBinaryPackage pack = socketProvider.readPackage();
-                    //todo
-//                    TarantoolBinaryPackage pack = BinaryProtoUtils.readPacket(getReadChannel());
+                    TarantoolBinaryPackage pack = communicationProvider.readPackage();
 
                     Map<Integer, Object> headers = pack.getHeaders();
 
@@ -407,9 +397,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 writerBuffer.flip();
                 writeLock.lock();
                 try {
-                    socketProvider.writeBuffer(writerBuffer);
-                    //todo
-//                    BinaryProtoUtils.writeFully(getWriteChannel(), writerBuffer);
+                    communicationProvider.writeBuffer(writerBuffer);
                 } finally {
                     writeLock.unlock();
                 }
