@@ -35,10 +35,14 @@ public abstract class AbstractTarantoolConnectorIT {
     protected static final int LISTEN = 3301;
     protected static final int ADMIN = 3313;
     protected static final int TIMEOUT = 500;
-    protected static final int RESTART_TIMEOUT = 2000;
+    protected static final int RESTART_TIMEOUT = 200000;//todo
 
+    @Deprecated
     protected static final SocketChannelProvider socketChannelProvider = new TestSocketChannelProvider(host, port,
         RESTART_TIMEOUT);
+
+    protected static final NodeCommunicationProvider testNodeCommunicationProvider =
+            new TestNodeCommunicationProvider(host + ":" + port, username, password, RESTART_TIMEOUT);
 
     protected static TarantoolControl control;
     protected static TarantoolConsole console;
@@ -132,7 +136,8 @@ public abstract class AbstractTarantoolConnectorIT {
     }
 
     protected TarantoolClient makeClient() {
-        return new TarantoolClientImpl(socketChannelProvider, makeClientConfig());
+//        return new TarantoolClientImpl(socketChannelProvider, makeClientConfig());
+        return new TarantoolClientImpl(testNodeCommunicationProvider, makeClientConfig());
     }
 
     protected static TarantoolClientConfig makeClientConfig() {

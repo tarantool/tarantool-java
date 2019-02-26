@@ -39,7 +39,9 @@ public class ClusterTopologyFromShardDiscovererImpl implements ClusterTopologyDi
 
             for (Object replica : replicas.entrySet()) {
                 Object replicaUri = getValue(((Map.Entry) replica).getValue(), "uri");
-                result.add(TarantoolInstanceInfo.create(parseReplicaUri(replicaUri.toString())));
+
+                result.add(TarantoolInstanceInfo.create(
+                        parseReplicaUri(replicaUri.toString()), clientConfig.username, clientConfig.password));
             }
         }
 

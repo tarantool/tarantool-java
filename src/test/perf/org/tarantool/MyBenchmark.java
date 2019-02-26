@@ -1,7 +1,10 @@
 package org.tarantool;
 
 import org.openjdk.jmh.annotations.*;
+import org.tarantool.server.TarantoolBinaryPackage;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -17,10 +20,36 @@ public class MyBenchmark {
         }
 
         @Override
-        public SocketChannel getNext(int retryNumber, Throwable lastError) {
+        public SocketChannel get() {
             return new DodgeSocketChannel(defaultSocketQueueSize);
         }
     }
+
+    /**
+     * todo
+     */
+    private static class DodgeCommunication implements NodeCommunicationProvider {
+        @Override
+        public void connect() throws IOException {
+
+        }
+
+        @Override
+        public TarantoolBinaryPackage readPackage() throws IOException {
+            return null;
+        }
+
+        @Override
+        public void writeBuffer(ByteBuffer byteBuffer) throws IOException {
+
+        }
+
+        @Override
+        public String getDescription() {
+            return null;
+        }
+    }
+
 
     @State(Scope.Benchmark)
     public static class SpeedOfWriteAndReadState {
@@ -31,7 +60,7 @@ public class MyBenchmark {
         public void init() {
             System.out.println("INIT BENCHMARK");
             TarantoolClientConfig config = new TarantoolClientConfig();
-            this.tarantoolClient = new TarantoolClientImpl(new DodgeSocketChannelProvider(10), config);
+            this.tarantoolClient = new TarantoolClientImpl(new DodgeCommunication(), config);
         }
 
         @TearDown(Level.Invocation)

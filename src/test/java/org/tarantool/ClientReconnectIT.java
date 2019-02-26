@@ -4,7 +4,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.tarantool.server.TarantoolBinaryPackage;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Collections;
 import java.util.List;
@@ -64,7 +67,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         });
 
         assertTrue(CommunicationException.class.isAssignableFrom(e.getClass()) ||
-            IllegalStateException.class.isAssignableFrom(e.getClass()));
+                IllegalStateException.class.isAssignableFrom(e.getClass()));
 
         assertNotNull(((TarantoolClientImpl) client).getThumbstone());
 
@@ -85,21 +88,38 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     @Test
     public void testSpuriousReturnFromPark() {
         final CountDownLatch latch = new CountDownLatch(2);
-        SocketChannelProvider provider = new SocketChannelProvider() {
+
+        TarantoolClientConfig config = makeClientConfig();
+
+        NodeCommunicationProvider nodeCommunicationProvider = new NodeCommunicationProvider() {
+
             @Override
-            public SocketChannel getNext(int retryNumber, Throwable lastError) {
-                if (lastError == null) {
-                    latch.countDown();
-                }
-                return socketChannelProvider.getNext(retryNumber, lastError);
+            public void connect() throws IOException {
+                latch.countDown();
+                testNodeCommunicationProvider.connect();
+            }
+
+            @Override
+            public TarantoolBinaryPackage readPackage() throws IOException {
+                return testNodeCommunicationProvider.readPackage();
+            }
+
+            @Override
+            public void writeBuffer(ByteBuffer byteBuffer) throws IOException {
+                testNodeCommunicationProvider.writeBuffer(byteBuffer);
+            }
+
+            @Override
+            public String getDescription() {
+                return testNodeCommunicationProvider.getDescription();
             }
         };
 
-        client = new TarantoolClientImpl(provider, makeClientConfig());
+        client = new TarantoolClientImpl(nodeCommunicationProvider, config);
         client.syncOps().ping();
 
         // The park() will return inside connector thread.
-        LockSupport.unpark(((TarantoolClientImpl)client).connector);
+        LockSupport.unpark(((TarantoolClientImpl) client).connector);
 
         // Wait on latch as a proof that reconnect did not happen.
         // In case of a failure, latch will reach 0 before timeout occurs.
@@ -116,7 +136,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
      */
     @Test
     public void testCloseWhileOperationsAreInProgress() {
-        client = new TarantoolClientImpl(socketChannelProvider, makeClientConfig()) {
+        client = new TarantoolClientImpl(testNodeCommunicationProvider, makeClientConfig()) {
             @Override
             protected void write(Code code, Long syncId, Long schemaId, Object... args) {
                 // Skip write.
@@ -124,7 +144,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         };
 
         final Future<List<?>> res = client.asyncOps().select(SPACE_ID, PK_INDEX_ID, Collections.singletonList(1),
-            0, 1, Iterator.EQ);
+                0, 1, Iterator.EQ);
 
         client.close();
 
@@ -144,7 +164,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     @Test
     public void testReconnectWhileOperationsAreInProgress() {
         final AtomicBoolean writeEnabled = new AtomicBoolean(false);
-        client = new TarantoolClientImpl(socketChannelProvider, makeClientConfig()) {
+        client = new TarantoolClientImpl(testNodeCommunicationProvider, makeClientConfig()) {
             @Override
             protected void write(Code code, Long syncId, Long schemaId, Object... args) throws Exception {
                 if (writeEnabled.get()) {
@@ -154,7 +174,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         };
 
         final Future<List<?>> mustFail = client.asyncOps().select(SPACE_ID, PK_INDEX_ID, Collections.singletonList(1),
-            0, 1, Iterator.EQ);
+                0, 1, Iterator.EQ);
 
         stopTarantool(INSTANCE_NAME);
 
@@ -176,7 +196,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         }
 
         Future<List<?>> res = client.asyncOps().select(SPACE_ID, PK_INDEX_ID, Collections.singletonList(1),
-            0, 1, Iterator.EQ);
+                0, 1, Iterator.EQ);
 
         try {
             res.get(TIMEOUT, TimeUnit.MILLISECONDS);
@@ -188,11 +208,11 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     @Test
     public void testConcurrentCloseAndReconnect() {
         final CountDownLatch latch = new CountDownLatch(2);
-        client = new TarantoolClientImpl(socketChannelProvider, makeClientConfig()) {
+        client = new TarantoolClientImpl(testNodeCommunicationProvider, makeClientConfig()) {
             @Override
-            protected void connect(final SocketChannel channel) throws Exception {
+            protected void connect(NodeCommunicationProvider communicationProvider) throws Exception {
                 latch.countDown();
-                super.connect(channel);
+                super.connect(communicationProvider);
             }
         };
 
@@ -221,10 +241,10 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     public void testLongParallelCloseReconnects() {
         int numThreads = 4;
         int numClients = 4;
-        int timeBudget = 30*1000;
+        int timeBudget = 30 * 1000;
 
         final AtomicReferenceArray<TarantoolClient> clients =
-            new AtomicReferenceArray<TarantoolClient>(numClients);
+                new AtomicReferenceArray<TarantoolClient>(numClients);
 
         for (int idx = 0; idx < clients.length(); idx++) {
             clients.set(idx, makeClient());
@@ -242,7 +262,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
                 @Override
                 public void run() {
                     while (!Thread.currentThread().isInterrupted() &&
-                        deadline > System.currentTimeMillis()) {
+                            deadline > System.currentTimeMillis()) {
 
                         int idx = rnd.nextInt(clients.length());
 
@@ -284,7 +304,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
                 fail(e);
             }
             if (deadline > System.currentTimeMillis()) {
-                System.out.println("" + (deadline - System.currentTimeMillis())/1000 + "s remains.");
+                System.out.println("" + (deadline - System.currentTimeMillis()) / 1000 + "s remains.");
             }
         }
 

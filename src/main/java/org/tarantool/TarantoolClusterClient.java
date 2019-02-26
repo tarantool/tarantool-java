@@ -72,7 +72,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
             RoundRobinNodeCommunicationProvider cp = (RoundRobinNodeCommunicationProvider) this.communicationProvider;
 
-            TarantoolInstanceInfo currentNode = cp.getCurrentNode();
+/*            TarantoolInstanceInfo currentNode = cp.getCurrentNode();
 
             int sameNodeIndex = newServerList.indexOf(currentNode);
             if (sameNodeIndex != -1) {
@@ -82,7 +82,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
                 cp.setNodes(newServerList);
                 die("The server list have been changed.", null);
                 //todo
-            }
+            }*/
 
             cp.updateNodes(newServerList);
 

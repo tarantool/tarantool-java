@@ -35,8 +35,8 @@ public class TestTarantoolClient {
         final Semaphore s = new Semaphore(0);
         long latency = 1L;
 
-        public TarantoolClientTestImpl(SocketChannelProvider socketProvider, TarantoolClientConfig options) {
-            super(socketProvider, options);
+        public TarantoolClientTestImpl(NodeCommunicationProvider nodeComm, TarantoolClientConfig options) {
+            super(nodeComm, options);
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -94,21 +94,12 @@ public class TestTarantoolClient {
         config.sharedBufferSize = 128;
 
         //config.sharedBufferSize = 0;
-        SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
-            @Override
-            public SocketChannel getNext(int retryNumber, Throwable lastError) {
-                if (lastError != null) {
-                    lastError.printStackTrace(System.out);
-                }
-                System.out.println("reconnect");
-                try {
-                    return SocketChannel.open(new InetSocketAddress("localhost", 3301));
-                } catch (IOException e) {
-                    throw new IllegalStateException(e);
-                }
-            }
-        };
-        final TarantoolClientTestImpl client = new TarantoolClientTestImpl(socketChannelProvider, config);
+
+        NodeCommunicationProvider nodeComm =
+                new SingleNodeCommunicationProvider("localhost:3301", config.username, config.password);
+
+
+        final TarantoolClientTestImpl client = new TarantoolClientTestImpl(nodeComm, config);
         config.writeTimeoutMillis = 2;
         client.latency = 1;
         client.syncOps.ping();
