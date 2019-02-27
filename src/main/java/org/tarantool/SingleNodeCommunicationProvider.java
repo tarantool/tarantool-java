@@ -24,8 +24,9 @@ public class SingleNodeCommunicationProvider implements NodeCommunicationProvide
     }
 
     @Override
-    public void connect() throws IOException {
+    public TarantoolInstanceConnection connect() throws IOException {
         nodeConnection = TarantoolInstanceConnection.connect(tarantoolInstanceInfo);
+        return nodeConnection;
     }
 
     public void writeBuffer(ByteBuffer byteBuffer) throws IOException {

@@ -4,6 +4,8 @@ import org.tarantool.cluster.ClusterTopologyDiscoverer;
 import org.tarantool.cluster.ClusterTopologyFromShardDiscovererImpl;
 import org.tarantool.server.*;
 
+import java.io.*;
+import java.nio.channels.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,6 +33,13 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     private final TarantoolInstanceInfo infoHost;
     private final Integer infoHostConnectionTimeout;
     private final ClusterTopologyDiscoverer topologyDiscoverer;
+
+
+
+    private TarantoolInstanceConnection instanceWithSentRequests;
+    private Selector readSelector;
+    private final Object readSyncObject = new Object();
+
     /**
      * @param config Configuration.
      */
@@ -66,32 +75,65 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         List<TarantoolInstanceInfo> newServerList = topologyDiscoverer
                 .discoverTarantoolNodes(infoNode, infoHostConnectionTimeout);
 
-        writeLock.lock();
-//        todo add a read lock
-        try {
+        synchronized (readSyncObject) {
+            writeLock.lock();
+            try {
 
-            RoundRobinNodeCommunicationProvider cp = (RoundRobinNodeCommunicationProvider) this.communicationProvider;
+                RoundRobinNodeCommunicationProvider cp = (RoundRobinNodeCommunicationProvider) this.communicationProvider;
 
-/*            TarantoolInstanceInfo currentNode = cp.getCurrentNode();
+                int sameNodeIndex = newServerList.indexOf(currConnection.getNodeInfo());
+                if (sameNodeIndex != -1) {
+                    //current node is in the list
+                    Collections.swap(newServerList, 0, sameNodeIndex);
+                    cp.updateNodes(newServerList);
+                } else {
+                    cp.updateNodes(newServerList);
+                    instanceWithSentRequests = currConnection;
+                    die("The server list have been changed.", null);
+                }
 
-            int sameNodeIndex = newServerList.indexOf(currentNode);
-            if (sameNodeIndex != -1) {
-                Collections.swap(newServerList, 0, sameNodeIndex);
-                cp.setNodes(newServerList);
-            } else {
-                cp.setNodes(newServerList);
-                die("The server list have been changed.", null);
-                //todo
-            }*/
-
-            cp.updateNodes(newServerList);
-
-
-        } finally {
-            writeLock.unlock();
+            } finally {
+                writeLock.unlock();
+            }
         }
 
         return newServerList;
+    }
+
+    @Override
+    protected void connect(NodeCommunicationProvider communicationProvider) throws Exception {
+        //region drop all registered selectors from channel
+        if (currConnection != null) {
+            SelectionKey registeredKey = currConnection.getChannel().keyFor(readSelector);
+            if (registeredKey != null) {
+                registeredKey.cancel();
+            }
+        }
+        //endregion
+
+        super.connect(communicationProvider);
+
+        //region reregister selector
+        readSelector = Selector.open();
+
+        if (instanceWithSentRequests != null) {
+            SelectionKey register = instanceWithSentRequests.getChannel().register(readSelector, SelectionKey.OP_READ);
+        }
+
+        currConnection.getChannel().register(readSelector, SelectionKey.OP_READ);
+        //endregion
+    }
+
+    @Override
+    protected TarantoolBinaryPackage readFromInstance() throws IOException {
+        synchronized (readSyncObject) {
+            //        return communicationProvider.readPackage();
+            readSelector.select();
+            SelectionKey selectedKey = readSelector.selectedKeys().iterator().next();
+
+            //todo обработать случай, когда прочитали последний пакет из instanceWithSentRequests инстанса
+            return BinaryProtoUtils.readPacket(((SocketChannel) selectedKey.channel()));
+        }
     }
 
     @Override

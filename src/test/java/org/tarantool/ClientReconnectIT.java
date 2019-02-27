@@ -4,7 +4,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
-import org.tarantool.server.TarantoolBinaryPackage;
+import org.tarantool.server.*;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -94,9 +94,9 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         NodeCommunicationProvider nodeCommunicationProvider = new NodeCommunicationProvider() {
 
             @Override
-            public void connect() throws IOException {
+            public TarantoolInstanceConnection connect() throws IOException {
                 latch.countDown();
-                testNodeCommunicationProvider.connect();
+                return testNodeCommunicationProvider.connect();
             }
 
             @Override

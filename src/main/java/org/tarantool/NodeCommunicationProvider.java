@@ -7,7 +7,7 @@ import java.nio.*;
 
 public interface NodeCommunicationProvider {
 
-    void connect() throws IOException;
+    TarantoolInstanceConnection connect() throws IOException;
 
     TarantoolBinaryPackage readPackage() throws IOException;
 

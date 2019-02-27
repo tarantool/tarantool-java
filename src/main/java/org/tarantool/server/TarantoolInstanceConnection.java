@@ -34,8 +34,9 @@ public class TarantoolInstanceConnection implements Closeable {
     /**
      *  Attempts to connect to a tarantool instance and create correspond TarantoolInstanceConnection
      *
-     * @param tarantoolInstanceInfo
-     * @throws CommunicationException
+     * @param tarantoolInstanceInfo information about an instance to connect
+     * @throws CommunicationException if an error occurred during connection related exchanges
+     * @throws IOException in case of any IO fail
      */
     public static TarantoolInstanceConnection connect(TarantoolInstanceInfo tarantoolInstanceInfo) throws IOException {
         SocketChannel channel;
@@ -65,12 +66,10 @@ public class TarantoolInstanceConnection implements Closeable {
     }
 
     private void closeConnection() {
-        if (channel != null) {
-            try {
-                channel.close();
-            } catch (IOException ignored) {
+        try {
+            channel.close();
+        } catch (IOException ignored) {
 
-            }
         }
     }
 

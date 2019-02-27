@@ -1,13 +1,10 @@
 package org.tarantool;
 
-import org.tarantool.server.BinaryProtoUtils;
-import org.tarantool.server.TarantoolBinaryPackage;
-import org.tarantool.server.TarantoolInstanceConnection;
-import org.tarantool.server.TarantoolInstanceInfo;
+import org.tarantool.server.*;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import java.io.*;
+import java.nio.*;
+import java.nio.channels.*;
 import java.util.*;
 import java.util.stream.*;
 
@@ -20,9 +17,12 @@ public class RoundRobinNodeCommunicationProvider implements NodeCommunicationPro
     private int retriesLimit = -1; // No-limit.
 
 
-    private TarantoolInstanceInfo[] nodes;
+    private final String clusterUsername;
+    private final String clusterPassword;
+
     private TarantoolInstanceConnection currentConnection;
 
+    private TarantoolInstanceInfo[] nodes;
     private int pos = 0;
 
     public RoundRobinNodeCommunicationProvider(String[] slaveHosts, String username, String password, int timeout) {
@@ -31,28 +31,28 @@ public class RoundRobinNodeCommunicationProvider implements NodeCommunicationPro
             throw new IllegalArgumentException("slave hosts is null ot empty");
         }
 
-        setNodes(slaveHosts, username, password);
+        clusterUsername = username;
+        clusterPassword = password;
+
+        setNodes(slaveHosts);
     }
 
-    private void setNodes(String[] slaveHosts, String username, String password) {
-        //todo add read-write lock
-        nodes = new TarantoolInstanceInfo[slaveHosts.length];
-        for (int i = 0; i < slaveHosts.length; i++) {
-            String slaveHostAddress = slaveHosts[i];
-            nodes[i] = TarantoolInstanceInfo.create(slaveHostAddress, username, password);
+    private void setNodes(String[] instanceAddresses) {
+        nodes = new TarantoolInstanceInfo[instanceAddresses.length];
+        for (int i = 0; i < instanceAddresses.length; i++) {
+            String slaveHostAddress = instanceAddresses[i];
+            nodes[i] = TarantoolInstanceInfo.create(slaveHostAddress, clusterUsername, clusterPassword);
         }
 
         pos = 0;
     }
 
-    public void updateNodes(List<TarantoolInstanceInfo> slaveHosts) {
-        if (slaveHosts == null) {
-            throw new IllegalArgumentException("slaveHosts can not be null");
+    public void updateNodes(List<TarantoolInstanceInfo> instanceAddresses) {
+        if (instanceAddresses == null) {
+            throw new IllegalArgumentException("instanceAddresses can not be null");
         }
-        //todo add read-write lock
 
-        this.nodes = (TarantoolInstanceInfo[]) slaveHosts.toArray();
-
+        this.nodes = (TarantoolInstanceInfo[]) instanceAddresses.toArray();
         pos = 0;
     }
 
@@ -119,8 +119,9 @@ public class RoundRobinNodeCommunicationProvider implements NodeCommunicationPro
 
 
     @Override
-    public void connect() {
+    public TarantoolInstanceConnection connect() {
         currentConnection = connectNextNode();
+        return currentConnection;
     }
 
     public void writeBuffer(ByteBuffer byteBuffer) throws IOException {

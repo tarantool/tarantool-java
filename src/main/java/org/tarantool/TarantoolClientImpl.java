@@ -45,6 +45,8 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
      * Write properties
      */
     protected SocketChannel channel;
+    protected TarantoolInstanceConnection currConnection;
+
     protected ByteBuffer sharedBuffer;
     protected ByteBuffer writerBuffer;
     protected ReentrantLock writerBufferLock = new ReentrantLock(false);
@@ -132,6 +134,17 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             }
             try {
                 connect(communicationProvider);
+
+                writerBufferLock.lock();
+                try {
+                    sharedBuffer.clear();
+                } finally {
+                    writerBufferLock.unlock();
+                }
+
+                this.thumbstone = null;
+                startThreads(communicationProvider.getDescription());
+
                 return;
             } catch (Exception e) {
                 closeChannel(channel);
@@ -157,20 +170,10 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     protected void connect(final NodeCommunicationProvider communicationProvider) throws Exception {
         try {
-//            this.currentNodeInfo = BinaryProtoUtils.connect(channel, config.username, config.password);
-            communicationProvider.connect();
+            currConnection = communicationProvider.connect();
         } catch (IOException e) {
             throw new CommunicationException("Couldn't connect to tarantool", e);
         }
-
-        writerBufferLock.lock();
-        try {
-            sharedBuffer.clear();
-        } finally {
-            writerBufferLock.unlock();
-        }
-        this.thumbstone = null;
-        startThreads(communicationProvider.getDescription());
     }
 
     protected void startThreads(String threadName) throws InterruptedException {
@@ -279,12 +282,12 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     protected void write(Code code, Long syncId, Long schemaId, Object... args)
             throws Exception {
-        ByteBuffer buffer = BinaryProtoUtils.createPacket(code, syncId, schemaId, args);
+        ByteBuffer msgBytes = BinaryProtoUtils.createPacket(code, syncId, schemaId, args);
 
-        if (directWrite(buffer)) {
+        if (directWrite(msgBytes)) {
             return;
         }
-        sharedWrite(buffer);
+        sharedWrite(msgBytes);
 
     }
 
@@ -358,7 +361,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    TarantoolBinaryPackage pack = communicationProvider.readPackage();
+                    TarantoolBinaryPackage pack = readFromInstance();
 
                     Map<Integer, Object> headers = pack.getHeaders();
 
@@ -376,6 +379,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         } catch (Exception e) {
             die("Cant init thread", e);
         }
+    }
+
+    protected TarantoolBinaryPackage readFromInstance() throws IOException {
+//        return communicationProvider.readPackage();
+        return BinaryProtoUtils.readPacket(currConnection.getChannel());
     }
 
     protected void writeThread() {
@@ -397,7 +405,8 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 writerBuffer.flip();
                 writeLock.lock();
                 try {
-                    communicationProvider.writeBuffer(writerBuffer);
+                    ByteBuffer writerBuffer = this.writerBuffer;
+                    sendToInstance(writerBuffer);
                 } finally {
                     writeLock.unlock();
                 }
@@ -409,6 +418,13 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             }
         }
     }
+
+
+    protected void sendToInstance(ByteBuffer writerBuffer) throws IOException {
+//        communicationProvider.writeBuffer(writerBuffer);
+        BinaryProtoUtils.writeFully(currConnection.getChannel(), writerBuffer);
+    }
+
 
     protected void fail(CompletableFuture<?> q, Exception e) {
         q.completeExceptionally(e);
