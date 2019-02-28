@@ -2,6 +2,7 @@ package org.tarantool;
 
 import org.openjdk.jmh.annotations.*;
 import org.tarantool.server.TarantoolBinaryPackage;
+import org.tarantool.server.TarantoolInstanceConnection;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -30,8 +31,8 @@ public class MyBenchmark {
      */
     private static class DodgeCommunication implements NodeCommunicationProvider {
         @Override
-        public void connect() throws IOException {
-
+        public TarantoolInstanceConnection connect() throws IOException {
+            return null;
         }
 
         @Override

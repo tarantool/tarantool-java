@@ -1,5 +1,7 @@
 package org.tarantool;
 
+import org.tarantool.server.TarantoolInstanceConnection;
+
 import java.io.IOException;
 
 public class TestNodeCommunicationProvider extends SingleNodeCommunicationProvider {
@@ -12,13 +14,12 @@ public class TestNodeCommunicationProvider extends SingleNodeCommunicationProvid
     }
 
     @Override
-    public void connect() throws IOException {
+    public TarantoolInstanceConnection connect() throws IOException {
 
         long budget = System.currentTimeMillis() + restartTimeout;
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                super.connect();
-                return;
+                return super.connect();
             } catch (Exception e) {
                 if (budget < System.currentTimeMillis())
                     throw new RuntimeException(e);
