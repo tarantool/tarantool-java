@@ -145,7 +145,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 connectAndStartThreads();
                 return;
             } catch (Exception e) {
-                closeChannel(channel);
+                closeChannel(currConnection);
                 lastError = e;
                 if (e instanceof InterruptedException)
                     Thread.currentThread().interrupt();
@@ -375,7 +375,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 try {
                     TarantoolBinaryPackage pack = readFromInstance();
 
-                    CompletableFuture<?> future = futures.remove(pack.getSync());
+                    CompletableFuture<?> future = getFuture(pack);
 
                     stats.received++;
                     wait.decrementAndGet();
@@ -388,6 +388,10 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         } catch (Exception e) {
             die("Cant init thread", e);
         }
+    }
+
+    protected CompletableFuture<?> getFuture(TarantoolBinaryPackage pack) {
+        return futures.remove(pack.getSync());
     }
 
     protected TarantoolBinaryPackage readFromInstance() throws IOException, InterruptedException {
@@ -508,7 +512,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         if (writer != null) {
             writer.interrupt();
         }
-        closeChannel(channel);
+        closeChannel(currConnection);
     }
 
     @Override

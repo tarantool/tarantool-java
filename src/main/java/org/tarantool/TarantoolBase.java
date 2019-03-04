@@ -1,6 +1,7 @@
 package org.tarantool;
 
 import org.tarantool.server.BinaryProtoUtils;
+import org.tarantool.server.TarantoolInstanceConnection;
 import org.tarantool.server.TarantoolInstanceConnectionMeta;
 
 import java.io.IOException;
@@ -68,10 +69,10 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
         }
     }
 
-    protected void closeChannel(SocketChannel channel) {
-        if (channel != null) {
+    protected void closeChannel(TarantoolInstanceConnection connection) {
+        if (connection != null) {
             try {
-                channel.close();
+                connection.close();
             } catch (IOException ignored) {
 
             }

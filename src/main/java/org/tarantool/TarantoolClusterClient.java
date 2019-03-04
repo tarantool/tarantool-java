@@ -11,7 +11,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
@@ -39,7 +39,6 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     private ClusterTopologyDiscoverer topologyDiscoverer;
 
 
-    private List<TarantoolInstanceInfo> newServerList = null;
     private TarantoolInstanceConnection oldConnection;
     private ConcurrentHashMap<Long, CompletableFuture<?>> futuresSentToOldConnection = new ConcurrentHashMap<>();
     private ReentrantLock initLock = new ReentrantLock();
@@ -109,21 +108,27 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
                 cp.updateNodes(newServerList);
 
-                //todo move to "connect" method
-                futuresSentToOldConnection.values()
-                        .forEach(f -> {
-                            f.completeExceptionally(new CommunicationException("Connection is dead"));
-                        });
-                futuresSentToOldConnection.putAll(futures);
-                futures.clear();
+
+
+                if (state.isAtState(StateHelper.ALIVE)) {
+                    stopIO();
+
+                    futuresSentToOldConnection.values()
+                            .forEach(f -> {
+                                f.completeExceptionally(new CommunicationException("Connection is dead"));
+                            });
+                    futuresSentToOldConnection.putAll(futures);
+                    futures.clear();
+
+                    LockSupport.unpark(connector);
+
+                    //remove
+//                    die("The server list have been changed.", null);
+                }
+                // if not alive, then do nothing because we are closed or on RECONNECT state.
+                // in the last case reconnect thread will wait untill the initLock will be unlocked
 
                 oldConnection = currConnection;
-
-
-                this.newServerList = newServerList;
-
-                //do reconnect to update list
-                die("The server list have been changed.", null);
             }
         } finally {
             initLock.unlock();
@@ -136,28 +141,30 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     @Override
     protected void connect(NodeCommunicationProvider communicationProvider) throws Exception {
         //region drop all registered selectors from channel
-        if (currConnection != null) {
-            SelectionKey registeredKey = currConnection.getChannel().keyFor(readSelector);
-            if (registeredKey != null) {
-                registeredKey.cancel();
-            }
-        }
-        //endregion
+//        if (currConnection != null) {
+//            SelectionKey registeredKey = currConnection.getChannel().keyFor(readSelector);
+//            if (registeredKey != null) {
+//                registeredKey.cancel();
+//            }
+//        }
 
-        super.connect(communicationProvider);
-
-        //region reregister selector
         if (readSelector != null) {
             try {
                 readSelector.close();
             } catch (IOException ignored) {
             }
         }
+        //endregion
+
+        //set a new value to currConnection variable
+        super.connect(communicationProvider);
+
+        //region reregister selector
+
         readSelector = Selector.open();
 
         if (oldConnection != null) {
-            SelectionKey register = oldConnection.getChannel().
-                    register(readSelector, SelectionKey.OP_READ, currConnection);
+            oldConnection.getChannel().register(readSelector, SelectionKey.OP_READ, currConnection);
         }
 
         currConnection.getChannel().register(readSelector, SelectionKey.OP_READ, currConnection);
@@ -179,13 +186,17 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         return BinaryProtoUtils.readPacket(readChannel);
     }
 
-    private void closeOldInstanceIfNeeded() {
-        if (futuresSentToOldConnection.isEmpty()) {
-            try {
-                oldConnection.close();
-            } catch (IOException ignored) {
+    @Override
+    protected CompletableFuture<?> getFuture(TarantoolBinaryPackage pack) {
+        Long sync = pack.getSync();
+        if (!futuresSentToOldConnection.isEmpty()) {
+            CompletableFuture<?> oldConnectionFuture = futuresSentToOldConnection.remove(sync);
+            if (oldConnectionFuture != null) {
+                futuresSentToOldConnection.entrySet().remo
             }
+
         }
+        return futures.remove(sync);
     }
 
     @Override
@@ -235,7 +246,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
             q.completeExceptionally(e);
             return true;
         } else {
-            assert retries != null;
+
             retries.put(((ExpirableOp<?>) q).getId(), (ExpirableOp<?>)q);
             return false;
         }
