@@ -14,6 +14,7 @@ import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -91,7 +92,7 @@ public abstract class BinaryProtoUtils {
     /**
      * Connects to a tarantool node described by {@code socketChannel}. Performs an authentication if required
      *
-     * @param channel  a socket channel to tarantool node
+     * @param channel  a socket channel to tarantool node. The channel have to be in blocking mode
      * @param username auth username
      * @param password auth password
      * @return object with information about a connection/
@@ -117,7 +118,7 @@ public abstract class BinaryProtoUtils {
         if (username != null && password != null) {
             ByteBuffer authPacket = createAuthPacket(username, password, salt);
             writeFully(channel, authPacket);
-            TarantoolBinaryPackage authResponse = readPacket(channel);
+            TarantoolBinaryPackage authResponse = readPacket(((ReadableByteChannel) channel));
             Long code = (Long) authResponse.getHeaders().get(Key.CODE.getId());
             if (code != 0) {
                 Object error = authResponse.getBody().get(Key.ERROR.getId());
@@ -143,20 +144,28 @@ public abstract class BinaryProtoUtils {
     }
 
     public static final int LENGTH_OF_SIZE_MESSAGE = 5;
-    public static TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
-        channel.configureBlocking(false);
 
+    /**
+     * Reads a tarantool's binary protocol package from the reader
+     *
+     * @param bufferReader readable channel that have to be in blocking mode
+     * @return
+     * @throws IOException
+     * @throws
+     * @throws java.nio.channels.NonReadableChannelException – If this channel was not opened for reading
+     */
+    public static TarantoolBinaryPackage readPacket(ReadableByteChannel bufferReader)
+            throws CommunicationException, IOException {
         //todo get rid of this because SelectorProvider.provider().openSelector() creates two pipes and socket in the /proc/fd
-        SelectorChannelReadHelper bufferReader = new SelectorChannelReadHelper(channel);
 
         ByteBuffer buffer = ByteBuffer.allocate(LENGTH_OF_SIZE_MESSAGE);
-        bufferReader.readFully(buffer);
+        bufferReader.read(buffer);
 
         buffer.flip();
         int size = ((Number) getMsgPackLite().unpack(new ByteBufferBackedInputStream(buffer))).intValue();
 
         buffer = ByteBuffer.allocate(size);
-        bufferReader.readFully(buffer);
+        bufferReader.read(buffer);
 
         buffer.flip();
         ByteBufferBackedInputStream msgBytesStream = new ByteBufferBackedInputStream(buffer);
@@ -182,6 +191,12 @@ public abstract class BinaryProtoUtils {
         }
 
         return new TarantoolBinaryPackage(headers, body);
+    }
+
+    @Deprecated
+    public static TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
+        ReadableViaSelectorChannel bufferReader = new ReadableViaSelectorChannel(channel);
+        return readPacket(bufferReader);
     }
 
     @Deprecated

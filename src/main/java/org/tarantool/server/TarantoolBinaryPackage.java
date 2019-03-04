@@ -32,6 +32,10 @@ public class TarantoolBinaryPackage {
         return (Long) potenticalCode;
     }
 
+    public Long getSync() {
+        return (Long) getHeaders().get(Key.SYNC.getId());
+    }
+
     public Map<Integer, Object> getHeaders() {
         return headers;
     }

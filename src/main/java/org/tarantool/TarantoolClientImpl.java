@@ -89,8 +89,16 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         this(new SingleNodeCommunicationProvider(address, config.username, config.password), config);
     }
 
+    protected TarantoolClientImpl() {
+//        delegate init to a descendant
+    }
+
     public TarantoolClientImpl(NodeCommunicationProvider communicationProvider, TarantoolClientConfig config) {
         super();
+        init(communicationProvider, config);
+    }
+
+    protected void init(NodeCommunicationProvider communicationProvider, TarantoolClientConfig config) {
         this.thumbstone = NOT_INIT_EXCEPTION;
         this.config = config;
         this.initialRequestSize = config.defaultRequestSize;
@@ -99,8 +107,6 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         this.futures = new ConcurrentHashMap<>(config.predictedFutures);
         this.sharedBuffer = ByteBuffer.allocateDirect(config.sharedBufferSize);
         this.writerBuffer = ByteBuffer.allocateDirect(sharedBuffer.capacity());
-        this.connector.setDaemon(true);
-        this.connector.setName("Tarantool connector");
         this.syncOps = new SyncOps();
         this.composableAsyncOps = new ComposableAsyncOps();
         this.fireAndForgetOps = new FireAndForgetOps();
@@ -110,6 +116,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             this.fireAndForgetOps.setCallCode(Code.CALL);
             this.composableAsyncOps.setCallCode(Code.CALL);
         }
+
+        this.connector.setDaemon(true);
+        this.connector.setName("Tarantool connector");
         connector.start();
         try {
             if (!waitAlive(config.initTimeoutMillis, TimeUnit.MILLISECONDS)) {
@@ -133,18 +142,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 close(new CommunicationException("Connection retries exceeded.", cause));
             }
             try {
-                connect(communicationProvider);
-
-                writerBufferLock.lock();
-                try {
-                    sharedBuffer.clear();
-                } finally {
-                    writerBufferLock.unlock();
-                }
-
-                this.thumbstone = null;
-                startThreads(communicationProvider.getDescription());
-
+                connectAndStartThreads();
                 return;
             } catch (Exception e) {
                 closeChannel(channel);
@@ -153,6 +151,20 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                     Thread.currentThread().interrupt();
             }
         }
+    }
+
+    protected void connectAndStartThreads() throws Exception {
+        connect(communicationProvider);
+
+        writerBufferLock.lock();
+        try {
+            sharedBuffer.clear();
+        } finally {
+            writerBufferLock.unlock();
+        }
+
+        this.thumbstone = null;
+        startThreads(communicationProvider.getDescription());
     }
 
     /**
@@ -334,7 +346,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                     if (rem > initialRequestSize) {
                         stats.directPacketSizeGrowth++;
                     }
-                    BinaryProtoUtils.writeFully(getReadChannel(), buffer);
+                    sendToInstance(buffer);
                     stats.directWrite++;
                     wait.incrementAndGet();
                 } finally {
@@ -363,10 +375,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 try {
                     TarantoolBinaryPackage pack = readFromInstance();
 
-                    Map<Integer, Object> headers = pack.getHeaders();
-
-                    Long syncId = (Long) headers.get(Key.SYNC.getId());
-                    CompletableFuture<?> future = futures.remove(syncId);
+                    CompletableFuture<?> future = futures.remove(pack.getSync());
 
                     stats.received++;
                     wait.decrementAndGet();
@@ -381,7 +390,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     }
 
-    protected TarantoolBinaryPackage readFromInstance() throws IOException {
+    protected TarantoolBinaryPackage readFromInstance() throws IOException, InterruptedException {
 //        return communicationProvider.readPackage();
         return BinaryProtoUtils.readPacket(currConnection.getChannel());
     }
@@ -663,6 +672,10 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
         protected int getState() {
             return state.get();
+        }
+
+        protected boolean isAtState(int state) {
+            return getState() == state;
         }
 
         protected boolean close() {

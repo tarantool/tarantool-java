@@ -4,18 +4,19 @@ import org.tarantool.CommunicationException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 
-class SelectorChannelReadHelper {
+class ReadableViaSelectorChannel implements ReadableByteChannel {
     private final SocketChannel channel;
     private final Selector selector;
 
-    public SelectorChannelReadHelper(SocketChannel channel) throws IOException {
+    public ReadableViaSelectorChannel(SocketChannel channel) throws IOException {
         if (channel.isBlocking()) {
-            throw new IllegalArgumentException("Channel have to be blocking");
+            throw new IllegalArgumentException("Channel have to be non-blocking");
         }
 
         this.channel = channel;
@@ -23,8 +24,11 @@ class SelectorChannelReadHelper {
         channel.register(selector, SelectionKey.OP_READ);
     }
 
-    public void readFully(ByteBuffer buffer) throws IOException {
-        int n = channel.read(buffer);
+    @Override
+    public int read(ByteBuffer buffer) throws IOException {
+        int count, n;
+        count = n = channel.read(buffer);
+
         if (n < 0) {
             throw new CommunicationException("Channel read failed " + n);
         }
@@ -35,7 +39,19 @@ class SelectorChannelReadHelper {
             if (n < 0) {
                 throw new CommunicationException("Channel read failed " + n);
             }
+            count += n;
         }
+        return count;
     }
 
+    @Override
+    public boolean isOpen() {
+        return channel.isOpen();
+    }
+
+    @Override
+    public void close() throws IOException {
+        selector.close();
+        channel.close();
+    }
 }

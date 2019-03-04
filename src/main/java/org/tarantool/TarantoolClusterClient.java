@@ -11,6 +11,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import static org.tarantool.TarantoolClientImpl.StateHelper.CLOSED;
 
@@ -28,17 +31,20 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     /* Collection of operations to be retried. */
     private ConcurrentHashMap<Long, ExpirableOp<?>> retries = new ConcurrentHashMap<Long, ExpirableOp<?>>();
 
+    @Deprecated
     private final Collection<TarantoolInstanceInfo> slaveHosts;
 
-    private final TarantoolInstanceInfo infoHost;
-    private final Integer infoHostConnectionTimeout;
-    private final ClusterTopologyDiscoverer topologyDiscoverer;
+    private TarantoolInstanceInfo infoHost;
+    private Integer infoHostConnectionTimeout;
+    private ClusterTopologyDiscoverer topologyDiscoverer;
 
 
+    private List<TarantoolInstanceInfo> newServerList = null;
+    private TarantoolInstanceConnection oldConnection;
+    private ConcurrentHashMap<Long, CompletableFuture<?>> futuresSentToOldConnection = new ConcurrentHashMap<>();
+    private ReentrantLock initLock = new ReentrantLock();
 
-    private TarantoolInstanceConnection instanceWithSentRequests;
     private Selector readSelector;
-    private final Object readSyncObject = new Object();
 
     /**
      * @param config Configuration.
@@ -54,16 +60,28 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
      * @param config Configuration.
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config, NodeCommunicationProvider provider) {
-        super(provider, config);
+        init(provider, config);
 
         this.executor = config.executor == null ?
             Executors.newSingleThreadExecutor() : config.executor;
-        this.infoHost = TarantoolInstanceInfo.create(config.infoHost, config.username, config.password);
 
-        this.infoHostConnectionTimeout = config.infoHostConnectionTimeout;
-        this.topologyDiscoverer = new ClusterTopologyFromShardDiscovererImpl(config);
+        if (config.infoHost != null) {
+            this.infoHost = TarantoolInstanceInfo.create(config.infoHost, config.username, config.password);
 
-        slaveHosts = topologyDiscoverer.discoverTarantoolNodes(this.infoHost, infoHostConnectionTimeout);
+            this.infoHostConnectionTimeout = config.infoHostConnectionTimeout;
+            this.topologyDiscoverer = new ClusterTopologyFromShardDiscovererImpl(config);
+
+            slaveHosts = topologyDiscoverer.discoverTarantoolInstances(this.infoHost, infoHostConnectionTimeout);
+        } else {
+            if (config.slaveHosts == null || config.slaveHosts.length == 0) {
+                throw new IllegalArgumentException("Either slaveHosts or infoHost must be specified.");
+            }
+
+            slaveHosts = Arrays.stream(config.slaveHosts)
+                    .map(s -> TarantoolInstanceInfo.create(s, config.username, config.password))
+                    .collect(Collectors.toList());
+        }
+
     }
 
     /**
@@ -73,29 +91,44 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
      */
     private Collection<TarantoolInstanceInfo> refreshServerList(TarantoolInstanceInfo infoNode) {
         List<TarantoolInstanceInfo> newServerList = topologyDiscoverer
-                .discoverTarantoolNodes(infoNode, infoHostConnectionTimeout);
+                .discoverTarantoolInstances(infoNode, infoHostConnectionTimeout);
 
-        synchronized (readSyncObject) {
-            writeLock.lock();
-            try {
 
-                RoundRobinNodeCommunicationProvider cp = (RoundRobinNodeCommunicationProvider) this.communicationProvider;
+        initLock.lock();
+        try {
 
-                int sameNodeIndex = newServerList.indexOf(currConnection.getNodeInfo());
-                if (sameNodeIndex != -1) {
-                    //current node is in the list
-                    Collections.swap(newServerList, 0, sameNodeIndex);
-                    cp.updateNodes(newServerList);
-                } else {
-                    cp.updateNodes(newServerList);
-                    instanceWithSentRequests = currConnection;
-                    die("The server list have been changed.", null);
-                }
+            RoundRobinNodeCommunicationProvider cp = (RoundRobinNodeCommunicationProvider) this.communicationProvider;
 
-            } finally {
-                writeLock.unlock();
+            int sameNodeIndex = newServerList.indexOf(currConnection.getNodeInfo());
+            if (sameNodeIndex != -1) {
+                //current node is in the list
+                Collections.swap(newServerList, 0, sameNodeIndex);
+                cp.updateNodes(newServerList);
+            } else {
+
+
+                cp.updateNodes(newServerList);
+
+                //todo move to "connect" method
+                futuresSentToOldConnection.values()
+                        .forEach(f -> {
+                            f.completeExceptionally(new CommunicationException("Connection is dead"));
+                        });
+                futuresSentToOldConnection.putAll(futures);
+                futures.clear();
+
+                oldConnection = currConnection;
+
+
+                this.newServerList = newServerList;
+
+                //do reconnect to update list
+                die("The server list have been changed.", null);
             }
+        } finally {
+            initLock.unlock();
         }
+
 
         return newServerList;
     }
@@ -114,25 +147,44 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         super.connect(communicationProvider);
 
         //region reregister selector
+        if (readSelector != null) {
+            try {
+                readSelector.close();
+            } catch (IOException ignored) {
+            }
+        }
         readSelector = Selector.open();
 
-        if (instanceWithSentRequests != null) {
-            SelectionKey register = instanceWithSentRequests.getChannel().register(readSelector, SelectionKey.OP_READ);
+        if (oldConnection != null) {
+            SelectionKey register = oldConnection.getChannel().
+                    register(readSelector, SelectionKey.OP_READ, currConnection);
         }
 
-        currConnection.getChannel().register(readSelector, SelectionKey.OP_READ);
+        currConnection.getChannel().register(readSelector, SelectionKey.OP_READ, currConnection);
         //endregion
     }
 
     @Override
-    protected TarantoolBinaryPackage readFromInstance() throws IOException {
-        synchronized (readSyncObject) {
-            //        return communicationProvider.readPackage();
-            readSelector.select();
-            SelectionKey selectedKey = readSelector.selectedKeys().iterator().next();
+    protected TarantoolBinaryPackage readFromInstance() throws IOException, InterruptedException {
 
-            //todo обработать случай, когда прочитали последний пакет из instanceWithSentRequests инстанса
-            return BinaryProtoUtils.readPacket(((SocketChannel) selectedKey.channel()));
+        readSelector.select();
+
+        SelectionKey selectedKey = readSelector.selectedKeys().iterator().next();
+
+        TarantoolInstanceConnection connection = (TarantoolInstanceConnection) selectedKey.attachment();
+        ReadableByteChannel readChannel = connection
+                .getReadChannel();
+
+        //todo обработать случай, когда прочитали последний пакет из oldConnection инстанса
+        return BinaryProtoUtils.readPacket(readChannel);
+    }
+
+    private void closeOldInstanceIfNeeded() {
+        if (futuresSentToOldConnection.isEmpty()) {
+            try {
+                oldConnection.close();
+            } catch (IOException ignored) {
+            }
         }
     }
 
@@ -237,6 +289,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
                     public void run() {
                         futures.put(fut.getId(), fut);
                         try {
+                            //todo invoke sendToInstance method? (maybe not)
                             write(fut.getCode(), fut.getId(), null, fut.getArgs());
                         } catch (Exception e) {
                             futures.remove(fut.getId());
@@ -245,6 +298,16 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
                     }
                 });
             }
+        }
+    }
+
+    @Override
+    protected void connectAndStartThreads() throws Exception {
+        initLock.lock();
+        try {
+            super.connectAndStartThreads();
+        } finally {
+            initLock.unlock();
         }
     }
 

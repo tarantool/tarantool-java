@@ -4,6 +4,7 @@ import org.tarantool.CommunicationException;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
 
 public class TarantoolInstanceConnection implements Closeable {
@@ -23,12 +24,18 @@ public class TarantoolInstanceConnection implements Closeable {
      */
     protected final SocketChannel channel;
 
+    /**
+     * Nonnull connection to a tarantool instance
+     */
+    protected final ReadableViaSelectorChannel readChannel;
+
     private TarantoolInstanceConnection(TarantoolInstanceInfo nodeInfo,
                                         TarantoolInstanceConnectionMeta meta,
-                                        SocketChannel channel) {
+                                        SocketChannel channel) throws IOException {
         this.nodeInfo = nodeInfo;
         this.meta = meta;
         this.channel = channel;
+        this.readChannel = new ReadableViaSelectorChannel(channel);
     }
 
     /**
@@ -42,10 +49,12 @@ public class TarantoolInstanceConnection implements Closeable {
         SocketChannel channel;
         try {
             channel = SocketChannel.open(tarantoolInstanceInfo.getSocketAddress());
+
             String username = tarantoolInstanceInfo.getUsername();
             String password = tarantoolInstanceInfo.getPassword();
-
             TarantoolInstanceConnectionMeta meta = BinaryProtoUtils.connect(channel, username, password);
+
+            channel.configureBlocking(false);
 
             return new TarantoolInstanceConnection(tarantoolInstanceInfo, meta, channel);
         } catch (IOException e) {
@@ -63,6 +72,10 @@ public class TarantoolInstanceConnection implements Closeable {
 
     public SocketChannel getChannel() {
         return channel;
+    }
+
+    public ReadableByteChannel getReadChannel() {
+        return readChannel;
     }
 
     private void closeConnection() {

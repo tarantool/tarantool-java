@@ -20,7 +20,7 @@ class ClusterTopologyFromShardDiscovererImplTest {
 
 //        Collection<TarantoolInstanceInfo> tarantoolNodes =
 //                new ClusterTopologyFromShardDiscovererImpl(clientConfig)
-//                        .discoverTarantoolNodes(tarantoolInstanceInfo, 5000);
+//                        .discoverTarantoolInstances(tarantoolInstanceInfo, 5000);
         int i = 0;
     }
 }

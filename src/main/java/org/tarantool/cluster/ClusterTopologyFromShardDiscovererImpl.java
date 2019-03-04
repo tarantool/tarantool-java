@@ -19,8 +19,8 @@ public class ClusterTopologyFromShardDiscovererImpl implements ClusterTopologyDi
     }
 
     @Override
-    public List<TarantoolInstanceInfo> discoverTarantoolNodes(TarantoolInstanceInfo infoNode,
-                                                              Integer infoHostConnectionTimeout) {
+    public List<TarantoolInstanceInfo> discoverTarantoolInstances(TarantoolInstanceInfo infoNode,
+                                                                  Integer infoHostConnectionTimeout) {
 
         List<?> list = new TarantoolClientImpl(infoNode.getSocketAddress(), clientConfig)
                 .syncOps()
