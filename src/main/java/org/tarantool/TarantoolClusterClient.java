@@ -39,8 +39,8 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     private ClusterTopologyDiscoverer topologyDiscoverer;
 
 
-    private TarantoolInstanceConnection oldConnection;
-    private ConcurrentHashMap<Long, CompletableFuture<?>> futuresSentToOldConnection = new ConcurrentHashMap<>();
+    private volatile TarantoolInstanceConnection oldConnection;
+    private ConcurrentHashMap<Long, ExpirableOp<?>> futuresSentToOldConnection = new ConcurrentHashMap<>();
     private ReentrantLock initLock = new ReentrantLock();
 
     private Selector readSelector;
@@ -117,7 +117,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
                             .forEach(f -> {
                                 f.completeExceptionally(new CommunicationException("Connection is dead"));
                             });
-                    futuresSentToOldConnection.putAll(futures);
+                    futuresSentToOldConnection.putAll((Map<? extends Long, ? extends ExpirableOp<?>>) futures);
                     futures.clear();
 
                     LockSupport.unpark(connector);
@@ -182,7 +182,6 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         ReadableByteChannel readChannel = connection
                 .getReadChannel();
 
-        //todo обработать случай, когда прочитали последний пакет из oldConnection инстанса
         return BinaryProtoUtils.readPacket(readChannel);
     }
 
@@ -192,7 +191,25 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         if (!futuresSentToOldConnection.isEmpty()) {
             CompletableFuture<?> oldConnectionFuture = futuresSentToOldConnection.remove(sync);
             if (oldConnectionFuture != null) {
-                futuresSentToOldConnection.entrySet().remo
+                long now = System.currentTimeMillis();
+                futuresSentToOldConnection.entrySet()
+                        .removeIf(entry -> {
+                            ExpirableOp<?> expirableOp = entry.getValue();
+                            if (expirableOp.hasExpired(now)) {
+                                expirableOp.completeExceptionally(
+                                        new CommunicationException("Operation timeout is expired"));
+                                return true;
+                            } else {
+                                return false;
+                            }
+                        });
+                if (futuresSentToOldConnection.isEmpty()) {
+                    try {
+                        oldConnection.close();
+                    } catch (IOException e) {
+                    }
+                    oldConnection = null;
+                }
             }
 
         }
