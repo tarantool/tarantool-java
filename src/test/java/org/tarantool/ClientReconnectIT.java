@@ -100,16 +100,6 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
             }
 
             @Override
-            public TarantoolBinaryPackage readPackage() throws IOException {
-                return testNodeCommunicationProvider.readPackage();
-            }
-
-            @Override
-            public void writeBuffer(ByteBuffer byteBuffer) throws IOException {
-                testNodeCommunicationProvider.writeBuffer(byteBuffer);
-            }
-
-            @Override
             public String getDescription() {
                 return testNodeCommunicationProvider.getDescription();
             }

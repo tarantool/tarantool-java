@@ -36,16 +36,6 @@ public class MyBenchmark {
         }
 
         @Override
-        public TarantoolBinaryPackage readPackage() throws IOException {
-            return null;
-        }
-
-        @Override
-        public void writeBuffer(ByteBuffer byteBuffer) throws IOException {
-
-        }
-
-        @Override
         public String getDescription() {
             return null;
         }

@@ -37,7 +37,7 @@ class ReadableViaSelectorChannel implements ReadableByteChannel {
             selector.select();//todo think about read timeout
             n = channel.read(buffer);
             if (n < 0) {
-                throw new CommunicationException("Channel read failed " + n);
+                throw new CommunicationException("Channel read failed: " + n);
             }
             count += n;
         }

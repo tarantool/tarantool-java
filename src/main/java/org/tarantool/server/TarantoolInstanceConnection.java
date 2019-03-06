@@ -80,7 +80,7 @@ public class TarantoolInstanceConnection implements Closeable {
 
     private void closeConnection() {
         try {
-            channel.close();
+            readChannel.close();//also closes the channel
         } catch (IOException ignored) {
 
         }

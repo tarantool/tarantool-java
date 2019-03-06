@@ -1,8 +1,10 @@
 package org.tarantool;
 
-import org.tarantool.server.*;
+import org.tarantool.server.BinaryProtoUtils;
+import org.tarantool.server.TarantoolBinaryPackage;
+import org.tarantool.server.TarantoolInstanceConnection;
 
-import java.io.*;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -145,10 +147,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 connectAndStartThreads();
                 return;
             } catch (Exception e) {
-                closeChannel(currConnection);
-                lastError = e;
-                if (e instanceof InterruptedException)
-                    Thread.currentThread().interrupt();
+                close(e);
+//                closeChannel(currConnection);
+//                lastError = e;
+//                if (e instanceof InterruptedException)
+//                    Thread.currentThread().interrupt();
             }
         }
     }
@@ -395,8 +398,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     protected TarantoolBinaryPackage readFromInstance() throws IOException, InterruptedException {
-//        return communicationProvider.readPackage();
-        return BinaryProtoUtils.readPacket(currConnection.getChannel());
+        return BinaryProtoUtils.readPacket(currConnection.getReadChannel());
     }
 
     protected void writeThread() {

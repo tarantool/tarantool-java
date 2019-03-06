@@ -1,13 +1,10 @@
 package org.tarantool;
 
-import org.tarantool.server.*;
+import org.tarantool.server.TarantoolInstanceConnection;
+import org.tarantool.server.TarantoolInstanceInfo;
 
-import java.io.*;
-import java.net.*;
-import java.nio.*;
-import java.nio.channels.*;
-import java.util.*;
-import java.util.stream.*;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 
 public class SingleNodeCommunicationProvider implements NodeCommunicationProvider {
 
@@ -27,23 +24,6 @@ public class SingleNodeCommunicationProvider implements NodeCommunicationProvide
     public TarantoolInstanceConnection connect() throws IOException {
         nodeConnection = TarantoolInstanceConnection.connect(tarantoolInstanceInfo);
         return nodeConnection;
-    }
-
-    public void writeBuffer(ByteBuffer byteBuffer) throws IOException {
-        SocketChannel channel2Write = getChannel();
-        BinaryProtoUtils.writeFully(channel2Write, byteBuffer);
-    }
-
-    public TarantoolBinaryPackage readPackage() throws IOException {
-        SocketChannel channel2Read = getChannel();
-        return BinaryProtoUtils.readPacket(channel2Read);
-    }
-
-    private SocketChannel getChannel() {
-        if (nodeConnection == null) {
-            throw new IllegalStateException("Not initialized");
-        }
-        return nodeConnection.getChannel();
     }
 
     @Override

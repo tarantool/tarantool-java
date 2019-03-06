@@ -156,7 +156,6 @@ public abstract class BinaryProtoUtils {
      */
     public static TarantoolBinaryPackage readPacket(ReadableByteChannel bufferReader)
             throws CommunicationException, IOException {
-        //todo get rid of this because SelectorProvider.provider().openSelector() creates two pipes and socket in the /proc/fd
 
         ByteBuffer buffer = ByteBuffer.allocate(LENGTH_OF_SIZE_MESSAGE);
         bufferReader.read(buffer);
@@ -191,18 +190,6 @@ public abstract class BinaryProtoUtils {
         }
 
         return new TarantoolBinaryPackage(headers, body);
-    }
-
-    @Deprecated
-    public static TarantoolBinaryPackage readPacket(SocketChannel channel) throws IOException {
-        ReadableViaSelectorChannel bufferReader = new ReadableViaSelectorChannel(channel);
-        return readPacket(bufferReader);
-    }
-
-    @Deprecated
-    public static TarantoolBinaryPackage readPacketOld(SocketChannel channel) throws IOException {
-        CountInputStream inputStream = new ByteBufferInputStream(channel);
-        return readPacket(inputStream);
     }
 
     @Deprecated
@@ -270,7 +257,7 @@ public abstract class BinaryProtoUtils {
     }
 
     public static ByteBuffer createPacket(int initialRequestSize, Code code, Long syncId, Long schemaId, Object... args) throws IOException {
-//        TarantoolClientImpl.ByteArrayOutputStream bos = new TarantoolClientImpl.ByteArrayOutputStream(initialRequestSize);
+
         ByteArrayOutputStream bos = new ByteArrayOutputStream(initialRequestSize);
         bos.write(new byte[5]);
         DataOutputStream ds = new DataOutputStream(bos);

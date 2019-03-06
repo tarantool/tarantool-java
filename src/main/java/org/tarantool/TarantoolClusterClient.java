@@ -31,16 +31,13 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     /* Collection of operations to be retried. */
     private ConcurrentHashMap<Long, ExpirableOp<?>> retries = new ConcurrentHashMap<Long, ExpirableOp<?>>();
 
-    @Deprecated
-    private final Collection<TarantoolInstanceInfo> slaveHosts;
-
-    private TarantoolInstanceInfo infoHost;
+    private TarantoolInstanceInfo infoHost;//todo will be used (remove this comment later)
     private Integer infoHostConnectionTimeout;
     private ClusterTopologyDiscoverer topologyDiscoverer;
 
 
     private volatile TarantoolInstanceConnection oldConnection;
-    private ConcurrentHashMap<Long, ExpirableOp<?>> futuresSentToOldConnection = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Long, CompletableFuture<?>> futuresSentToOldConnection = new ConcurrentHashMap<>();
     private ReentrantLock initLock = new ReentrantLock();
 
     private Selector readSelector;
@@ -69,16 +66,10 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
             this.infoHostConnectionTimeout = config.infoHostConnectionTimeout;
             this.topologyDiscoverer = new ClusterTopologyFromShardDiscovererImpl(config);
-
-            slaveHosts = topologyDiscoverer.discoverTarantoolInstances(this.infoHost, infoHostConnectionTimeout);
         } else {
             if (config.slaveHosts == null || config.slaveHosts.length == 0) {
                 throw new IllegalArgumentException("Either slaveHosts or infoHost must be specified.");
             }
-
-            slaveHosts = Arrays.stream(config.slaveHosts)
-                    .map(s -> TarantoolInstanceInfo.create(s, config.username, config.password))
-                    .collect(Collectors.toList());
         }
 
     }
@@ -104,11 +95,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
                 Collections.swap(newServerList, 0, sameNodeIndex);
                 cp.updateNodes(newServerList);
             } else {
-
-
                 cp.updateNodes(newServerList);
-
-
 
                 if (state.isAtState(StateHelper.ALIVE)) {
                     stopIO();
@@ -117,14 +104,13 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
                             .forEach(f -> {
                                 f.completeExceptionally(new CommunicationException("Connection is dead"));
                             });
-                    futuresSentToOldConnection.putAll((Map<? extends Long, ? extends ExpirableOp<?>>) futures);
+
+                    futuresSentToOldConnection.putAll(futures);
                     futures.clear();
 
                     LockSupport.unpark(connector);
-
-                    //remove
-//                    die("The server list have been changed.", null);
                 }
+
                 // if not alive, then do nothing because we are closed or on RECONNECT state.
                 // in the last case reconnect thread will wait untill the initLock will be unlocked
 
@@ -150,7 +136,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
         if (readSelector != null) {
             try {
-                readSelector.close();
+                readSelector.close();//todo must be closed at stopIO operation
             } catch (IOException ignored) {
             }
         }
@@ -164,7 +150,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         readSelector = Selector.open();
 
         if (oldConnection != null) {
-            oldConnection.getChannel().register(readSelector, SelectionKey.OP_READ, currConnection);
+            oldConnection.getChannel().register(readSelector, SelectionKey.OP_READ, oldConnection);
         }
 
         currConnection.getChannel().register(readSelector, SelectionKey.OP_READ, currConnection);
@@ -194,7 +180,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
                 long now = System.currentTimeMillis();
                 futuresSentToOldConnection.entrySet()
                         .removeIf(entry -> {
-                            ExpirableOp<?> expirableOp = entry.getValue();
+                            ExpirableOp<?> expirableOp = (ExpirableOp<?>) entry.getValue();
                             if (expirableOp.hasExpired(now)) {
                                 expirableOp.completeExceptionally(
                                         new CommunicationException("Operation timeout is expired"));
@@ -280,6 +266,17 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
         for (ExpirableOp<?> op : retries.values()) {
             op.completeExceptionally(e);
+        }
+    }
+
+    @Override
+    protected void stopIO() {
+        super.stopIO();
+        closeChannel(oldConnection);
+        try {
+            readSelector.close();
+        } catch (IOException e) {
+            //ignored
         }
     }
 

@@ -35,7 +35,7 @@ public abstract class AbstractTarantoolConnectorIT {
     protected static final int LISTEN = 3301;
     protected static final int ADMIN = 3313;
     protected static final int TIMEOUT = 500;
-    protected static final int RESTART_TIMEOUT = 200000;//todo
+    protected static final int RESTART_TIMEOUT = 2000;
 
     @Deprecated
     protected static final SocketChannelProvider socketChannelProvider = new TestSocketChannelProvider(host, port,

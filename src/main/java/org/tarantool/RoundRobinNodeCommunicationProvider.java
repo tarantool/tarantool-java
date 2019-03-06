@@ -13,10 +13,6 @@ public class RoundRobinNodeCommunicationProvider implements NodeCommunicationPro
     /** Timeout to establish socket connection with an individual server. */
     private final int timeout; // 0 is infinite.
 
-    /** Limit of retries. */
-    private int retriesLimit = -1; // No-limit.
-
-
     private final String clusterUsername;
     private final String clusterPassword;
 
@@ -64,7 +60,13 @@ public class RoundRobinNodeCommunicationProvider implements NodeCommunicationPro
         return nodes;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Tries to connect amid nodes in {@code nodes} in round-robin manner.
+     *
+     * @return A request-ready connection to an instance
+     * @throws CommunicationException if it's failed to connect and authorize to a node in given deadline
+     * described in {@code timeout} field.
+     */
     public TarantoolInstanceConnection connectNextNode() {
         int attempts = getAddressCount();
         long deadline = System.currentTimeMillis() + timeout * attempts;
@@ -122,23 +124,6 @@ public class RoundRobinNodeCommunicationProvider implements NodeCommunicationPro
     public TarantoolInstanceConnection connect() {
         currentConnection = connectNextNode();
         return currentConnection;
-    }
-
-    public void writeBuffer(ByteBuffer byteBuffer) throws IOException {
-        SocketChannel channel2Write = getChannel();
-        BinaryProtoUtils.writeFully(channel2Write, byteBuffer);
-    }
-
-    public TarantoolBinaryPackage readPackage() throws IOException {
-        SocketChannel channel2Read = getChannel();
-        return BinaryProtoUtils.readPacket(channel2Read);
-    }
-
-    private SocketChannel getChannel() {
-        if (currentConnection == null) {
-            throw new IllegalStateException("Not initialized");
-        }
-        return currentConnection.getChannel();
     }
 
     @Override
