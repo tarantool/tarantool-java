@@ -94,7 +94,7 @@ public class TestTarantoolClient {
         //config.sharedBufferSize = 0;
 
         InstanceConnectionProvider nodeComm =
-                new SingleNodeConnectionProvider("localhost:3301", config.username, config.password);
+                new SingleInstanceConnectionProvider("localhost:3301", config.username, config.password);
 
 
         final TarantoolClientTestImpl client = new TarantoolClientTestImpl(nodeComm, config);

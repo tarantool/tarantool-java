@@ -84,11 +84,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     });
 
     public TarantoolClientImpl(InetSocketAddress socketAddress, TarantoolClientConfig config) {
-        this(new SingleNodeConnectionProvider(socketAddress, config.username, config.password), config);
+        this(new SingleInstanceConnectionProvider(socketAddress, config.username, config.password), config);
     }
 
     public TarantoolClientImpl(String address, TarantoolClientConfig config) {
-        this(new SingleNodeConnectionProvider(address, config.username, config.password), config);
+        this(new SingleInstanceConnectionProvider(address, config.username, config.password), config);
     }
 
     protected TarantoolClientImpl() {

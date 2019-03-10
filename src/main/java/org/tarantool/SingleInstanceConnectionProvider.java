@@ -6,17 +6,17 @@ import org.tarantool.server.TarantoolInstanceInfo;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
-public class SingleNodeConnectionProvider implements InstanceConnectionProvider {
+public class SingleInstanceConnectionProvider implements InstanceConnectionProvider {
 
     private final TarantoolInstanceInfo tarantoolInstanceInfo;
 
     private TarantoolInstanceConnection nodeConnection;
 
-    public SingleNodeConnectionProvider(InetSocketAddress socketAddress, String username, String password) {
+    public SingleInstanceConnectionProvider(InetSocketAddress socketAddress, String username, String password) {
         this.tarantoolInstanceInfo = TarantoolInstanceInfo.create(socketAddress, username, password);
     }
 
-    public SingleNodeConnectionProvider(String address, String username, String password) {
+    public SingleInstanceConnectionProvider(String address, String username, String password) {
         this.tarantoolInstanceInfo = TarantoolInstanceInfo.create(address, username, password);
     }
 

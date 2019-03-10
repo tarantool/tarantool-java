@@ -4,10 +4,10 @@ import org.tarantool.server.TarantoolInstanceConnection;
 
 import java.io.IOException;
 
-public class TestNodeConnectionProvider extends SingleNodeConnectionProvider {
+public class TestInstanceConnectionProvider extends SingleInstanceConnectionProvider {
     private final long restartTimeout;
 
-    public TestNodeConnectionProvider(String address, String username, String password, long restartTimeout1) {
+    public TestInstanceConnectionProvider(String address, String username, String password, long restartTimeout1) {
         super(address, username, password);
 
         this.restartTimeout = restartTimeout1;
