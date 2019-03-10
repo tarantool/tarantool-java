@@ -41,7 +41,7 @@ public abstract class AbstractTarantoolConnectorIT {
     protected static final SocketChannelProvider socketChannelProvider = new TestSocketChannelProvider(host, port,
         RESTART_TIMEOUT);
 
-    protected static final NodeCommunicationProvider testNodeCommunicationProvider =
+    protected static final InstanceConnectionProvider TEST_INSTANCE_CONNECTION_PROVIDER =
             new TestNodeConnectionProvider(host + ":" + port, username, password, RESTART_TIMEOUT);
 
     protected static TarantoolControl control;
@@ -137,7 +137,7 @@ public abstract class AbstractTarantoolConnectorIT {
 
     protected TarantoolClient makeClient() {
 //        return new TarantoolClientImpl(socketChannelProvider, makeClientConfig());
-        return new TarantoolClientImpl(testNodeCommunicationProvider, makeClientConfig());
+        return new TarantoolClientImpl(TEST_INSTANCE_CONNECTION_PROVIDER, makeClientConfig());
     }
 
     protected static TarantoolClientConfig makeClientConfig() {

@@ -6,7 +6,7 @@ import org.tarantool.server.TarantoolInstanceInfo;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
-public class SingleNodeConnectionProvider implements NodeCommunicationProvider {
+public class SingleNodeConnectionProvider implements InstanceConnectionProvider {
 
     private final TarantoolInstanceInfo tarantoolInstanceInfo;
 

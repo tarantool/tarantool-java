@@ -13,7 +13,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 import static org.tarantool.TarantoolClientImpl.StateHelper.CLOSED;
 
@@ -47,7 +46,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config) {
 //        this(config, new RoundRobinSocketProviderImpl(config.slaveHosts).setTimeout(config.operationExpiryTimeMillis));
-        this(config, new RoundRobinNodeCommunicationProvider(config.slaveHosts,
+        this(config, new RoundRobinInstanceConnectionProvider(config.slaveHosts,
                 config.username, config.password, config.operationExpiryTimeMillis));
     }
 
@@ -55,7 +54,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
      * @param provider Socket channel provider.
      * @param config Configuration.
      */
-    public TarantoolClusterClient(TarantoolClusterClientConfig config, NodeCommunicationProvider provider) {
+    public TarantoolClusterClient(TarantoolClusterClientConfig config, InstanceConnectionProvider provider) {
         init(provider, config);
 
         this.executor = config.executor == null ?
@@ -85,7 +84,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         initLock.lock();
         try {
 
-            RoundRobinNodeCommunicationProvider cp = (RoundRobinNodeCommunicationProvider) this.communicationProvider;
+            RoundRobinInstanceConnectionProvider cp = (RoundRobinInstanceConnectionProvider) this.communicationProvider;
 
             int sameNodeIndex = newServerList.indexOf(currConnection.getNodeInfo());
             if (sameNodeIndex != -1) {
@@ -123,7 +122,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     }
 
     @Override
-    protected void connect(NodeCommunicationProvider communicationProvider) throws Exception {
+    protected void connect(InstanceConnectionProvider communicationProvider) throws Exception {
         //region drop all registered selectors from channel
 //        if (currConnection != null) {
 //            SelectionKey registeredKey = currConnection.getChannel().keyFor(readSelector);

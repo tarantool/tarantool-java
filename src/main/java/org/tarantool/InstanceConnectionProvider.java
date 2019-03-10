@@ -5,7 +5,7 @@ import org.tarantool.server.*;
 import java.io.*;
 import java.nio.*;
 
-public interface NodeCommunicationProvider {
+public interface InstanceConnectionProvider {
 
     TarantoolInstanceConnection connect() throws IOException;
 

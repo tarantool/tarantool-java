@@ -3,12 +3,10 @@ package org.tarantool;
 import org.tarantool.server.*;
 
 import java.io.*;
-import java.nio.*;
-import java.nio.channels.*;
 import java.util.*;
 import java.util.stream.*;
 
-public class RoundRobinNodeCommunicationProvider implements NodeCommunicationProvider {
+public class RoundRobinInstanceConnectionProvider implements InstanceConnectionProvider {
 
     /** Timeout to establish socket connection with an individual server. */
     private final int timeout; // 0 is infinite.
@@ -21,7 +19,7 @@ public class RoundRobinNodeCommunicationProvider implements NodeCommunicationPro
     private TarantoolInstanceInfo[] nodes;
     private int pos = 0;
 
-    public RoundRobinNodeCommunicationProvider(String[] slaveHosts, String username, String password, int timeout) {
+    public RoundRobinInstanceConnectionProvider(String[] slaveHosts, String username, String password, int timeout) {
         this.timeout = timeout;
         if (slaveHosts == null || slaveHosts.length < 1) {
             throw new IllegalArgumentException("slave hosts is null ot empty");

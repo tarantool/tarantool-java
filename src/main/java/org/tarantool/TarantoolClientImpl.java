@@ -33,7 +33,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     /**
      * External
      */
-    protected NodeCommunicationProvider communicationProvider;
+    protected InstanceConnectionProvider communicationProvider;
 
     /**
      * Max amount of one by one reconnect attempts
@@ -95,12 +95,12 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 //        delegate init to a descendant
     }
 
-    public TarantoolClientImpl(NodeCommunicationProvider communicationProvider, TarantoolClientConfig config) {
+    public TarantoolClientImpl(InstanceConnectionProvider communicationProvider, TarantoolClientConfig config) {
         super();
         init(communicationProvider, config);
     }
 
-    protected void init(NodeCommunicationProvider communicationProvider, TarantoolClientConfig config) {
+    protected void init(InstanceConnectionProvider communicationProvider, TarantoolClientConfig config) {
         this.thumbstone = NOT_INIT_EXCEPTION;
         this.config = config;
         this.initialRequestSize = config.defaultRequestSize;
@@ -183,7 +183,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         return retries >= limit;
     }
 
-    protected void connect(final NodeCommunicationProvider communicationProvider) throws Exception {
+    protected void connect(final InstanceConnectionProvider communicationProvider) throws Exception {
         try {
             currConnection = communicationProvider.connect();
         } catch (IOException e) {

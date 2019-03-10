@@ -7,8 +7,6 @@ import org.junit.jupiter.api.function.Executable;
 import org.tarantool.server.*;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -91,21 +89,21 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
 
         TarantoolClientConfig config = makeClientConfig();
 
-        NodeCommunicationProvider nodeCommunicationProvider = new NodeCommunicationProvider() {
+        InstanceConnectionProvider instanceConnectionProvider = new InstanceConnectionProvider() {
 
             @Override
             public TarantoolInstanceConnection connect() throws IOException {
                 latch.countDown();
-                return testNodeCommunicationProvider.connect();
+                return TEST_INSTANCE_CONNECTION_PROVIDER.connect();
             }
 
             @Override
             public String getDescription() {
-                return testNodeCommunicationProvider.getDescription();
+                return TEST_INSTANCE_CONNECTION_PROVIDER.getDescription();
             }
         };
 
-        client = new TarantoolClientImpl(nodeCommunicationProvider, config);
+        client = new TarantoolClientImpl(instanceConnectionProvider, config);
         client.syncOps().ping();
 
         // The park() will return inside connector thread.
@@ -126,7 +124,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
      */
     @Test
     public void testCloseWhileOperationsAreInProgress() {
-        client = new TarantoolClientImpl(testNodeCommunicationProvider, makeClientConfig()) {
+        client = new TarantoolClientImpl(TEST_INSTANCE_CONNECTION_PROVIDER, makeClientConfig()) {
             @Override
             protected void write(Code code, Long syncId, Long schemaId, Object... args) {
                 // Skip write.
@@ -154,7 +152,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     @Test
     public void testReconnectWhileOperationsAreInProgress() {
         final AtomicBoolean writeEnabled = new AtomicBoolean(false);
-        client = new TarantoolClientImpl(testNodeCommunicationProvider, makeClientConfig()) {
+        client = new TarantoolClientImpl(TEST_INSTANCE_CONNECTION_PROVIDER, makeClientConfig()) {
             @Override
             protected void write(Code code, Long syncId, Long schemaId, Object... args) throws Exception {
                 if (writeEnabled.get()) {
@@ -198,9 +196,9 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     @Test
     public void testConcurrentCloseAndReconnect() {
         final CountDownLatch latch = new CountDownLatch(2);
-        client = new TarantoolClientImpl(testNodeCommunicationProvider, makeClientConfig()) {
+        client = new TarantoolClientImpl(TEST_INSTANCE_CONNECTION_PROVIDER, makeClientConfig()) {
             @Override
-            protected void connect(NodeCommunicationProvider communicationProvider) throws Exception {
+            protected void connect(InstanceConnectionProvider communicationProvider) throws Exception {
                 latch.countDown();
                 super.connect(communicationProvider);
             }

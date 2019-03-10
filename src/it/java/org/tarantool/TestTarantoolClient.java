@@ -33,7 +33,7 @@ public class TestTarantoolClient {
         final Semaphore s = new Semaphore(0);
         long latency = 1L;
 
-        public TarantoolClientTestImpl(NodeCommunicationProvider nodeComm, TarantoolClientConfig options) {
+        public TarantoolClientTestImpl(InstanceConnectionProvider nodeComm, TarantoolClientConfig options) {
             super(nodeComm, options);
             Thread t = new Thread(new Runnable() {
                 @Override
@@ -93,7 +93,7 @@ public class TestTarantoolClient {
 
         //config.sharedBufferSize = 0;
 
-        NodeCommunicationProvider nodeComm =
+        InstanceConnectionProvider nodeComm =
                 new SingleNodeConnectionProvider("localhost:3301", config.username, config.password);
 
 
