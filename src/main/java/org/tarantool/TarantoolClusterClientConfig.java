@@ -18,9 +18,15 @@ public class TarantoolClusterClientConfig extends TarantoolClientConfig {
     public String[] slaveHosts;
 
     /**
-     * Address of a tarantool instance that can act as provider of host list
+     * Address of a tarantool instance form which a cluster host list can be discovered.
      */
     public String infoHost;
+
+    /**
+     * Name of a function that called on info host instance to fetch the list of
+     * tarantool cluster instances
+     */
+    public String infoFunctionName;
 
     /**
      * timeout of connecting to a info host

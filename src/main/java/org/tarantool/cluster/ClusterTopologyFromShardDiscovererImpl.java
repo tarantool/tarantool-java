@@ -11,20 +11,22 @@ import java.util.Map;
 public class ClusterTopologyFromShardDiscovererImpl implements ClusterTopologyDiscoverer {
 
     private final TarantoolClusterClientConfig clientConfig;
+    private final TarantoolInstanceInfo infoNode;
 
-    private static final String DISCOVER_TOPOLOGY_TARANTOOL_SIDE_FUNCTION_NAME = "get_shard_cfg";
+    private static final String DEFAULT_TOPOLOGY_DISCOVER_CALL = "require('vshard').storage.internal.current_cfg";
 
     public ClusterTopologyFromShardDiscovererImpl(TarantoolClusterClientConfig clientConfig) {
         this.clientConfig = clientConfig;
+        this.infoNode = TarantoolInstanceInfo.create(
+                clientConfig.infoHost, clientConfig.username, clientConfig.password);
     }
 
     @Override
-    public List<TarantoolInstanceInfo> discoverTarantoolInstances(TarantoolInstanceInfo infoNode,
-                                                                  Integer infoHostConnectionTimeout) {
+    public List<TarantoolInstanceInfo> discoverTarantoolInstances(Integer infoHostConnectionTimeout) {
 
         List<?> list = new TarantoolClientImpl(infoNode.getSocketAddress(), clientConfig)
                 .syncOps()
-                .call(DISCOVER_TOPOLOGY_TARANTOOL_SIDE_FUNCTION_NAME);
+                .call(DEFAULT_TOPOLOGY_DISCOVER_CALL);
 
         Map funcResult = (Map) ((List) list.get(0)).get(0);
 

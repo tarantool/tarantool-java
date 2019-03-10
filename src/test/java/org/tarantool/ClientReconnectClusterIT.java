@@ -110,7 +110,7 @@ public class ClientReconnectClusterIT {
         assertEquals("Connection time out.", e.getMessage());
     }
 
-    private TarantoolClientImpl makeClient(String...addrs) {
+    private TarantoolClusterClient makeClient(String...addrs) {
         TarantoolClusterClientConfig config = makeClusterClientConfig();
         config.slaveHosts = addrs;
         return new TarantoolClusterClient(config);

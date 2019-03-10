@@ -61,7 +61,27 @@ public class TarantoolInstanceInfo {
 
 
     /**
+     * Creates an instance info object with no authentication data.
+     *
      * @param address hostname address as String
+     *
+     * @throws IllegalArgumentException if the port parameter is outside the range
+     *                                  of valid port values, or if the hostname parameter is <TT>null</TT>.
+     * @throws SecurityException        if a security manager is present and
+     *                                  permission to resolve the host name is
+     *                                  denied.
+     */
+    public static TarantoolInstanceInfo create(String address) {
+        return create(address, null, null);
+    }
+
+
+
+    /**
+     * Creates an instance info object
+     * @param address hostname address as String
+     * @param username authentication username
+     * @param password authentication password
      *
      * @throws IllegalArgumentException if the port parameter is outside the range
      *                                  of valid port values, or if the hostname parameter is <TT>null</TT>.

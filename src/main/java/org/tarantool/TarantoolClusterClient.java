@@ -75,14 +75,12 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     }
 
     /**
-     * @param infoNode a node from which a topology of the cluster is discovered.
      * @throws CommunicationException in case of communication with {@code infoNode} exception
      * @throws IllegalArgumentException in case when the info node returned invalid address
      */
-    private Collection<TarantoolInstanceInfo> refreshServerList(TarantoolInstanceInfo infoNode) {
+    protected Collection<TarantoolInstanceInfo> refreshServerList() {
         List<TarantoolInstanceInfo> newServerList = topologyDiscoverer
-                .discoverTarantoolInstances(infoNode, infoHostConnectionTimeout);
-
+                .discoverTarantoolInstances(infoHostConnectionTimeout);
 
         initLock.lock();
         try {

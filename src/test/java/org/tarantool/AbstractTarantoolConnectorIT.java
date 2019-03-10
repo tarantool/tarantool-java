@@ -144,7 +144,7 @@ public abstract class AbstractTarantoolConnectorIT {
         return fillClientConfig(new TarantoolClientConfig());
     }
 
-    protected static TarantoolClusterClientConfig makeClusterClientConfig() {
+    public static TarantoolClusterClientConfig makeClusterClientConfig() {
         TarantoolClusterClientConfig config = fillClientConfig(new TarantoolClusterClientConfig());
         config.executor = null;
         config.operationExpiryTimeMillis = TIMEOUT;

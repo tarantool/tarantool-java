@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.tarantool.TarantoolClusterClientConfig;
 import org.tarantool.server.TarantoolInstanceInfo;
 
+@Deprecated
 class ClusterTopologyFromShardDiscovererImplTest {
 
     @DisplayName("Test that a list which describes the topology is fetched correctly")

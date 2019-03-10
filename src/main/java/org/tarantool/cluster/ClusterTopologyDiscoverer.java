@@ -5,5 +5,5 @@ import org.tarantool.server.TarantoolInstanceInfo;
 import java.util.List;
 
 public interface ClusterTopologyDiscoverer {
-    List<TarantoolInstanceInfo> discoverTarantoolInstances(TarantoolInstanceInfo infoNode, Integer infoHostConnectionTimeout);
+    List<TarantoolInstanceInfo> discoverTarantoolInstances(Integer infoHostConnectionTimeout);
 }
