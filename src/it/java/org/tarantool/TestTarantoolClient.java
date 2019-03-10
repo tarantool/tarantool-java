@@ -3,9 +3,7 @@ package org.tarantool;
 import org.tarantool.server.TarantoolBinaryPackage;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
@@ -96,7 +94,7 @@ public class TestTarantoolClient {
         //config.sharedBufferSize = 0;
 
         NodeCommunicationProvider nodeComm =
-                new SingleNodeCommunicationProvider("localhost:3301", config.username, config.password);
+                new SingleNodeConnectionProvider("localhost:3301", config.username, config.password);
 
 
         final TarantoolClientTestImpl client = new TarantoolClientTestImpl(nodeComm, config);

@@ -42,7 +42,7 @@ public abstract class AbstractTarantoolConnectorIT {
         RESTART_TIMEOUT);
 
     protected static final NodeCommunicationProvider testNodeCommunicationProvider =
-            new TestNodeCommunicationProvider(host + ":" + port, username, password, RESTART_TIMEOUT);
+            new TestNodeConnectionProvider(host + ":" + port, username, password, RESTART_TIMEOUT);
 
     protected static TarantoolControl control;
     protected static TarantoolConsole console;

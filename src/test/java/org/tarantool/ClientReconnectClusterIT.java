@@ -115,4 +115,33 @@ public class ClientReconnectClusterIT {
         config.slaveHosts = addrs;
         return new TarantoolClusterClient(config);
     }
+
+
+    @Test
+    void testUpdateNodeList() {
+        control.start(SRV1);
+        control.start(SRV2);
+        control.start(SRV3);
+
+        control.waitStarted(SRV1);
+        control.waitStarted(SRV2);
+        control.waitStarted(SRV3);
+
+        String srv1_address = "localhost:" + PORTS[0];
+        String srv2_address = "127.0.0.1:" + PORTS[1];
+        String srv3_address = "localhost:" + PORTS[2];
+        final TarantoolClusterClient client = makeClient(
+                srv1_address,
+                srv2_address);
+
+
+        List<?> ids = client.syncOps().eval(
+                "return box.schema.space.create('rr_test').id, " +
+                        "box.space.rr_test:create_index('primary').id");
+
+
+//        client.ref
+//todo
+
+    }
 }
