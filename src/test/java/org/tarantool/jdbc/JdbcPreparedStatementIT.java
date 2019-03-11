@@ -189,7 +189,7 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
     @Test
     public void testSetString() throws SQLException {
         makeHelper(String.class)
-        .setColumns(TntSqlType.CHAR, TntSqlType.VARCHAR, TntSqlType.TEXT)
+        .setColumns(TntSqlType.VARCHAR, TntSqlType.TEXT)
         .setValues(STRING_VALS)
         .testSetParameter();
     }
@@ -213,9 +213,7 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
     @Test
     public void testSetBigDecimal() throws SQLException {
         makeHelper(BigDecimal.class)
-        .setColumns(TntSqlType.DECIMAL, TntSqlType.DECIMAL_PREC, TntSqlType.DECIMAL_PREC_SCALE,
-            TntSqlType.NUMERIC, TntSqlType.NUMERIC_PREC, TntSqlType.NUMERIC_PREC_SCALE,
-            TntSqlType.NUM, TntSqlType.NUM_PREC, TntSqlType.NUM_PREC_SCALE)
+        .setColumns(TntSqlType.REAL, TntSqlType.FLOAT, TntSqlType.DOUBLE)
         .setValues(BIGDEC_VALS)
         .testSetParameter();
     }
@@ -224,7 +222,7 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
     @Test
     public void testSetByteArray() throws SQLException {
         makeHelper(byte[].class)
-        .setColumns(TntSqlType.BLOB)
+        .setColumns(TntSqlType.SCALAR)
         .setValues(BINARY_VALS)
         .testSetParameter();
     }
