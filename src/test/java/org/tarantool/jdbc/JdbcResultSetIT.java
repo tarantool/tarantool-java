@@ -85,9 +85,7 @@ public class JdbcResultSetIT extends JdbcTypesIT {
     @Test
     public void testGetBigDecimalColumn() throws SQLException {
         makeHelper(BigDecimal.class)
-        .setColumns(TntSqlType.DECIMAL, TntSqlType.DECIMAL_PREC, TntSqlType.DECIMAL_PREC_SCALE,
-            TntSqlType.NUMERIC, TntSqlType.NUMERIC_PREC, TntSqlType.NUMERIC_PREC_SCALE,
-            TntSqlType.NUM, TntSqlType.NUM_PREC, TntSqlType.NUM_PREC_SCALE)
+        .setColumns(TntSqlType.REAL, TntSqlType.FLOAT, TntSqlType.DOUBLE)
         .setValues(BIGDEC_VALS)
         .testGetColumn();
     }
@@ -111,7 +109,7 @@ public class JdbcResultSetIT extends JdbcTypesIT {
     @Test
     public void testGetStringColumn() throws SQLException {
         makeHelper(String.class)
-        .setColumns(TntSqlType.CHAR, TntSqlType.VARCHAR, TntSqlType.TEXT)
+        .setColumns(TntSqlType.VARCHAR, TntSqlType.TEXT)
         .setValues(STRING_VALS)
         .testGetColumn();
     }
@@ -119,7 +117,7 @@ public class JdbcResultSetIT extends JdbcTypesIT {
     @Test
     public void testGetByteArrayColumn() throws SQLException {
         makeHelper(byte[].class)
-        .setColumns(TntSqlType.BLOB)
+        .setColumns(TntSqlType.SCALAR)
         .setValues(BINARY_VALS)
         .testGetColumn();
     }
