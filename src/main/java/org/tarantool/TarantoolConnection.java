@@ -28,7 +28,7 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
             ByteBuffer packet = createPacket(code, syncId.incrementAndGet(), null, args);
             out.write(packet.array(), 0, packet.remaining());
             out.flush();
-            readPacket(is);
+            readPacket();
             Long c = (Long) headers.get(Key.CODE.getId());
             if (c == 0) {
                 return (List) body.get(Key.DATA.getId());

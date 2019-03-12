@@ -132,8 +132,10 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     protected void connect(final SocketChannel channel) throws Exception {
+        closeStreams();
         try {
-            DataInputStream is = new DataInputStream(cis = new ByteBufferInputStream(channel));
+            cis = new ByteBufferInputStream(channel);
+            is = new DataInputStream(cis);
             byte[] bytes = new byte[64];
             is.readFully(bytes);
             String firstLine = new String(bytes);
@@ -141,6 +143,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 CommunicationException e = new CommunicationException("Welcome message should starts with tarantool " +
                         "but starts with '" + firstLine + "'", new IllegalStateException("Invalid welcome packet"));
 
+                closeStreams();
                 close(e);
                 throw e;
             }
@@ -148,24 +151,15 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             this.salt = new String(bytes);
             if (config.username != null && config.password != null) {
                 writeFully(channel, createAuthPacket(config.username, config.password));
-                readPacket(is);
+                readPacket();
                 Long code = (Long) headers.get(Key.CODE.getId());
                 if (code != 0) {
+                    closeStreams();
                     throw serverError(code, body.get(Key.ERROR.getId()));
                 }
             }
-            this.is = is;
         } catch (IOException e) {
-            try {
-                is.close();
-            } catch (IOException ignored) {
-
-            }
-            try {
-                cis.close();
-            } catch (IOException ignored) {
-
-            }
+            closeStreams();
             throw new CommunicationException("Couldn't connect to tarantool", e);
         }
         channel.configureBlocking(false);
@@ -358,7 +352,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     long code;
-                    readPacket(is);
+                    readPacket();
                     code = (Long) headers.get(Key.CODE.getId());
                     Long syncId = (Long) headers.get(Key.SYNC.getId());
                     CompletableFuture<?> future = futures.remove(syncId);

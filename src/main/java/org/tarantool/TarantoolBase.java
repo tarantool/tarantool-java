@@ -40,11 +40,13 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
     public TarantoolBase(String username, String password, Socket socket) {
         super();
         try {
-            this.is = new DataInputStream(cis = new CountInputStreamImpl(socket.getInputStream()));
+            cis = new CountInputStreamImpl(socket.getInputStream());
+            is = new DataInputStream(cis);
             byte[] bytes = new byte[64];
             is.readFully(bytes);
             String firstLine = new String(bytes);
             if (!firstLine.startsWith(WELCOME)) {
+                closeStreams();
                 close();
                 throw new CommunicationException("Welcome message should starts with tarantool but starts with '" + firstLine + "'", new IllegalStateException("Invalid welcome packet"));
             }
@@ -56,23 +58,15 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
                 OutputStream os = socket.getOutputStream();
                 os.write(authPacket.array(), 0, authPacket.remaining());
                 os.flush();
-                readPacket(is);
+                readPacket();
                 Long code = (Long) headers.get(Key.CODE.getId());
                 if (code != 0) {
+                    closeStreams();
                     throw serverError(code, body.get(Key.ERROR.getId()));
                 }
             }
         } catch (IOException e) {
-            try {
-                is.close();
-            } catch (IOException ignored) {
-
-            }
-            try {
-                cis.close();
-            } catch (IOException ignored) {
-
-            }
+            closeStreams();
             throw new CommunicationException("Couldn't connect to tarantool", e);
         }
     }
@@ -130,7 +124,7 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
         return buffer;
     }
 
-    protected void readPacket(DataInputStream is) throws IOException {
+    protected void readPacket() throws IOException {
         int size = ((Number) msgPackLite.unpack(is)).intValue();
         long mark = cis.getBytesRead();
         headers = (Map<Integer, Object>) msgPackLite.unpack(is);
@@ -185,7 +179,6 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
         return values;
     }
 
-
     protected Long getSqlRowCount() {
         Map<Key, Object> info = (Map<Key, Object>) body.get(Key.SQL_INFO.getId());
         Number rowCount;
@@ -216,6 +209,21 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
                 channel.close();
             } catch (IOException ignored) {
 
+            }
+        }
+    }
+
+    protected void closeStreams() {
+        if (is != null) {
+            try {
+                is.close();
+            } catch (IOException ignored) {
+            }
+        }
+        if (cis != null) {
+            try {
+                cis.close();
+            } catch (IOException ignored) {
             }
         }
     }

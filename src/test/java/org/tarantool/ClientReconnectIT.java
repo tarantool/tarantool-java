@@ -20,6 +20,7 @@ import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -215,7 +216,12 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
 
     /**
      * Test concurrent operations, reconnects and close.
+     *
      * Expected situation is nothing gets stuck.
+     *
+     * The test sets SO_LINGER to 0 for outgoing connections to avoid producing
+     * many TIME_WAIT sockets, because an available port range can be
+     * exhausted.
      */
     @Test
     public void testLongParallelCloseReconnects() {
@@ -223,11 +229,14 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         int numClients = 4;
         int timeBudget = 30*1000;
 
+        SocketChannelProvider provider = new TestSocketChannelProvider(host,
+            port, RESTART_TIMEOUT).setSoLinger(0);
+
         final AtomicReferenceArray<TarantoolClient> clients =
             new AtomicReferenceArray<TarantoolClient>(numClients);
 
         for (int idx = 0; idx < clients.length(); idx++) {
-            clients.set(idx, makeClient());
+            clients.set(idx, makeClient(provider));
         }
 
         final Random rnd = new Random();
@@ -256,7 +265,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
 
                             cli.close();
 
-                            TarantoolClient next = makeClient();
+                            TarantoolClient next = makeClient(provider);
                             if (!clients.compareAndSet(idx, cli, next)) {
                                 next.close();
                             }
@@ -284,7 +293,9 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
                 fail(e);
             }
             if (deadline > System.currentTimeMillis()) {
-                System.out.println("" + (deadline - System.currentTimeMillis())/1000 + "s remains.");
+                System.out.println("testLongParallelCloseReconnects: " +
+                    (deadline - System.currentTimeMillis()) / 1000 +
+                    "s remain");
             }
         }
 
@@ -301,5 +312,47 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         }
 
         assertTrue(cnt.get() > threads.length);
+    }
+
+    /**
+     * Verify that we don't exceed a file descriptor limit (and so likely don't
+     * leak file descriptors) when trying to connect to an existing node with
+     * wrong authentification credentials.
+     *
+     * The test sets SO_LINGER to 0 for outgoing connections to avoid producing
+     * many TIME_WAIT sockets, because an available port range can be
+     * exhausted.
+     */
+    @Test
+    public void testReconnectWrongAuth() throws Exception {
+        SocketChannelProvider provider = new TestSocketChannelProvider(host,
+            port, RESTART_TIMEOUT).setSoLinger(0);
+        TarantoolClientConfig config = makeClientConfig();
+        config.initTimeoutMillis = 100;
+        config.password = config.password + 'x';
+        for (int i = 0; i < 100; ++i) {
+            if (i % 10 == 0)
+                System.out.println("testReconnectWrongAuth: " + (100 - i) +
+                    " iterations remain");
+            CommunicationException e = assertThrows(CommunicationException.class,
+                new Executable() {
+                    @Override
+                    public void execute() throws Throwable {
+                        client = new TarantoolClientImpl(provider, config);
+                    }
+                }
+            );
+            assertEquals(e.getMessage(), "100ms is exceeded when waiting " +
+                "for client initialization. You could configure init " +
+                "timeout in TarantoolConfig");
+        }
+
+        /*
+         * Verify we don't exceed a file descriptor limit. If we exceed it, a
+         * client will not able to connect to tarantool.
+         */
+        TarantoolClient client = makeClient();
+        client.syncOps().ping();
+        client.close();
     }
 }

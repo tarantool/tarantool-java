@@ -135,6 +135,10 @@ public abstract class AbstractTarantoolConnectorIT {
         return new TarantoolClientImpl(socketChannelProvider, makeClientConfig());
     }
 
+    protected TarantoolClient makeClient(SocketChannelProvider provider) {
+        return new TarantoolClientImpl(provider, makeClientConfig());
+    }
+
     protected static TarantoolClientConfig makeClientConfig() {
         return fillClientConfig(new TarantoolClientConfig());
     }
