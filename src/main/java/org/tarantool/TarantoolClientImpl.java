@@ -25,6 +25,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements TarantoolClient {
+
     public static final CommunicationException NOT_INIT_EXCEPTION
         = new CommunicationException("Not connected, initializing connection");
 
@@ -34,22 +35,23 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
      * External.
      */
     protected SocketChannelProvider socketProvider;
+    protected SocketChannel channel;
+    protected ReadableViaSelectorChannel readChannel;
+
     protected volatile Exception thumbstone;
 
     protected Map<Long, TarantoolOp<?>> futures;
-    protected AtomicInteger wait = new AtomicInteger();
+    protected AtomicInteger pendingResponsesCount = new AtomicInteger();
 
     /**
      * Write properties.
      */
-    protected SocketChannel channel;
-    protected ReadableViaSelectorChannel readChannel;
-
     protected ByteBuffer sharedBuffer;
-    protected ByteBuffer writerBuffer;
     protected ReentrantLock bufferLock = new ReentrantLock(false);
     protected Condition bufferNotEmpty = bufferLock.newCondition();
     protected Condition bufferEmpty = bufferLock.newCondition();
+
+    protected ByteBuffer writerBuffer;
     protected ReentrantLock writeLock = new ReentrantLock(true);
 
     /**
@@ -81,6 +83,10 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     });
 
+    public TarantoolClientImpl(String address, TarantoolClientConfig config) {
+        this(new SingleSocketChannelProviderImpl(address), config);
+    }
+
     public TarantoolClientImpl(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
         super();
         this.thumbstone = NOT_INIT_EXCEPTION;
@@ -102,6 +108,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             this.fireAndForgetOps.setCallCode(Code.CALL);
             this.composableAsyncOps.setCallCode(Code.CALL);
         }
+
+        startConnector(config);
+    }
+
+    private void startConnector(TarantoolClientConfig config) {
         connector.start();
         try {
             if (!waitAlive(config.initTimeoutMillis, TimeUnit.MILLISECONDS)) {
@@ -254,6 +265,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 iterator.remove();
             }
         }
+        pendingResponsesCount.set(0);
 
         bufferLock.lock();
         try {
@@ -306,7 +318,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                     }
                 }
                 sharedBuffer.put(buffer);
-                wait.incrementAndGet();
+                pendingResponsesCount.incrementAndGet();
                 bufferNotEmpty.signalAll();
                 stats.buffered++;
             } finally {
@@ -333,7 +345,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                     }
                     writeFully(channel, buffer);
                     stats.directWrite++;
-                    wait.incrementAndGet();
+                    pendingResponsesCount.incrementAndGet();
                 } finally {
                     writeLock.unlock();
                 }
@@ -360,7 +372,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 Long syncId = (Long) headers.get(Key.SYNC.getId());
                 TarantoolOp<?> future = futures.remove(syncId);
                 stats.received++;
-                wait.decrementAndGet();
+                pendingResponsesCount.decrementAndGet();
                 complete(packet, future);
             } catch (Exception e) {
                 die("Cant read answer", e);
@@ -431,9 +443,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     }
 
-    protected <T> T syncGet(Future<T> r) {
+    protected <T> T syncGet(Future<T> result) {
         try {
-            return r.get();
+            return result.get();
         } catch (ExecutionException e) {
             if (e.getCause() instanceof CommunicationException) {
                 throw (CommunicationException) e.getCause();
@@ -464,7 +476,6 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     protected void close(Exception e) {
         if (state.close()) {
             connector.interrupt();
-
             die(e.getMessage(), e);
         }
     }
@@ -564,9 +575,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         public void close() {
             throw new IllegalStateException("You should close TarantoolClient instead.");
         }
+
     }
 
     protected class FireAndForgetOps extends AbstractTarantoolOps<Integer, List<?>, Object, Long> {
+
         @Override
         public Long exec(Code code, Object... args) {
             if (thumbstone == null) {
@@ -586,6 +599,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         public void close() {
             throw new IllegalStateException("You should close TarantoolClient instead.");
         }
+
     }
 
     protected class ComposableAsyncOps
@@ -600,10 +614,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         public void close() {
             TarantoolClientImpl.this.close();
         }
+
     }
 
     protected boolean isDead(CompletableFuture<?> q) {
-        if (TarantoolClientImpl.this.thumbstone != null) {
+        if (this.thumbstone != null) {
             fail(q, new CommunicationException("Connection is dead", thumbstone));
             return true;
         }
@@ -630,6 +645,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
      * Manages state changes.
      */
     protected final class StateHelper {
+
         static final int UNINITIALIZED = 0;
         static final int READING = 1;
         static final int WRITING = 2;
@@ -640,14 +656,14 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         private final AtomicInteger state;
 
         private final AtomicReference<CountDownLatch> nextAliveLatch =
-                new AtomicReference<>(new CountDownLatch(1));
+            new AtomicReference<>(new CountDownLatch(1));
 
         private final CountDownLatch closedLatch = new CountDownLatch(1);
 
         /**
          * The condition variable to signal a reconnection is needed from reader /
          * writer threads and waiting for that signal from the reconnection thread.
-         *
+         * <p>
          * The lock variable to access this condition.
          *
          * @see #awaitReconnection()
@@ -685,7 +701,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
         /**
          * Move from a current state to a give one.
-         *
+         * <p>
          * Some moves are forbidden.
          */
         protected boolean acquire(int mask) {
@@ -805,6 +821,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 }
             }
         }
+
     }
 
     protected static class TarantoolOp<V> extends CompletableFuture<V> {

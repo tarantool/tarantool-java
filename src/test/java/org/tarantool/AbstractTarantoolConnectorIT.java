@@ -37,8 +37,8 @@ public abstract class AbstractTarantoolConnectorIT {
     protected static final int TIMEOUT = 500;
     protected static final int RESTART_TIMEOUT = 2000;
 
-    protected static final SocketChannelProvider socketChannelProvider = new TestSocketChannelProvider(host, port,
-        RESTART_TIMEOUT);
+    protected static final SocketChannelProvider socketChannelProvider =
+        new TestSocketChannelProvider(host, port, RESTART_TIMEOUT);
 
     protected static TarantoolControl control;
     protected static TarantoolConsole console;
@@ -143,14 +143,14 @@ public abstract class AbstractTarantoolConnectorIT {
         return fillClientConfig(new TarantoolClientConfig());
     }
 
-    protected static TarantoolClusterClientConfig makeClusterClientConfig() {
+    public static TarantoolClusterClientConfig makeClusterClientConfig() {
         TarantoolClusterClientConfig config = fillClientConfig(new TarantoolClusterClientConfig());
         config.executor = null;
         config.operationExpiryTimeMillis = TIMEOUT;
         return config;
     }
 
-    private static <T> T fillClientConfig(TarantoolClientConfig config) {
+    private static <T extends TarantoolClientConfig> T fillClientConfig(T config) {
         config.username = username;
         config.password = password;
         config.initTimeoutMillis = RESTART_TIMEOUT;
@@ -163,7 +163,7 @@ public abstract class AbstractTarantoolConnectorIT {
     }
 
     protected static TarantoolConsole openConsole(String instance) {
-        return TarantoolConsole.open(control.tntCtlWorkDir, instance);
+        return TarantoolConsole.open(TarantoolControl.tntCtlWorkDir, instance);
     }
 
     protected TarantoolConnection openConnection() {

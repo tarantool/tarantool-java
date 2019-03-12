@@ -3,6 +3,10 @@ package org.tarantool;
 import java.nio.channels.SocketChannel;
 
 public interface SocketChannelProvider {
+
+    int RETRY_NO_LIMIT = -1;
+    int NO_TIMEOUT = 0;
+
     /**
      * Provides socket channel to init restore connection.
      * You could change hosts on fail and sleep between retries in this method
