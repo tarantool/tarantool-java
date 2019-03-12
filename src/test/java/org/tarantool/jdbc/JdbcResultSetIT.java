@@ -1,10 +1,11 @@
 package org.tarantool.jdbc;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -16,10 +17,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class JdbcResultSetIT extends JdbcTypesIT {
     private Statement stmt;
+    private DatabaseMetaData metaData;
 
     @BeforeEach
     public void setUp() throws Exception {
         stmt = conn.createStatement();
+        metaData = conn.getMetaData();
     }
 
     @AfterEach
@@ -121,4 +124,12 @@ public class JdbcResultSetIT extends JdbcTypesIT {
         .setValues(BINARY_VALS)
         .testGetColumn();
     }
+
+    @Test
+    public void testHoldability() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
+        assertNotNull(resultSet);
+        assertEquals(metaData.getResultSetHoldability(), resultSet.getHoldability());
+    }
+
 }

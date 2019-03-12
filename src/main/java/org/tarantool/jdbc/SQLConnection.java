@@ -1,5 +1,10 @@
 package org.tarantool.jdbc;
 
+import org.tarantool.CommunicationException;
+import org.tarantool.JDBCBridge;
+import org.tarantool.TarantoolConnection;
+import org.tarantool.util.SQLStates;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -16,6 +21,8 @@ import java.sql.ResultSet;
 import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLNonTransientException;
 import java.sql.SQLWarning;
 import java.sql.SQLXML;
 import java.sql.Savepoint;
@@ -27,10 +34,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 
-import org.tarantool.CommunicationException;
-import org.tarantool.JDBCBridge;
-import org.tarantool.TarantoolConnection;
-
 import static org.tarantool.jdbc.SQLDriver.PROP_HOST;
 import static org.tarantool.jdbc.SQLDriver.PROP_PASSWORD;
 import static org.tarantool.jdbc.SQLDriver.PROP_PORT;
@@ -39,9 +42,17 @@ import static org.tarantool.jdbc.SQLDriver.PROP_USER;
 
 @SuppressWarnings("Since15")
 public class SQLConnection implements Connection {
+
+    private static final int UNSET_HOLDABILITY = 0;
+
     private final TarantoolConnection connection;
-    final String url;
-    final Properties properties;
+
+    private final String url;
+    private final Properties properties;
+
+    private DatabaseMetaData cachedMetadata;
+
+    private int resultSetHoldability = UNSET_HOLDABILITY;
 
     SQLConnection(String url, Properties properties) throws SQLException {
         this.url = url;
@@ -62,7 +73,7 @@ public class SQLConnection implements Connection {
                 }
             }
             if (e instanceof SQLException)
-                throw (SQLException)e;
+                throw (SQLException) e;
             throw new SQLException("Couldn't initiate connection using " + SQLDriver.diagProperties(properties), e);
         }
     }
@@ -70,12 +81,12 @@ public class SQLConnection implements Connection {
     /**
      * Provides a connected socket to be used to initialize a native tarantool
      * connection.
-     *
+     * <p>
      * The implementation assumes that {@link #properties} contains all the
      * necessary info extracted from both the URI and connection properties
      * provided by the user. However, the overrides are free to also use the
      * {@link #url} if required.
-     *
+     * <p>
      * A connect is guarded with user provided timeout. Socket is configured
      * to honor this timeout for the following read/write operations as well.
      *
@@ -111,7 +122,7 @@ public class SQLConnection implements Connection {
     /**
      * Provides a newly connected socket instance. The method is intended to be
      * overridden to enable unit testing of the class.
-     *
+     * <p>
      * Not supposed to contain any logic other than a call to constructor.
      *
      * @return socket.
@@ -123,11 +134,11 @@ public class SQLConnection implements Connection {
     /**
      * Provides a native tarantool connection instance. The method is intended
      * to be overridden to enable unit testing of the class.
-     *
+     * <p>
      * Not supposed to contain any logic other than a call to constructor.
      *
-     * @param user User name.
-     * @param pass Password.
+     * @param user   User name.
+     * @param pass   Password.
      * @param socket Connected socket.
      * @return Native tarantool connection.
      * @throws IOException if failed.
@@ -140,14 +151,12 @@ public class SQLConnection implements Connection {
 
     @Override
     public Statement createStatement() throws SQLException {
-        checkNotClosed();
-        return new SQLStatement(this);
+        return createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     }
 
     @Override
     public PreparedStatement prepareStatement(String sql) throws SQLException {
-        checkNotClosed();
-        return new SQLPreparedStatement(this, sql);
+        return prepareStatement(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     }
 
     @Override
@@ -196,7 +205,10 @@ public class SQLConnection implements Connection {
     @Override
     public DatabaseMetaData getMetaData() throws SQLException {
         checkNotClosed();
-        return new SQLDatabaseMetadata(this);
+        if (cachedMetadata == null) {
+            cachedMetadata = new SQLDatabaseMetadata(this);
+        }
+        return cachedMetadata;
     }
 
     @Override
@@ -242,13 +254,13 @@ public class SQLConnection implements Connection {
 
     @Override
     public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return createStatement(resultSetType, resultSetConcurrency, getHoldability());
     }
 
     @Override
     public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
             throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return prepareStatement(sql, resultSetType, resultSetConcurrency, getHoldability());
     }
 
     @Override
@@ -268,12 +280,18 @@ public class SQLConnection implements Connection {
 
     @Override
     public void setHoldability(int holdability) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        checkHoldabilitySupport(holdability);
+        resultSetHoldability = holdability;
     }
 
     @Override
     public int getHoldability() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        if (resultSetHoldability == UNSET_HOLDABILITY) {
+            resultSetHoldability = getMetaData().getResultSetHoldability();
+        }
+        return resultSetHoldability;
     }
 
     @Override
@@ -297,15 +315,22 @@ public class SQLConnection implements Connection {
     }
 
     @Override
-    public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
-            throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public Statement createStatement(int resultSetType,
+                                     int resultSetConcurrency,
+                                     int resultSetHoldability) throws SQLException {
+        checkNotClosed();
+        checkHoldabilitySupport(resultSetHoldability);
+        return new SQLStatement(this, resultSetType, resultSetConcurrency, resultSetHoldability);
     }
 
     @Override
-    public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability)
-            throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public PreparedStatement prepareStatement(String sql,
+                                              int resultSetType,
+                                              int resultSetConcurrency,
+                                              int resultSetHoldability) throws SQLException {
+        checkNotClosed();
+        checkHoldabilitySupport(resultSetHoldability);
+        return new SQLPreparedStatement(this, sql, resultSetType, resultSetConcurrency, resultSetHoldability);
     }
 
     @Override
@@ -423,16 +448,19 @@ public class SQLConnection implements Connection {
     }
 
     @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public <T> T unwrap(Class<T> type) throws SQLException {
+        if (isWrapperFor(type)) {
+            return type.cast(this);
+        }
+        throw new SQLNonTransientException("Connection does not wrap " + type.getName());
     }
 
     @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public boolean isWrapperFor(Class<?> type) throws SQLException {
+        return type.isAssignableFrom(this.getClass());
     }
 
-    protected Object execute(String sql, Object ... args) throws SQLException {
+    protected Object execute(String sql, Object... args) throws SQLException {
         checkNotClosed();
         try {
             return JDBCBridge.execute(connection, sql, args);
@@ -442,17 +470,17 @@ public class SQLConnection implements Connection {
         }
     }
 
-    protected ResultSet executeQuery(String sql, Object ... args) throws SQLException {
+    protected JDBCBridge executeQuery(String sql, Object... args) throws SQLException {
         checkNotClosed();
         try {
-            return new SQLResultSet(JDBCBridge.query(connection, sql, args));
+            return JDBCBridge.query(connection, sql, args);
         } catch (Exception e) {
             handleException(e);
             throw new SQLException(formatError(sql, args), e);
         }
     }
 
-    protected int executeUpdate(String sql, Object ... args) throws SQLException {
+    protected int executeUpdate(String sql, Object... args) throws SQLException {
         checkNotClosed();
         try {
             return JDBCBridge.update(connection, sql, args);
@@ -463,7 +491,7 @@ public class SQLConnection implements Connection {
     }
 
     protected List<?> nativeSelect(Integer space, Integer index, List<?> key, int offset, int limit, int iterator)
-        throws SQLException {
+            throws SQLException {
         checkNotClosed();
         try {
             return connection.select(space, index, key, offset, limit, iterator);
@@ -482,7 +510,18 @@ public class SQLConnection implements Connection {
      */
     protected void checkNotClosed() throws SQLException {
         if (isClosed())
-            throw new SQLException("Connection is closed.");
+            throw new SQLNonTransientConnectionException(
+                    "Connection is closed.",
+                    SQLStates.CONNECTION_DOES_NOT_EXIST.getSqlState()
+            );
+    }
+
+    String getUrl() {
+        return url;
+    }
+
+    Properties getProperties() {
+        return properties;
     }
 
     /**
@@ -492,7 +531,7 @@ public class SQLConnection implements Connection {
      */
     private void handleException(Exception e) {
         if (CommunicationException.class.isAssignableFrom(e.getClass()) ||
-            IOException.class.isAssignableFrom(e.getClass())) {
+                IOException.class.isAssignableFrom(e.getClass())) {
             try {
                 close();
             } catch (SQLException ignored) {
@@ -502,13 +541,30 @@ public class SQLConnection implements Connection {
     }
 
     /**
+     * Checks whether <code>holdability</code> is supported
+     *
+     * @param holdability param to be checked
+     * @throws SQLFeatureNotSupportedException param is not supported
+     * @throws SQLNonTransientException param has invalid value
+     */
+    private void checkHoldabilitySupport(int holdability) throws SQLException {
+        if (holdability != ResultSet.CLOSE_CURSORS_AT_COMMIT
+                && holdability != ResultSet.HOLD_CURSORS_OVER_COMMIT) {
+            throw new SQLNonTransientException("", SQLStates.INVALID_PARAMETER_VALUE.getSqlState());
+        }
+        if (!getMetaData().supportsResultSetHoldability(holdability)) {
+            throw new SQLFeatureNotSupportedException();
+        }
+    }
+
+    /**
      * Provides error message that contains parameters of failed SQL statement.
      *
-     * @param sql SQL Text.
+     * @param sql    SQL Text.
      * @param params Parameters of the SQL statement.
      * @return Formatted error message.
      */
-    private static String formatError(String sql, Object ... params) {
+    private static String formatError(String sql, Object... params) {
         return "Failed to execute SQL: " + sql + ", params: " + Arrays.deepToString(params);
     }
 }

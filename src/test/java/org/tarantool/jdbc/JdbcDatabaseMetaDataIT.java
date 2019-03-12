@@ -1,13 +1,15 @@
 package org.tarantool.jdbc;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -16,9 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
     private DatabaseMetaData meta;
@@ -239,4 +238,20 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         assertEquals(majorVersion, majorVersionMatched);
         assertEquals(minorVersion, minorVersionMatched);
     }
+
+    @Test
+    public void testGetResultSetHoldability() throws SQLException {
+        int resultSetHoldability = meta.getResultSetHoldability();
+        assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, resultSetHoldability);
+    }
+
+    @Test
+    public void testSupportsResultSetHoldability() throws SQLException {
+        assertTrue(meta.supportsResultSetHoldability(ResultSet.HOLD_CURSORS_OVER_COMMIT));
+        assertFalse(meta.supportsResultSetHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT));
+        assertFalse(meta.supportsResultSetHoldability(Integer.MAX_VALUE));
+        assertFalse(meta.supportsResultSetHoldability(Integer.MIN_VALUE));
+        assertFalse(meta.supportsResultSetHoldability(42));
+    }
+
 }

@@ -1,5 +1,8 @@
 package org.tarantool.jdbc;
 
+import org.tarantool.JDBCBridge;
+import org.tarantool.Version;
+
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -14,11 +17,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-import org.tarantool.Version;
-import org.tarantool.JDBCBridge;
-
 @SuppressWarnings("Since15")
 public class SQLDatabaseMetadata implements DatabaseMetaData {
+
     protected static final int _VSPACE = 281;
     protected static final int _VINDEX = 289;
     protected static final int SPACES_MAX = 65535;
@@ -28,16 +29,15 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     public static final int SPACE_ID_IDX = 0;
     protected final SQLConnection connection;
 
-
     protected class SQLNullResultSet extends SQLResultSet {
 
-        public SQLNullResultSet(JDBCBridge bridge) {
-            super(bridge);
+        public SQLNullResultSet(JDBCBridge bridge, SQLStatement ownerStatement) throws SQLException {
+            super(bridge, ownerStatement);
         }
 
         @Override
         protected Object getRaw(int columnIndex) {
-            return columnIndex > row.size() ? null : row.get(columnIndex - 1);
+            return columnIndex > getCurrentRow().size() ? null : getCurrentRow().get(columnIndex - 1);
         }
 
         @Override
@@ -65,12 +65,12 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public String getURL() throws SQLException {
-        return connection.url;
+        return connection.getUrl();
     }
 
     @Override
     public String getUserName() throws SQLException {
-        return connection.properties.getProperty("user");
+        return connection.getProperties().getProperty("user");
     }
 
     @Override
@@ -646,13 +646,13 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     @Override
     public ResultSet getProcedures(String catalog, String schemaPattern, String procedureNamePattern)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern, String columnNamePattern)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     protected boolean like(String value, String[] parts) {
@@ -676,7 +676,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
         try {
             if (types != null && !Arrays.asList(types).contains("TABLE")) {
                 connection.checkNotClosed();
-                return new SQLResultSet(JDBCBridge.EMPTY);
+                return asMetadataResultSet(JDBCBridge.EMPTY);
             }
             String[] parts = tableNamePattern == null ? new String[]{""} : tableNamePattern.split("%");
             List<List<Object>> spaces = (List<List<Object>>) connection.nativeSelect(_VSPACE, 0, Arrays.asList(), 0, SPACES_MAX, 0);
@@ -692,10 +692,16 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
                     rows.add(Arrays.asList((Object) tableName, (Object) "TABLE"));
                 }
             }
-            return new SQLNullResultSet(JDBCBridge.mock(Arrays.asList("TABLE_NAME", "TABLE_TYPE",
+            List<String> columnNames = Arrays.asList(
+                    "TABLE_NAME", "TABLE_TYPE",
                     //nulls
-                    "REMARKS", "TABLE_CAT", "TABLE_SCHEM", "TABLE_TYPE", "TYPE_CAT", "TYPE_SCHEM",
-                    "TYPE_NAME", "SELF_REFERENCING_COL_NAME", "REF_GENERATION"), rows));
+                    "REMARKS", "TABLE_CAT",
+                    "TABLE_SCHEM", "TABLE_TYPE",
+                    "TYPE_CAT", "TYPE_SCHEM",
+                    "TYPE_NAME", "SELF_REFERENCING_COL_NAME",
+                    "REF_GENERATION"
+            );
+            return sqlNullResultSet(columnNames, rows);
         } catch (Exception e) {
             throw new SQLException("Failed to retrieve table(s) description: " +
                 "tableNamePattern=\"" + tableNamePattern + "\".", e);
@@ -707,10 +713,6 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
         return rowOfNullsResultSet();
     }
 
-    private SQLNullResultSet rowOfNullsResultSet() {
-        return new SQLNullResultSet(JDBCBridge.mock(Collections.<String>emptyList(), Collections.singletonList(Collections.emptyList())));
-    }
-
     @Override
     public ResultSet getCatalogs() throws SQLException {
         return rowOfNullsResultSet();
@@ -718,7 +720,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getTableTypes() throws SQLException {
-        return new SQLResultSet(JDBCBridge.mock(Arrays.asList("TABLE_TYPE"), Arrays.asList(Arrays.<Object>asList("TABLE"))));
+        return asMetadataResultSet(JDBCBridge.mock(Arrays.asList("TABLE_TYPE"), Arrays.asList(Arrays.<Object>asList("TABLE"))));
     }
 
     @Override
@@ -748,12 +750,25 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
                 }
             }
 
-            return new SQLNullResultSet((JDBCBridge.mock(
-                    Arrays.asList("TABLE_NAME", "COLUMN_NAME", "ORDINAL_POSITION", "DATA_TYPE", "TYPE_NAME", "NUM_PREC_RADIX", "NULLABLE", "IS_NULLABLE", "SOURCE_DATA_TYPE", "IS_AUTOINCREMENT", "IS_GENERATEDCOLUMN",
-                            //nulls
-                            "TABLE_CAT", "TABLE_SCHEM", "COLUMN_SIZE", "BUFFER_LENGTH", "DECIMAL_DIGITS", "REMARKS", "COLUMN_DEF", "SQL_DATA_TYPE", "SQL_DATETIME_SUB", "CHAR_OCTET_LENGTH", "SCOPE_CATALOG", "SCOPE_SCHEMA", "SCOPE_TABLE"
-                    ),
-                    rows)));
+            List<String> columnNames = Arrays.asList(
+                    "TABLE_NAME", "COLUMN_NAME",
+                    "ORDINAL_POSITION", "DATA_TYPE",
+                    "TYPE_NAME", "NUM_PREC_RADIX",
+                    "NULLABLE", "IS_NULLABLE",
+                    "SOURCE_DATA_TYPE", "IS_AUTOINCREMENT",
+                    "IS_GENERATEDCOLUMN",
+                    //nulls
+                    "TABLE_CAT", "TABLE_SCHEM",
+                    "COLUMN_SIZE", "BUFFER_LENGTH",
+                    "DECIMAL_DIGITS", "REMARKS",
+                    "COLUMN_DEF", "SQL_DATA_TYPE",
+                    "SQL_DATETIME_SUB", "CHAR_OCTET_LENGTH",
+                    "SCOPE_CATALOG", "SCOPE_SCHEMA",
+                    "SCOPE_TABLE"
+            );
+            return sqlNullResultSet(
+                    columnNames,
+                    rows);
         } catch (Exception e) {
             throw new SQLException("Error processing table column metadata: " +
                 "tableNamePattern=\"" + tableNamePattern + "\"; " +
@@ -776,12 +791,12 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     @Override
     public ResultSet getBestRowIdentifier(String catalog, String schema, String table, int scope, boolean nullable)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getVersionColumns(String catalog, String schema, String table) throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
@@ -830,7 +845,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
                     return col0.compareTo(col1);
                 }
             });
-            return new SQLNullResultSet((JDBCBridge.mock(colNames, rows)));
+            return sqlNullResultSet(colNames, rows);
         } catch (Exception e) {
             throw new SQLException("Error processing metadata for table \"" + table + "\".", e);
         }
@@ -838,29 +853,29 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getImportedKeys(String catalog, String schema, String table) throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getExportedKeys(String catalog, String schema, String table) throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getCrossReference(String parentCatalog, String parentSchema, String parentTable, String foreignCatalog, String foreignSchema, String foreignTable)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getTypeInfo() throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
@@ -926,7 +941,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     @Override
     public ResultSet getUDTs(String catalog, String schemaPattern, String typeNamePattern, int[] types)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
@@ -956,28 +971,34 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getSuperTypes(String catalog, String schemaPattern, String typeNamePattern) throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getSuperTables(String catalog, String schemaPattern, String tableNamePattern) throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getAttributes(String catalog, String schemaPattern, String typeNamePattern, String attributeNamePattern)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * Support of {@link ResultSet#CLOSE_CURSORS_AT_COMMIT} is not
+     * available now because it requires cursor transaction support.
+     */
     @Override
     public boolean supportsResultSetHoldability(int holdability) throws SQLException {
-        return false;
+        return holdability == ResultSet.HOLD_CURSORS_OVER_COMMIT;
     }
 
     @Override
     public int getResultSetHoldability() throws SQLException {
-        return 0;
+        return ResultSet.HOLD_CURSORS_OVER_COMMIT;
     }
 
     @Override
@@ -1037,25 +1058,25 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getClientInfoProperties() throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getFunctions(String catalog, String schemaPattern, String functionNamePattern)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getFunctionColumns(String catalog, String schemaPattern, String functionNamePattern, String columnNamePattern)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
     public ResultSet getPseudoColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
             throws SQLException {
-        return new SQLResultSet(JDBCBridge.EMPTY);
+        return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
@@ -1073,6 +1094,14 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
         throw new SQLFeatureNotSupportedException();
     }
 
+    private ResultSet asMetadataResultSet(JDBCBridge jdbcBridge) throws SQLException {
+        return createMetadataStatement().executeMetadata(jdbcBridge);
+    }
+
+    private SQLStatement createMetadataStatement() throws SQLException {
+        return connection.createStatement().unwrap(SQLStatement.class);
+    }
+
     private static <T> T ensureType(Class<T> cls, Object v) throws Exception {
         if (v == null || !cls.isAssignableFrom(v.getClass())) {
             throw new Exception(String.format("Wrong value type '%s', expected '%s'.",
@@ -1085,8 +1114,16 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
         return (v != null && cls.isAssignableFrom(v.getClass())) ? cls.cast(v) : null;
     }
 
-    private ResultSet emptyResultSet(List<String> colNames) {
-        return new SQLNullResultSet((JDBCBridge.mock(colNames, Collections.<List<Object>>emptyList())));
+    private SQLNullResultSet rowOfNullsResultSet() throws SQLException {
+        return sqlNullResultSet(Collections.emptyList(), Collections.emptyList());
+    }
+
+    private SQLNullResultSet emptyResultSet(List<String> colNames) throws SQLException {
+        return sqlNullResultSet(colNames, Collections.emptyList());
+    }
+
+    private SQLNullResultSet sqlNullResultSet(List<String> colNames, List<List<Object>> rows) throws SQLException {
+        return new SQLNullResultSet(JDBCBridge.mock(colNames, rows), createMetadataStatement());
     }
 
 }

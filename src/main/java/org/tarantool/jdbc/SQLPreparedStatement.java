@@ -25,21 +25,33 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class SQLPreparedStatement extends SQLStatement implements PreparedStatement {
+
     final static String INVALID_CALL_MSG = "The method cannot be called on a PreparedStatement.";
     final String sql;
     final Map<Integer, Object> params;
 
 
-    public SQLPreparedStatement(SQLConnection connection, String sql) {
+    public SQLPreparedStatement(SQLConnection connection, String sql) throws SQLException {
         super(connection);
         this.sql = sql;
-        this.params = new HashMap<Integer, Object>();
+        this.params = new HashMap<>();
+    }
+
+    public SQLPreparedStatement(SQLConnection connection,
+                                String sql,
+                                int resultSetType,
+                                int resultSetConcurrency,
+                                int resultSetHoldability) throws SQLException {
+        super(connection, resultSetType, resultSetConcurrency, resultSetHoldability);
+        this.sql = sql;
+        this.params = new HashMap<>();
     }
 
     @Override
     public ResultSet executeQuery() throws SQLException {
+        checkNotClosed();
         discardLastResults();
-        return connection.executeQuery(sql, getParams());
+        return createResultSet(connection.executeQuery(sql, getParams()));
     }
 
     protected Object[] getParams() throws SQLException {
@@ -56,93 +68,94 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public int executeUpdate() throws SQLException {
+        checkNotClosed();
         discardLastResults();
         return connection.executeUpdate(sql, getParams());
     }
 
     @Override
     public void setNull(int parameterIndex, int sqlType) throws SQLException {
-        params.put(parameterIndex, null);
+        setParameter(parameterIndex, null);
     }
 
     @Override
-    public void setBoolean(int parameterIndex, boolean x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setBoolean(int parameterIndex, boolean parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setByte(int parameterIndex, byte x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setByte(int parameterIndex, byte parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setShort(int parameterIndex, short x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setShort(int parameterIndex, short parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setInt(int parameterIndex, int x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setInt(int parameterIndex, int parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setLong(int parameterIndex, long x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setLong(int parameterIndex, long parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setFloat(int parameterIndex, float x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setFloat(int parameterIndex, float parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setDouble(int parameterIndex, double x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setDouble(int parameterIndex, double parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setBigDecimal(int parameterIndex, BigDecimal parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setString(int parameterIndex, String x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setString(int parameterIndex, String parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setBytes(int parameterIndex, byte[] x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setBytes(int parameterIndex, byte[] parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setDate(int parameterIndex, Date x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setDate(int parameterIndex, Date parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setTime(int parameterIndex, Time x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setTime(int parameterIndex, Time parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setTimestamp(int parameterIndex, Timestamp parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setAsciiStream(int parameterIndex, InputStream parameterValue, int length) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setUnicodeStream(int parameterIndex, InputStream parameterValue, int length) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setBinaryStream(int parameterIndex, InputStream parameterValue, int length) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
@@ -152,16 +165,22 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
-        params.put(parameterIndex, x);
+        setObject(parameterIndex, x, targetSqlType, -1);
     }
 
     @Override
-    public void setObject(int parameterIndex, Object x) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setObject(int parameterIndex, Object value) throws SQLException {
+        setParameter(parameterIndex, value);
+    }
+
+    private void setParameter(int parameterIndex, Object value) throws SQLException {
+        checkNotClosed();
+        params.put(parameterIndex, value);
     }
 
     @Override
     public boolean execute() throws SQLException {
+        checkNotClosed();
         discardLastResults();
         return handleResult(connection.execute(sql, getParams()));
     }
@@ -197,28 +216,28 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
-    public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setDate(int parameterIndex, Date parameterValue, Calendar calendar) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setTime(int parameterIndex, Time parameterValue, Calendar calendar) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setTimestamp(int parameterIndex, Timestamp parameterValue, Calendar calendar) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
     public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
-        params.put(parameterIndex, null);
+        setParameter(parameterIndex, null);
     }
 
     @Override
-    public void setURL(int parameterIndex, URL x) throws SQLException {
-        params.put(parameterIndex, x.toString());
+    public void setURL(int parameterIndex, URL parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue.toString());
     }
 
     @Override
@@ -232,8 +251,8 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
-    public void setNString(int parameterIndex, String value) throws SQLException {
-        params.put(parameterIndex, value);
+    public void setNString(int parameterIndex, String parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override
@@ -267,8 +286,8 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
-    public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
-        params.put(parameterIndex, x);
+    public void setObject(int parameterIndex, Object parameterValue, int targetSqlType, int scaleOrLength) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
     }
 
     @Override

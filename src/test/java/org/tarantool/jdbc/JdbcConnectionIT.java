@@ -8,7 +8,9 @@ import java.lang.reflect.Field;
 import java.net.Socket;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 @SuppressWarnings("Since15")
 public class JdbcConnectionIT extends AbstractJdbcIT {
+
     @Test
     public void testCreateStatement() throws SQLException {
         Statement stmt = conn.createStatement();
@@ -71,7 +74,7 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
         Field sock = TarantoolConnection.class.getDeclaredField("socket");
         sock.setAccessible(true);
 
-        assertEquals(3000, ((Socket)sock.get(tntCon.get(conn))).getSoTimeout());
+        assertEquals(3000, ((Socket) sock.get(tntCon.get(conn))).getSoTimeout());
     }
 
     @Test
@@ -85,15 +88,20 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
                 @Override
                 public void execute() throws Throwable {
                     switch (step) {
-                        case 0: conn.createStatement();
+                        case 0:
+                            conn.createStatement();
                             break;
-                        case 1: conn.prepareStatement("TEST");
+                        case 1:
+                            conn.prepareStatement("TEST");
                             break;
-                        case 2: conn.getMetaData();
+                        case 2:
+                            conn.getMetaData();
                             break;
-                        case 3: conn.getNetworkTimeout();
+                        case 3:
+                            conn.getNetworkTimeout();
                             break;
-                        case 4: conn.setNetworkTimeout(null, 1000);
+                        case 4:
+                            conn.setNetworkTimeout(null, 1000);
                             break;
                         default:
                             fail();
@@ -104,4 +112,84 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
         }
         assertEquals(5, i);
     }
+
+    @Test
+    public void testConnectionUnwrap() throws SQLException {
+        assertEquals(conn, conn.unwrap(SQLConnection.class));
+        assertThrows(SQLException.class, () -> conn.unwrap(Integer.class));
+    }
+
+    @Test
+    public void testConnectionIsWrapperFor() throws SQLException {
+        assertTrue(conn.isWrapperFor(SQLConnection.class));
+        assertFalse(conn.isWrapperFor(Integer.class));
+    }
+
+    @Test
+    public void testDefaultGetHoldability() throws SQLException {
+        // default connection holdability should be equal to metadata one
+        assertEquals(conn.getMetaData().getResultSetHoldability(), conn.getHoldability());
+    }
+
+    @Test
+    public void testSetAndGetHoldability() throws SQLException {
+        conn.setHoldability(ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, conn.getHoldability());
+
+        assertThrows(SQLFeatureNotSupportedException.class, () -> conn.setHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT));
+        assertThrows(SQLException.class, () -> conn.setHoldability(Integer.MAX_VALUE));
+
+        assertThrows(SQLException.class, () -> {
+            conn.close();
+            conn.setHoldability(ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        });
+    }
+
+    @Test
+    public void testCreateHoldableStatement() throws SQLException {
+        Statement statement = conn.createStatement();
+        assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
+
+        statement = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+        assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
+
+        statement = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
+
+        assertThrows(SQLException.class, () -> {
+            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, Integer.MAX_VALUE);
+        });
+        assertThrows(SQLFeatureNotSupportedException.class, () -> {
+            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
+        });
+        assertThrows(SQLException.class, () -> {
+            conn.close();
+            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        });
+    }
+
+    @Test
+    public void testPrepareHoldableStatement() throws SQLException {
+        String sqlString = "TEST";
+        Statement statement = conn.prepareStatement(sqlString);
+        assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
+
+        statement = conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+        assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
+
+        statement = conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
+
+        assertThrows(SQLException.class, () -> {
+            conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, Integer.MAX_VALUE);
+        });
+        assertThrows(SQLFeatureNotSupportedException.class, () -> {
+            conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
+        });
+        assertThrows(SQLException.class, () -> {
+            conn.close();
+            conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        });
+    }
+
 }

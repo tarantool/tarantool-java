@@ -1,8 +1,8 @@
 package org.tarantool.jdbc;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.function.Executable;
 
 import java.math.BigDecimal;
@@ -157,7 +157,7 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
                     }
                 }
             });
-            assertEquals("Connection is closed.", e.getMessage());
+            assertEquals("Statement is closed.", e.getMessage());
         }
         assertEquals(3, i);
     }

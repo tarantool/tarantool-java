@@ -9,11 +9,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class JdbcStatementIT extends AbstractJdbcIT {
@@ -89,7 +89,7 @@ public class JdbcStatementIT extends AbstractJdbcIT {
                     }
                 }
             });
-            assertEquals("Connection is closed.", e.getMessage());
+            assertEquals("Statement is closed.", e.getMessage());
         }
         assertEquals(3, i);
     }

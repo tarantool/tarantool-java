@@ -11,6 +11,7 @@ import org.tarantool.jdbc.SQLResultSet;
 import org.tarantool.protocol.TarantoolPacket;
 
 public class JDBCBridge {
+
     public static final JDBCBridge EMPTY = new JDBCBridge(Collections.<TarantoolBase.SQLMetaData>emptyList(), Collections.<List<Object>>emptyList());
 
     final List<TarantoolBase.SQLMetaData> sqlMetadata;
@@ -41,7 +42,7 @@ public class JDBCBridge {
 
     public static JDBCBridge mock(List<String> fields, List<List<Object>> values)  {
         List<TarantoolBase.SQLMetaData> meta = new ArrayList<TarantoolBase.SQLMetaData>(fields.size());
-        for(String field:fields) {
+        for(String field : fields) {
            meta.add(new TarantoolBase.SQLMetaData(field));
         }
         return new JDBCBridge(meta, values);
@@ -51,7 +52,7 @@ public class JDBCBridge {
         TarantoolPacket pack = connection.sql(sql, params);
         Long rowCount = SqlProtoUtils.getSqlRowCount(pack);
         if(rowCount == null) {
-            return new SQLResultSet(new JDBCBridge(pack));
+            return new JDBCBridge(pack);
         }
         return rowCount.intValue();
     }

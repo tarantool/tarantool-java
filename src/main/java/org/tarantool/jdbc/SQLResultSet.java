@@ -1,5 +1,7 @@
 package org.tarantool.jdbc;
 
+import org.tarantool.JDBCBridge;
+
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.Reader;
@@ -19,6 +21,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.RowId;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLNonTransientException;
 import java.sql.SQLWarning;
 import java.sql.SQLXML;
 import java.sql.Statement;
@@ -29,26 +32,46 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 
-import org.tarantool.JDBCBridge;
-
 @SuppressWarnings("Since15")
 public class SQLResultSet implements ResultSet {
-    ListIterator<List<Object>> iterator;
-    final JDBCBridge bridge;
-    final SQLResultSetMetaData metaData;
 
-    int maxRows;
-    List<Object> row = null;
+    private ListIterator<List<Object>> iterator;
+    private JDBCBridge bridge;
+    private final SQLResultSetMetaData metaData;
 
+    private final Statement statement;
+    private int maxRows;
+    private List<Object> row = null;
 
-    public SQLResultSet(JDBCBridge bridge) {
+    private final int type;
+    private final int concurrencyLevel;
+    private final int holdability;
+
+    public SQLResultSet(JDBCBridge bridge, SQLStatement ownerStatement) throws SQLException {
         this.bridge = bridge;
         iterator = bridge.iterator();
         metaData = new SQLResultSetMetaData(bridge);
+        statement = ownerStatement;
+        type = statement.getResultSetType();
+        concurrencyLevel = statement.getResultSetConcurrency();
+        holdability = statement.getResultSetHoldability();
+    }
+
+    public int getMaxRows() {
+        return maxRows;
+    }
+
+    public void setMaxRows(int maxRows) {
+        this.maxRows = maxRows;
+    }
+
+    List<Object> getCurrentRow() {
+        return row;
     }
 
     @Override
     public boolean next() throws SQLException {
+        checkNotClosed();
         if (iterator.hasNext() && (maxRows == 0 || iterator.nextIndex() < maxRows)) {
             row = iterator.next();
             return true;
@@ -300,32 +323,38 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean isBeforeFirst() throws SQLException {
+        checkNotClosed();
         return row == null && iterator.previousIndex() == -1;
     }
 
     @Override
     public boolean isAfterLast() throws SQLException {
+        checkNotClosed();
         return iterator.nextIndex() == bridge.size() && row == null;
     }
 
     @Override
     public boolean isFirst() throws SQLException {
+        checkNotClosed();
         return iterator.previousIndex() == 0;
     }
 
     @Override
     public boolean isLast() throws SQLException {
+        checkNotClosed();
         return iterator.nextIndex() == bridge.size();
     }
 
     @Override
     public void beforeFirst() throws SQLException {
+        checkNotClosed();
         row = null;
         iterator = bridge.iterator();
     }
 
     @Override
     public void afterLast() throws SQLException {
+        checkNotClosed();
         while (next()) {
         }
     }
@@ -338,6 +367,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean last() throws SQLException {
+        checkNotClosed();
         while (iterator.hasNext()) {
             next();
         }
@@ -346,6 +376,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public int getRow() throws SQLException {
+        checkNotClosed();
         return iterator.previousIndex() + 1;
     }
 
@@ -361,6 +392,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean relative(int rows) throws SQLException {
+        checkNotClosed();
         for (int i = 0; i < rows && iterator.hasNext(); i++) {
             next();
         }
@@ -369,6 +401,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean previous() throws SQLException {
+        checkNotClosed();
         if (iterator.hasPrevious()) {
             iterator.previous();
             return true;
@@ -378,6 +411,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public void setFetchDirection(int direction) throws SQLException {
+        checkNotClosed();
         if (direction != ResultSet.FETCH_FORWARD) {
             throw new SQLException("TYPE_FORWARD_ONLY");
         }
@@ -385,6 +419,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public int getFetchDirection() throws SQLException {
+        checkNotClosed();
         return ResultSet.FETCH_FORWARD;
     }
 
@@ -400,12 +435,14 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public int getType() throws SQLException {
-        return ResultSet.TYPE_FORWARD_ONLY;
+        checkNotClosed();
+        return type;
     }
 
     @Override
     public int getConcurrency() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        return concurrencyLevel;
     }
 
     @Override
@@ -813,12 +850,13 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public int getHoldability() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        return holdability;
     }
 
     @Override
     public boolean isClosed() throws SQLException {
-        return false;
+        return statement.isClosed();
     }
 
     @Override
@@ -1059,4 +1097,11 @@ public class SQLResultSet implements ResultSet {
                 ", row=" + row +
                 '}';
     }
+
+    protected void checkNotClosed() throws SQLException {
+        if (isClosed()) {
+            throw new SQLNonTransientException("ResultSet is closed.");
+        }
+    }
+
 }
