@@ -2,19 +2,18 @@ package org.tarantool.server;
 
 import org.tarantool.Key;
 
-import java.util.Collections;
 import java.util.Map;
 
-public class TarantoolBinaryPackage {
+public class TarantoolBinaryPacket {
     private final Map<Integer, Object> headers;
     private final Map<Integer, Object> body;
 
-    public TarantoolBinaryPackage(Map<Integer, Object> headers, Map<Integer, Object> body) {
+    public TarantoolBinaryPacket(Map<Integer, Object> headers, Map<Integer, Object> body) {
         this.headers = headers;
         this.body = body;
     }
 
-    public TarantoolBinaryPackage(Map<Integer, Object> headers) {
+    public TarantoolBinaryPacket(Map<Integer, Object> headers) {
         this.headers = headers;
         body = null;
     }

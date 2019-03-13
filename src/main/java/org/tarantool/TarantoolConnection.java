@@ -1,11 +1,13 @@
 package org.tarantool;
 
-import org.tarantool.server.*;
+import org.tarantool.server.BinaryProtoUtils;
+import org.tarantool.server.TarantoolBinaryPacket;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.*;
+import java.net.Socket;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -25,18 +27,25 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
 
     @Override
     protected List<?> exec(Code code, Object... args) {
-        TarantoolBinaryPackage responsePackage = writeAndRead(code, args);
+        TarantoolBinaryPacket responsePackage = writeAndRead(code, args);
         return (List) responsePackage.getBody().get(Key.DATA.getId());
     }
 
-    protected TarantoolBinaryPackage writeAndRead(Code code, Object... args) {
+    protected TarantoolBinaryPacket writeAndRead(Code code, Object... args) {
         try {
-            ByteBuffer packet = BinaryProtoUtils.createPacket(code, syncId.incrementAndGet(), null, args);
+            ByteBuffer packet = BinaryProtoUtils.createPacket(
+                    initialRequestSize,
+                    msgPackLite,
+                    code,
+                    syncId.incrementAndGet(),
+                    null,
+                    args
+            );
 
             out.write(packet.array(), 0, packet.remaining());
             out.flush();
 
-            TarantoolBinaryPackage responsePackage = BinaryProtoUtils.readPacket(in);
+            TarantoolBinaryPacket responsePackage = BinaryProtoUtils.readPacket(in);
 
             Map<Integer, Object> headers = responsePackage.getHeaders();
             Map<Integer, Object> body = responsePackage.getBody();
@@ -75,17 +84,17 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
 
     @Override
     public Long update(String sql, Object... bind) {
-        TarantoolBinaryPackage pack = sql(sql, bind);
+        TarantoolBinaryPacket pack = sql(sql, bind);
         return SqlProtoUtils.getSqlRowCount(pack);
     }
 
     @Override
     public List<Map<String, Object>> query(String sql, Object... bind) {
-        TarantoolBinaryPackage pack = sql(sql, bind);
+        TarantoolBinaryPacket pack = sql(sql, bind);
         return SqlProtoUtils.readSqlResult(pack);
     }
 
-    protected TarantoolBinaryPackage sql(String sql, Object[] bind) {
+    protected TarantoolBinaryPacket sql(String sql, Object[] bind) {
         return writeAndRead(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, bind);
     }
 

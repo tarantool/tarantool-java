@@ -2,11 +2,19 @@ package org.tarantool;
 
 import org.tarantool.cluster.ClusterTopologyDiscoverer;
 import org.tarantool.cluster.ClusterTopologyFromShardDiscovererImpl;
-import org.tarantool.server.*;
+import org.tarantool.server.BinaryProtoUtils;
+import org.tarantool.server.TarantoolBinaryPacket;
+import org.tarantool.server.TarantoolInstanceConnection;
+import org.tarantool.server.TarantoolInstanceInfo;
 
-import java.io.*;
-import java.nio.channels.*;
-import java.util.*;
+import java.io.IOException;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -155,7 +163,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     }
 
     @Override
-    protected TarantoolBinaryPackage readFromInstance() throws IOException, InterruptedException {
+    protected TarantoolBinaryPacket readFromInstance() throws IOException, InterruptedException {
 
         readSelector.select();
 
@@ -169,7 +177,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     }
 
     @Override
-    protected CompletableFuture<?> getFuture(TarantoolBinaryPackage pack) {
+    protected CompletableFuture<?> getFuture(TarantoolBinaryPacket pack) {
         Long sync = pack.getSync();
         if (!futuresSentToOldConnection.isEmpty()) {
             CompletableFuture<?> oldConnectionFuture = futuresSentToOldConnection.remove(sync);

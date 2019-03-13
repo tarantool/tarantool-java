@@ -5,7 +5,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.function.ThrowingConsumer;
 import org.tarantool.CommunicationException;
 import org.tarantool.TarantoolConnection;
-import org.tarantool.server.TarantoolBinaryPackage;
+import org.tarantool.server.TarantoolBinaryPacket;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -33,8 +33,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.tarantool.jdbc.SQLDatabaseMetadata.FORMAT_IDX;
 import static org.tarantool.jdbc.SQLDatabaseMetadata.INDEX_FORMAT_IDX;
-import static org.tarantool.jdbc.SQLDatabaseMetadata.SPACE_ID_IDX;
 import static org.tarantool.jdbc.SQLDatabaseMetadata.SPACES_MAX;
+import static org.tarantool.jdbc.SQLDatabaseMetadata.SPACE_ID_IDX;
 import static org.tarantool.jdbc.SQLDatabaseMetadata._VINDEX;
 import static org.tarantool.jdbc.SQLDatabaseMetadata._VSPACE;
 import static org.tarantool.jdbc.SQLDriver.PROP_SOCKET_TIMEOUT;
@@ -298,7 +298,7 @@ public class JdbcExceptionHandlingTest {
             super(null, null, mock(Socket.class));
         }
         @Override
-        protected TarantoolBinaryPackage sql(String sql, Object[] bind) {
+        protected TarantoolBinaryPacket sql(String sql, Object[] bind) {
             return super.sql(sql, bind);
         }
     }

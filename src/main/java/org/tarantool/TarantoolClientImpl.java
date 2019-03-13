@@ -1,7 +1,7 @@
 package org.tarantool;
 
 import org.tarantool.server.BinaryProtoUtils;
-import org.tarantool.server.TarantoolBinaryPackage;
+import org.tarantool.server.TarantoolBinaryPacket;
 import org.tarantool.server.TarantoolInstanceConnection;
 
 import java.io.IOException;
@@ -376,7 +376,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    TarantoolBinaryPackage pack = readFromInstance();
+                    TarantoolBinaryPacket pack = readFromInstance();
 
                     CompletableFuture<?> future = getFuture(pack);
 
@@ -393,11 +393,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     }
 
-    protected CompletableFuture<?> getFuture(TarantoolBinaryPackage pack) {
+    protected CompletableFuture<?> getFuture(TarantoolBinaryPacket pack) {
         return futures.remove(pack.getSync());
     }
 
-    protected TarantoolBinaryPackage readFromInstance() throws IOException, InterruptedException {
+    protected TarantoolBinaryPacket readFromInstance() throws IOException, InterruptedException {
         return BinaryProtoUtils.readPacket(currConnection.getReadChannel());
     }
 
@@ -445,7 +445,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         q.completeExceptionally(e);
     }
 
-    protected void complete(TarantoolBinaryPackage pack, CompletableFuture<?> q) {
+    protected void complete(TarantoolBinaryPacket pack, CompletableFuture<?> q) {
         if (q != null) {
             long code = pack.getCode();
             if (code == 0) {
@@ -463,7 +463,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     }
 
-    protected void completeSql(CompletableFuture<?> q, TarantoolBinaryPackage pack) {
+    protected void completeSql(CompletableFuture<?> q, TarantoolBinaryPacket pack) {
         Long rowCount = SqlProtoUtils.getSqlRowCount(pack);
         if (rowCount!=null) {
             ((CompletableFuture) q).complete(rowCount);
