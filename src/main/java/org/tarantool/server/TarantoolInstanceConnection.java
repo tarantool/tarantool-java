@@ -58,6 +58,7 @@ public class TarantoolInstanceConnection implements Closeable {
 
             return new TarantoolInstanceConnection(tarantoolInstanceInfo, meta, channel);
         } catch (IOException e) {
+            //todo add toString method to TarantoolInstanceConnection to describe failed attempt to connect properly
             throw new IOException("IOException occurred while connecting to node " + tarantoolInstanceInfo, e);
         }
     }
