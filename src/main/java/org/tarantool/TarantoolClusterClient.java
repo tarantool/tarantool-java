@@ -104,6 +104,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
                 if (state.isAtState(StateHelper.ALIVE)) {
                     stopIO();
+                    //todo add wait for reconnect here
 
                     futuresSentToOldConnection.values()
                             .forEach(f -> {
@@ -170,10 +171,8 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         SelectionKey selectedKey = readSelector.selectedKeys().iterator().next();
 
         TarantoolInstanceConnection connection = (TarantoolInstanceConnection) selectedKey.attachment();
-        ReadableByteChannel readChannel = connection
-                .getReadChannel();
 
-        return BinaryProtoUtils.readPacket(readChannel);
+        return connection.readPacket();
     }
 
     @Override

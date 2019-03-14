@@ -398,7 +398,8 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     protected TarantoolBinaryPacket readFromInstance() throws IOException, InterruptedException {
-        return BinaryProtoUtils.readPacket(currConnection.getReadChannel());
+//        return BinaryProtoUtils.readPacket(currConnection.getReadChannel());
+        return currConnection.readPacket();
     }
 
     protected void writeThread() {
@@ -436,8 +437,8 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
 
     protected void sendToInstance(ByteBuffer writerBuffer) throws IOException {
-//        communicationProvider.writeBuffer(writerBuffer);
-        BinaryProtoUtils.writeFully(currConnection.getChannel(), writerBuffer);
+//        BinaryProtoUtils.writeFully(currConnection.getChannel(), writerBuffer);
+        currConnection.writeBuffer(writerBuffer);
     }
 
 

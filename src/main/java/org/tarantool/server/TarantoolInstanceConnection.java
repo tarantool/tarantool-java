@@ -4,7 +4,7 @@ import org.tarantool.CommunicationException;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.channels.ReadableByteChannel;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 public class TarantoolInstanceConnection implements Closeable {
@@ -74,13 +74,17 @@ public class TarantoolInstanceConnection implements Closeable {
         return channel;
     }
 
-    public ReadableByteChannel getReadChannel() {
-        return readChannel;
+    public void writeBuffer(ByteBuffer writerBuffer) throws IOException {
+        BinaryProtoUtils.writeFully(getChannel(), writerBuffer);
+    }
+
+    public TarantoolBinaryPacket readPacket() throws IOException {
+        return BinaryProtoUtils.readPacket(readChannel);
     }
 
     private void closeConnection() {
         try {
-            readChannel.close();//also closes the channel
+            readChannel.close();//also closes this.channel
         } catch (IOException ignored) {
 
         }

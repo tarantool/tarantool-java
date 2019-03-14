@@ -1,6 +1,6 @@
 package org.tarantool;
 
-import org.tarantool.server.TarantoolBinaryPackage;
+import org.tarantool.server.TarantoolBinaryPacket;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -71,7 +71,7 @@ public class TestTarantoolClient {
         }
 
         @Override
-        protected void complete(TarantoolBinaryPackage pack, CompletableFuture<?> q) {
+        protected void complete(TarantoolBinaryPacket pack, CompletableFuture<?> q) {
             super.complete(pack, q);
             Long code = pack.getCode();
             if (code != 0) {

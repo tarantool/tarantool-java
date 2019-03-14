@@ -5,10 +5,16 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.mockito.Matchers;
+import org.mockito.Mockito;
+import org.tarantool.cluster.ClusterTopologyDiscoverer;
+import org.tarantool.server.TarantoolInstanceInfo;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -129,21 +135,37 @@ public class ClientReconnectClusterIT {
         control.waitStarted(SRV2);
         control.waitStarted(SRV3);
 
+
+        String testSchemaCreateScript = "return box.schema.space.create('rr_test').id, " +
+                "box.space.rr_test:create_index('primary').id";
+        control.executeCommand(testSchemaCreateScript, SRV1);
+
         String srv1_address = "localhost:" + PORTS[0];
         String srv2_address = "127.0.0.1:" + PORTS[1];
         String srv3_address = "localhost:" + PORTS[2];
+
+        String INFO_FUNCTION_NAME = "returnAddrsExceptSrv1";
+        String INFO_FUNCTION_SCRIPT =
+                "function " + INFO_FUNCTION_NAME + "() return {'" + srv2_address + "', '" + srv3_address + "'} end";
+
+        control.executeCommand(INFO_FUNCTION_SCRIPT, SRV1);
+        control.waitReplication(SRV1, TIMEOUT);
+
         final TarantoolClusterClient client = makeClient(
                 srv1_address,
                 srv2_address);
-
-
         List<?> ids = client.syncOps().eval(
-                "return box.schema.space.create('rr_test').id, " +
-                        "box.space.rr_test:create_index('primary').id");
+                testSchemaCreateScript);
 
 
-//        client.ref
 //todo
+        List<TarantoolInstanceInfo> newInstances = Stream.of(srv2_address, srv3_address)
+                .map(TarantoolInstanceInfo::create)
+                .collect(Collectors.toList());
+
+        ClusterTopologyDiscoverer discovererMock = Mockito.mock(ClusterTopologyDiscoverer.class);
+        Mockito.when(discovererMock.discoverTarantoolInstances(Matchers.anyInt())).thenReturn(newInstances);
+
 
     }
 }
