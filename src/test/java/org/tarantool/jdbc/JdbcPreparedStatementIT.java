@@ -1,8 +1,7 @@
 package org.tarantool.jdbc;
 
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 import java.math.BigDecimal;
@@ -218,7 +217,6 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
         .testSetParameter();
     }
 
-    @Disabled("Issue#45. Binary string is reported back as char string by tarantool")
     @Test
     public void testSetByteArray() throws SQLException {
         makeHelper(byte[].class)
