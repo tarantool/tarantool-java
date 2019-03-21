@@ -101,6 +101,17 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.2</version>
+                <configuration>
+                    <includes>
+                    </includes>
+                    <!--
+                        Exclude generated sources to prevent a
+                        coveralls-maven-plugin error.
+                    -->
+                    <excludes>
+                        org/tarantool/Version.class
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
