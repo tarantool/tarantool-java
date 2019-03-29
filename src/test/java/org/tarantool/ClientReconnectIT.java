@@ -231,7 +231,8 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         SocketChannelProvider provider = new TestSocketChannelProvider(host,
             port, RESTART_TIMEOUT).setSoLinger(0);
 
-        final AtomicReferenceArray<TarantoolClient> clients = new AtomicReferenceArray<TarantoolClient>(numClients);
+        final AtomicReferenceArray<TarantoolClient> clients =
+                new AtomicReferenceArray<>(numClients);
 
         for (int idx = 0; idx < clients.length(); idx++) {
             clients.set(idx, makeClient(provider));
@@ -249,9 +250,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
                 @Override
                 public void run() {
                     while (!Thread.currentThread().isInterrupted() && deadline > System.currentTimeMillis()) {
-
                         int idx = rnd.nextInt(clients.length());
-
                         try {
                             TarantoolClient cli = clients.get(idx);
 
@@ -300,7 +299,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
 
         // Wait for all threads to finish.
         try {
-            assertTrue(latch.await(RESTART_TIMEOUT, TimeUnit.MILLISECONDS));
+            assertTrue(latch.await(RESTART_TIMEOUT * 2, TimeUnit.MILLISECONDS));
         } catch (InterruptedException e) {
             fail(e);
         }
