@@ -20,7 +20,6 @@ import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -227,13 +226,13 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     public void testLongParallelCloseReconnects() {
         int numThreads = 4;
         int numClients = 4;
-        int timeBudget = 30*1000;
+        int timeBudget = 30 * 1000;
 
         SocketChannelProvider provider = new TestSocketChannelProvider(host,
             port, RESTART_TIMEOUT).setSoLinger(0);
 
         final AtomicReferenceArray<TarantoolClient> clients =
-            new AtomicReferenceArray<TarantoolClient>(numClients);
+                new AtomicReferenceArray<>(numClients);
 
         for (int idx = 0; idx < clients.length(); idx++) {
             clients.set(idx, makeClient(provider));
@@ -301,7 +300,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
 
         // Wait for all threads to finish.
         try {
-            assertTrue(latch.await(RESTART_TIMEOUT, TimeUnit.MILLISECONDS));
+            assertTrue(latch.await(RESTART_TIMEOUT * 2, TimeUnit.MILLISECONDS));
         } catch (InterruptedException e) {
             fail(e);
         }
