@@ -12,7 +12,7 @@ import static org.tarantool.TarantoolClientImpl.StateHelper.CLOSED;
 /**
  * Basic implementation of a client that may work with the cluster
  * of tarantool instances in fault-tolerant way.
- *
+ * <p>
  * Failed operations will be retried once connection is re-established
  * unless the configured expiration time is over.
  */
@@ -25,7 +25,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
     /**
      * @param config Configuration.
-     * @param addrs Array of addresses in the form of [host]:[port].
+     * @param addrs  Array of addresses in the form of [host]:[port].
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config, String... addrs) {
         this(config, new RoundRobinSocketProviderImpl(addrs).setTimeout(config.operationExpiryTimeMillis));
@@ -33,13 +33,13 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
     /**
      * @param provider Socket channel provider.
-     * @param config Configuration.
+     * @param config   Configuration.
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config, SocketChannelProvider provider) {
         super(provider, config);
 
         this.executor = config.executor == null ?
-            Executors.newSingleThreadExecutor() : config.executor;
+                Executors.newSingleThreadExecutor() : config.executor;
     }
 
     @Override
@@ -59,23 +59,23 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     protected CompletableFuture<?> doExec(Code code, Object[] args) {
         validateArgs(args);
         long sid = syncId.incrementAndGet();
-        CompletableFuture<?> q = makeFuture(sid, code, args);
+        ExpirableOp<?> future = makeFuture(sid, code, args);
 
-        if (isDead(q)) {
-            return q;
+        if (isDead(future)) {
+            return future;
         }
-        futures.put(sid, q);
-        if (isDead(q)) {
+        futures.put(sid, future);
+        if (isDead(future)) {
             futures.remove(sid);
-            return q;
+            return future;
         }
         try {
             write(code, sid, null, args);
         } catch (Exception e) {
             futures.remove(sid);
-            fail(q, e);
+            fail(future, e);
         }
-        return q;
+        return future;
     }
 
     @Override
@@ -85,12 +85,12 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
 
     protected boolean checkFail(CompletableFuture<?> q, Exception e) {
         assert q instanceof ExpirableOp<?>;
-        if (!isTransientError(e) || ((ExpirableOp<?>)q).hasExpired(System.currentTimeMillis())) {
+        if (!isTransientError(e) || ((ExpirableOp<?>) q).hasExpired(System.currentTimeMillis())) {
             q.completeExceptionally(e);
             return true;
         } else {
             assert retries != null;
-            retries.put(((ExpirableOp<?>) q).getId(), (ExpirableOp<?>)q);
+            retries.put(((ExpirableOp<?>) q).getId(), (ExpirableOp<?>) q);
             return false;
         }
     }
@@ -114,12 +114,12 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
             return true;
         }
         if (e instanceof TarantoolException) {
-            return ((TarantoolException)e).isTransient();
+            return ((TarantoolException) e).isTransient();
         }
         return false;
     }
 
-    protected CompletableFuture<?> makeFuture(long id, Code code, Object...args) {
+    private ExpirableOp<?> makeFuture(long id, Code code, Object... args) {
         int expireTime = ((TarantoolClusterClientConfig) config).operationExpiryTimeMillis;
         return new ExpirableOp(id, expireTime, code, args);
     }
@@ -133,20 +133,20 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
             // First call is before the constructor finished. Skip it.
             return;
         }
-        Collection<ExpirableOp<?>> futsToRetry = new ArrayList<ExpirableOp<?>>(retries.values());
+        Collection<ExpirableOp<?>> futuresToRetry = new ArrayList<ExpirableOp<?>>(retries.values());
         retries.clear();
         long now = System.currentTimeMillis();
-        for (final ExpirableOp<?> fut : futsToRetry) {
-            if (!fut.hasExpired(now)) {
+        for (final ExpirableOp<?> future : futuresToRetry) {
+            if (!future.hasExpired(now)) {
                 executor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        futures.put(fut.getId(), fut);
+                        futures.put(future.getId(), future);
                         try {
-                            write(fut.getCode(), fut.getId(), null, fut.getArgs());
+                            write(future.getCode(), future.getId(), null, future.getArgs());
                         } catch (Exception e) {
-                            futures.remove(fut.getId());
-                            fail(fut, e);
+                            futures.remove(future.getId());
+                            fail(future, e);
                         }
                     }
                 });
@@ -157,8 +157,11 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     /**
      * Holds operation code and arguments for retry.
      */
-    private class ExpirableOp<V> extends CompletableFuture<V> {
-        /** Moment in time when operation is not considered for retry. */
+    private class ExpirableOp<V> extends TarantoolOp<V> {
+
+        /**
+         * Moment in time when operation is not considered for retry.
+         */
         final private long deadline;
 
         /**
@@ -167,24 +170,20 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         final private long id;
 
         /**
-         * Tarantool binary protocol operation code.
+         * Arguments of operation.
          */
-        final private Code code;
-
-        /** Arguments of operation. */
         final private Object[] args;
 
         /**
-         *
-         * @param id Sync.
+         * @param id         Sync.
          * @param expireTime Expiration time (relative) in ms.
-         * @param code Tarantool operation code.
-         * @param args Operation arguments.
+         * @param code       Tarantool operation code.
+         * @param args       Operation arguments.
          */
-        ExpirableOp(long id, int expireTime, Code code, Object...args) {
+        ExpirableOp(long id, int expireTime, Code code, Object... args) {
+            super(code);
             this.id = id;
             this.deadline = System.currentTimeMillis() + expireTime;
-            this.code = code;
             this.args = args;
         }
 
@@ -196,12 +195,9 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
             return id;
         }
 
-        public Code getCode() {
-            return code;
-        }
-
         public Object[] getArgs() {
             return args;
         }
+
     }
 }

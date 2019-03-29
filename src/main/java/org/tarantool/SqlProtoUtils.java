@@ -11,10 +11,10 @@ public abstract class SqlProtoUtils {
     public static List<Map<String, Object>> readSqlResult(TarantoolPacket pack) {
         List<List<?>> data = (List<List<?>>) pack.getBody().get(Key.DATA.getId());
 
-        List<Map<String, Object>> values = new ArrayList<Map<String, Object>>(data.size());
+        List<Map<String, Object>> values = new ArrayList<>(data.size());
         List<TarantoolBase.SQLMetaData> metaData = getSQLMetadata(pack);
-        LinkedHashMap<String, Object> value = new LinkedHashMap<String, Object>();
         for (List row : data) {
+            LinkedHashMap<String, Object> value = new LinkedHashMap<>();
             for (int i = 0; i < row.size(); i++) {
                 value.put(metaData.get(i).getName(), row.get(i));
             }
