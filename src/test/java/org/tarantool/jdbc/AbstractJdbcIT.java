@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.tarantool.TarantoolConnection;
+import org.tarantool.TarantoolControl;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -19,8 +20,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.tarantool.TestUtils.makeInstanceEnv;
 import static org.tarantool.jdbc.SqlTestUtils.getCreateTableSQL;
-
-import org.tarantool.TarantoolControl;
 
 //mvn -DtntHost=localhost -DtntPort=3301 -DtntUser=test -DtntPass=test verify
 public abstract class AbstractJdbcIT {
@@ -87,7 +86,7 @@ public abstract class AbstractJdbcIT {
         TarantoolConnection con = makeConnection();
         try {
             for (String cmd : text)
-                con.eval("box.sql.execute(\"" + cmd + "\")");
+                con.eval("box.execute(\"" + cmd + "\")");
         } finally {
             con.close();
         }
