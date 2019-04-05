@@ -1,23 +1,26 @@
 package org.tarantool.jdbc;
 
-import org.tarantool.JDBCBridge;
+import org.tarantool.SqlProtoUtils;
+import org.tarantool.util.SQLStates;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLNonTransientException;
 import java.sql.Types;
+import java.util.List;
 
 public class SQLResultSetMetaData implements ResultSetMetaData {
-    protected final JDBCBridge jdbcBridge;
 
-    public SQLResultSetMetaData(JDBCBridge jdbcBridge) {
-        this.jdbcBridge = jdbcBridge;
+    private final List<SqlProtoUtils.SQLMetaData> sqlMetadata;
+
+    public SQLResultSetMetaData(List<SqlProtoUtils.SQLMetaData> sqlMetaData) {
+        this.sqlMetadata = sqlMetaData;
     }
 
     @Override
     public int getColumnCount() throws SQLException {
-        return jdbcBridge.getColumnCount();
+        return sqlMetadata.size();
     }
 
     @Override
@@ -57,12 +60,14 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
 
     @Override
     public String getColumnLabel(int column) throws SQLException {
-        return jdbcBridge.getColumnName(column);
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getName();
     }
 
     @Override
     public String getColumnName(int column) throws SQLException {
-        return jdbcBridge.getColumnName(column);
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getName();
     }
 
     @Override
@@ -133,10 +138,19 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
         return type.isAssignableFrom(this.getClass());
     }
 
+    void checkColumnIndex(int columnIndex) throws SQLException {
+        if (columnIndex < 1 || columnIndex > getColumnCount()) {
+            throw new SQLNonTransientException(
+                    String.format("Column index %d is out of range. Max index is %d", columnIndex, getColumnCount()),
+                    SQLStates.INVALID_PARAMETER_VALUE.getSqlState()
+            );
+        }
+    }
+
     @Override
     public String toString() {
         return "SQLResultSetMetaData{" +
-                "bridge=" + jdbcBridge +
+                "sqlMetadata=" + sqlMetadata +
                 '}';
     }
 }

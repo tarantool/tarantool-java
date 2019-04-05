@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -130,6 +131,47 @@ public class JdbcResultSetIT extends JdbcTypesIT {
     }
 
     @Test
+    public void testDefaultScrollType() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
+        assertNotNull(resultSet);
+        assertEquals(stmt.getResultSetType(), resultSet.getType());
+
+        stmt.close();
+        assertThrows(SQLException.class, resultSet::getType);
+    }
+
+    @Test
+    public void testSelectedScrollType() throws SQLException {
+        Statement statement = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        ResultSet resultSet = statement.executeQuery("SELECT * FROM test WHERE id < 0");
+        assertNotNull(resultSet);
+        assertEquals(statement.getResultSetType(), resultSet.getType());
+
+        statement.close();
+        assertThrows(SQLException.class, resultSet::getType);
+    }
+
+    @Test
+    public void testOwnedResultSet() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
+        assertNotNull(resultSet);
+        assertEquals(stmt, resultSet.getStatement());
+
+        stmt.close();
+        assertThrows(SQLException.class, resultSet::getStatement);
+    }
+
+    @Test
+    public void testResultSetMetadataAfterClose() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
+        assertNotNull(resultSet);
+        ResultSetMetaData metaData = resultSet.getMetaData();
+        assertNotNull(metaData);
+        resultSet.close();
+        assertEquals(metaData, resultSet.getMetaData());
+    }
+
+    @Test
     public void testHoldability() throws SQLException {
         ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
         assertNotNull(resultSet);
@@ -176,6 +218,108 @@ public class JdbcResultSetIT extends JdbcTypesIT {
             assertNull(resultSet.getString(2));
         }
         assertFalse(resultSet.next());
+    }
+
+    @Test
+    public void testFindUniqueColumnLabels() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT id as f1, val as f2 FROM test");
+        assertNotNull(resultSet);
+        assertEquals(1, resultSet.findColumn("f1"));
+        assertEquals(2, resultSet.findColumn("f2"));
+    }
+
+    @Test
+    public void testFindDuplicatedColumnLabels() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT id as f1, val as f1 FROM test");
+        assertNotNull(resultSet);
+        assertEquals(1, resultSet.findColumn("f1"));
+    }
+
+    @Test
+    public void testMaxRows() throws SQLException {
+        stmt.setMaxRows(1);
+        ResultSet resultSet = stmt.executeQuery("SELECT id as f1, val as f2 FROM test");
+        assertNotNull(resultSet);
+        assertTrue(resultSet.next());
+        assertTrue(resultSet.getInt("f1") > 0);
+        assertFalse(resultSet.next());
+    }
+
+    @Test
+    public void testForwardTraversal() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT id as f1, val as f2 FROM test");
+        assertNotNull(resultSet);
+        assertTrue(resultSet.isBeforeFirst());
+        assertEquals(0, resultSet.getRow());
+
+        assertTrue(resultSet.next());
+        assertTrue(resultSet.isFirst());
+        assertEquals(1, resultSet.getRow());
+
+        assertTrue(resultSet.next());
+        assertEquals(2, resultSet.getRow());
+
+        assertTrue(resultSet.next());
+        assertEquals(3, resultSet.getRow());
+        assertTrue(resultSet.isLast());
+
+        assertFalse(resultSet.next());
+        assertEquals(0, resultSet.getRow());
+        assertTrue(resultSet.isAfterLast());
+
+        stmt.close();
+        assertThrows(SQLException.class, resultSet::isAfterLast);
+    }
+
+    @Test
+    public void testTraversal() throws SQLException {
+        Statement statement = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        ResultSet resultSet = statement.executeQuery("SELECT id as f1, val as f2 FROM test");
+        assertNotNull(resultSet);
+        assertTrue(resultSet.isBeforeFirst());
+        assertEquals(0, resultSet.getRow());
+
+        assertTrue(resultSet.last());
+        assertEquals(3, resultSet.getRow());
+        assertTrue(resultSet.isLast());
+
+        assertTrue(resultSet.first());
+        assertEquals(1, resultSet.getRow());
+        assertTrue(resultSet.isFirst());
+
+        assertFalse(resultSet.relative(-1));
+        assertEquals(0, resultSet.getRow());
+        assertTrue(resultSet.isBeforeFirst());
+
+        assertTrue(resultSet.relative(1));
+        assertEquals(1, resultSet.getRow());
+        assertTrue(resultSet.isFirst());
+
+        assertTrue(resultSet.absolute(-1));
+        assertEquals(3, resultSet.getRow());
+        assertTrue(resultSet.isLast());
+
+        assertTrue(resultSet.absolute(1));
+        assertEquals(1, resultSet.getRow());
+        assertTrue(resultSet.isFirst());
+
+        resultSet.beforeFirst();
+        assertEquals(0, resultSet.getRow());
+        assertTrue(resultSet.isBeforeFirst());
+
+        resultSet.afterLast();
+        assertEquals(0, resultSet.getRow());
+        assertTrue(resultSet.isAfterLast());
+
+        assertTrue(resultSet.previous());
+        assertEquals(3, resultSet.getRow());
+        assertTrue(resultSet.isLast());
+
+        assertTrue(resultSet.first());
+        assertEquals(1, resultSet.getRow());
+
+        assertFalse(resultSet.previous());
+        assertEquals(0, resultSet.getRow());
     }
 
 }

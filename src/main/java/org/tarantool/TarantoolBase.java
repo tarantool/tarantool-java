@@ -32,25 +32,6 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
         }
     }
 
-    protected static class SQLMetaData {
-        protected String name;
-
-        public SQLMetaData(String name) {
-            this.name = name;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        @Override
-        public String toString() {
-            return "SQLMetaData{" +
-                "name='" + name + '\'' +
-                '}';
-        }
-    }
-
     protected TarantoolException serverError(long code, Object error) {
         return new TarantoolException(code, error instanceof String ? (String) error : new String((byte[]) error));
     }
@@ -60,7 +41,7 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
             try {
                 channel.close();
             } catch (IOException ignored) {
-                // No-op
+                // no-op
             }
         }
     }

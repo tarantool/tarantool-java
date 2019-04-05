@@ -36,16 +36,16 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
         }
 
         @Override
-        protected Object getRaw(int columnIndex) {
-            return columnIndex > getCurrentRow().size() ? null : getCurrentRow().get(columnIndex - 1);
+        protected Object getRaw(int columnIndex) throws SQLException {
+            List<Object> row = getCurrentRow();
+            return columnIndex > row.size() ? null : row.get(columnIndex - 1);
         }
 
         @Override
-        protected Integer getColumnIndex(String columnLabel) {
-            Integer idx = super.getColumnIndex(columnLabel);
-            return idx == null ? Integer.MAX_VALUE : idx;
+        protected int findColumnIndex(String columnLabel) throws SQLException {
+            int index = super.findColumnIndex(columnLabel);
+            return index == 0 ? Integer.MAX_VALUE : index;
         }
-
 
     }
 
@@ -908,12 +908,13 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public boolean supportsResultSetType(int type) throws SQLException {
-        return false;
+        return type == ResultSet.TYPE_FORWARD_ONLY ||
+            type == ResultSet.TYPE_SCROLL_INSENSITIVE;
     }
 
     @Override
     public boolean supportsResultSetConcurrency(int type, int concurrency) throws SQLException {
-        return false;
+        return supportsResultSetType(type) && concurrency == ResultSet.CONCUR_READ_ONLY;
     }
 
     @Override

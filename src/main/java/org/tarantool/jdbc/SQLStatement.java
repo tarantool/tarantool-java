@@ -2,6 +2,7 @@ package org.tarantool.jdbc;
 
 import org.tarantool.JDBCBridge;
 import org.tarantool.util.JdbcConstants;
+import org.tarantool.util.SQLStates;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -10,18 +11,32 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLNonTransientException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Tarantool {@link Statement} implementation.
+ * <p>
+ * Supports {@link ResultSet#TYPE_FORWARD_ONLY} and {@link ResultSet#TYPE_SCROLL_INSENSITIVE}
+ * types of cursors.
+ * Supports only {@link ResultSet#HOLD_CURSORS_OVER_COMMIT} holdability type.
+ */
 public class SQLStatement implements Statement {
 
     protected final SQLConnection connection;
 
+    /**
+     * Current result set / update count associated to this statement.
+     */
     private SQLResultSet resultSet;
+    private int updateCount;
+
     private final int resultSetType;
     private final int resultSetConcurrency;
     private final int resultSetHoldability;
 
-    private int updateCount;
     private int maxRows;
+
+    private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
     protected SQLStatement(SQLConnection sqlConnection) throws SQLException {
         this.connection = sqlConnection;
@@ -43,15 +58,22 @@ public class SQLStatement implements Statement {
     @Override
     public ResultSet executeQuery(String sql) throws SQLException {
         checkNotClosed();
-        discardLastResults();
-        return createResultSet(connection.executeQuery(sql));
+        if (!executeInternal(sql)) {
+            throw new SQLException("No results were returned", SQLStates.NO_DATA.getSqlState());
+        }
+        return resultSet;
     }
 
     @Override
     public int executeUpdate(String sql) throws SQLException {
         checkNotClosed();
-        discardLastResults();
-        return connection.executeUpdate(sql);
+        if (executeInternal(sql)) {
+            throw new SQLException(
+                "Result was returned but nothing was expected",
+                SQLStates.TOO_MANY_RESULTS.getSqlState()
+            );
+        }
+        return updateCount;
     }
 
     @Override
@@ -76,7 +98,10 @@ public class SQLStatement implements Statement {
 
     @Override
     public void close() throws SQLException {
-
+        if (isClosed.compareAndSet(false, true)) {
+            cancel();
+            discardLastResults();
+        }
     }
 
     @Override
@@ -102,9 +127,6 @@ public class SQLStatement implements Statement {
             throw new SQLNonTransientException("Max rows parameter can't be a negative value");
         }
         this.maxRows = maxRows;
-        if (resultSet != null) {
-            resultSet.setMaxRows(this.maxRows);
-        }
     }
 
     @Override
@@ -146,7 +168,7 @@ public class SQLStatement implements Statement {
     public boolean execute(String sql) throws SQLException {
         checkNotClosed();
         discardLastResults();
-        return handleResult(connection.execute(sql));
+        return executeInternal(sql);
     }
 
     @Override
@@ -172,21 +194,13 @@ public class SQLStatement implements Statement {
     @Override
     public ResultSet getResultSet() throws SQLException {
         checkNotClosed();
-        try {
-            return resultSet;
-        } finally {
-            resultSet = null;
-        }
+        return resultSet;
     }
 
     @Override
     public int getUpdateCount() throws SQLException {
         checkNotClosed();
-        try {
-            return updateCount;
-        } finally {
-            updateCount = -1;
-        }
+        return updateCount;
     }
 
     @Override
@@ -272,7 +286,7 @@ public class SQLStatement implements Statement {
 
     @Override
     public boolean isClosed() throws SQLException {
-        return connection.isClosed();
+        return isClosed.get() || connection.isClosed();
     }
 
     @Override
@@ -312,7 +326,8 @@ public class SQLStatement implements Statement {
     /**
      * Clears the results of the most recent execution.
      */
-    protected void discardLastResults() {
+    protected void discardLastResults() throws SQLException {
+        clearWarnings();
         updateCount = -1;
         if (resultSet != null) {
             try {
@@ -325,15 +340,28 @@ public class SQLStatement implements Statement {
     }
 
     /**
+     * Performs query execution.
+     *
+     * @param sql    query
+     * @param params optional params
+     *
+     * @return {@code true}, if the result is a ResultSet object;
+     */
+    protected boolean executeInternal(String sql, Object... params) throws SQLException {
+        discardLastResults();
+        return handleResult(connection.execute(sql, params));
+    }
+
+    /**
      * Sets the internals according to the result of last execution.
      *
      * @param result The result of SQL statement execution.
+     *
      * @return {@code true}, if the result is a ResultSet object.
      */
     protected boolean handleResult(Object result) throws SQLException {
         if (result instanceof JDBCBridge) {
             resultSet = createResultSet((JDBCBridge) result);
-            resultSet.setMaxRows(maxRows);
             updateCount = -1;
             return true;
         } else {
@@ -347,7 +375,9 @@ public class SQLStatement implements Statement {
      * Returns {@link ResultSet} which will be initialized by <code>data</code>.
      *
      * @param data predefined result to be wrapped by {@link ResultSet}
+     *
      * @return wrapped result
+     *
      * @throws SQLException if a database access error occurs or
      *                      this method is called on a closed <code>Statement</code>
      */
@@ -365,4 +395,5 @@ public class SQLStatement implements Statement {
             throw new SQLNonTransientException("Statement is closed.");
         }
     }
+
 }

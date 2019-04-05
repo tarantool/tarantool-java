@@ -5,10 +5,26 @@ import java.util.List;
 import java.util.Map;
 
 public class TestUtils {
+
     static final String replicationInfoRequest = "return " +
         "box.info.id, " +
         "box.info.lsn, " +
         "box.info.replication";
+
+    @FunctionalInterface
+    public interface ThrowingAction<X extends Throwable> {
+        void run() throws X;
+    }
+
+    public static <X extends Throwable> Runnable throwingWrapper(ThrowingAction<X> action) {
+        return () -> {
+            try {
+                action.run();
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        };
+    }
 
     public static String makeReplicationString(String user, String pass, String... addrs) {
         StringBuilder sb = new StringBuilder();

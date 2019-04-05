@@ -20,6 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
+
     private DatabaseMetaData meta;
 
     @BeforeEach
@@ -41,7 +42,7 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
 
     @Test
     public void testGetAllTables() throws SQLException {
-        ResultSet rs = meta.getTables(null, null, null, new String[] {"TABLE"});
+        ResultSet rs = meta.getTables(null, null, null, new String[] { "TABLE" });
         assertNotNull(rs);
 
         assertTrue(rs.next());
@@ -63,7 +64,7 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
 
     @Test
     public void testGetTable() throws SQLException {
-        ResultSet rs = meta.getTables(null, null, "TEST", new String[] {"TABLE"});
+        ResultSet rs = meta.getTables(null, null, "TEST", new String[] { "TABLE" });
         assertNotNull(rs);
         assertTrue(rs.next());
         assertEquals("TEST", rs.getString("TABLE_NAME"));
@@ -127,7 +128,7 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
 
     @Test
     public void testGetPrimaryKeysIgnoresCatalogSchema() throws SQLException {
-        String[] vals = new String[] {null, "", "IGNORE"};
+        String[] vals = new String[] { null, "", "IGNORE" };
         for (String cat : vals) {
             for (String schema : vals) {
                 ResultSet rs = meta.getPrimaryKeys(cat, schema, "TEST");
@@ -143,7 +144,7 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
 
     @Test
     public void testGetPrimaryKeysNotFound() throws SQLException {
-        String[] tables = new String[] {null, "", "NOSUCHTABLE"};
+        String[] tables = new String[] { null, "", "NOSUCHTABLE" };
         for (String t : tables) {
             ResultSet rs = meta.getPrimaryKeys(null, null, t);
             assertNotNull(rs);
@@ -203,14 +204,17 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
                 @Override
                 public void execute() throws Throwable {
                     switch (step) {
-                        case 0: meta.getTables(null, null, null, new String[]{"TABLE"});
-                            break;
-                        case 1: meta.getColumns(null, null, "TEST", null);
-                            break;
-                        case 2: meta.getPrimaryKeys(null, null, "TEST");
-                            break;
-                        default:
-                            fail();
+                    case 0:
+                        meta.getTables(null, null, null, new String[] { "TABLE" });
+                        break;
+                    case 1:
+                        meta.getColumns(null, null, "TEST", null);
+                        break;
+                    case 2:
+                        meta.getPrimaryKeys(null, null, "TEST");
+                        break;
+                    default:
+                        fail();
                     }
                 }
             });
@@ -283,4 +287,88 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         assertFalse(meta.nullsAreSortedAtStart());
         assertFalse(meta.nullsAreSortedAtEnd());
     }
+
+    @Test
+    public void testSupportsResultSetType() throws SQLException {
+        assertTrue(meta.supportsResultSetType(ResultSet.TYPE_FORWARD_ONLY));
+        assertTrue(meta.supportsResultSetType(ResultSet.TYPE_SCROLL_INSENSITIVE));
+        assertFalse(meta.supportsResultSetType(ResultSet.TYPE_SCROLL_SENSITIVE));
+        assertFalse(meta.supportsResultSetType(Integer.MAX_VALUE));
+        assertFalse(meta.supportsResultSetType(Integer.MIN_VALUE));
+        assertFalse(meta.supportsResultSetType(54));
+    }
+
+    @Test
+    public void testSupportsResultSetConcurrency() throws SQLException {
+        // valid combinations
+        assertTrue(meta.supportsResultSetConcurrency(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY));
+        assertTrue(meta.supportsResultSetConcurrency(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY));
+
+        // everything else is invalid
+        assertFalse(meta.supportsResultSetConcurrency(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_UPDATABLE));
+        assertFalse(meta.supportsResultSetConcurrency(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE));
+        assertFalse(meta.supportsResultSetConcurrency(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY));
+        assertFalse(meta.supportsResultSetConcurrency(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE));
+
+        // bad inputs are also unsupported
+        assertFalse(meta.supportsResultSetConcurrency(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        assertFalse(meta.supportsResultSetConcurrency(Integer.MIN_VALUE, Integer.MAX_VALUE));
+        assertFalse(meta.supportsResultSetConcurrency(54, -45));
+    }
+
+    @Test
+    public void testInsertDetectionSupport() throws SQLException {
+        int[] types = new int[] {
+            ResultSet.TYPE_FORWARD_ONLY,
+            ResultSet.TYPE_SCROLL_INSENSITIVE,
+            ResultSet.TYPE_SCROLL_SENSITIVE,
+            -23,
+            Integer.MIN_VALUE,
+            Integer.MAX_VALUE
+        };
+
+        for (int type : types) {
+            assertFalse(meta.othersInsertsAreVisible(type));
+            assertFalse(meta.ownInsertsAreVisible(type));
+            assertFalse(meta.insertsAreDetected(type));
+        }
+
+    }
+
+    @Test
+    public void testUpdateDetectionSupport() throws SQLException {
+        int[] types = new int[] {
+            ResultSet.TYPE_FORWARD_ONLY,
+            ResultSet.TYPE_SCROLL_INSENSITIVE,
+            ResultSet.TYPE_SCROLL_SENSITIVE,
+            -23,
+            Integer.MIN_VALUE,
+            Integer.MAX_VALUE
+        };
+
+        for (int type : types) {
+            assertFalse(meta.othersUpdatesAreVisible(type));
+            assertFalse(meta.ownUpdatesAreVisible(type));
+            assertFalse(meta.updatesAreDetected(type));
+        }
+    }
+
+    @Test
+    public void testDeleteDetectionSupport() throws SQLException {
+        int[] types = new int[] {
+            ResultSet.TYPE_FORWARD_ONLY,
+            ResultSet.TYPE_SCROLL_INSENSITIVE,
+            ResultSet.TYPE_SCROLL_SENSITIVE,
+            -23,
+            Integer.MIN_VALUE,
+            Integer.MAX_VALUE
+        };
+
+        for (int type : types) {
+            assertFalse(meta.othersDeletesAreVisible(type));
+            assertFalse(meta.ownDeletesAreVisible(type));
+            assertFalse(meta.deletesAreDetected(type));
+        }
+    }
+
 }

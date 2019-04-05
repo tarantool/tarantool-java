@@ -1,6 +1,10 @@
 package org.tarantool.jdbc;
 
 import org.tarantool.JDBCBridge;
+import org.tarantool.jdbc.cursor.CursorIterator;
+import org.tarantool.jdbc.cursor.InMemoryForwardCursorIteratorImpl;
+import org.tarantool.jdbc.cursor.InMemoryScrollableCursorIteratorImpl;
+import org.tarantool.util.SQLStates;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -28,66 +32,78 @@ import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-@SuppressWarnings("Since15")
 public class SQLResultSet implements ResultSet {
 
-    private ListIterator<List<Object>> iterator;
-    private JDBCBridge bridge;
+    private final CursorIterator<List<Object>> iterator;
     private final SQLResultSetMetaData metaData;
 
-    private final Statement statement;
-    private int maxRows;
-    private List<Object> row = null;
+    private Map<String, Integer> columnByNameLookups;
 
-    private final int type;
+    private final Statement statement;
+    private final int maxRows;
+
+    private AtomicBoolean isClosed = new AtomicBoolean(false);
+
+    private final int scrollType;
     private final int concurrencyLevel;
     private final int holdability;
 
     public SQLResultSet(JDBCBridge bridge, SQLStatement ownerStatement) throws SQLException {
-        this.bridge = bridge;
-        iterator = bridge.iterator();
-        metaData = new SQLResultSetMetaData(bridge);
+        metaData = new SQLResultSetMetaData(bridge.getSqlMetadata());
         statement = ownerStatement;
-        type = statement.getResultSetType();
+        scrollType = statement.getResultSetType();
         concurrencyLevel = statement.getResultSetConcurrency();
         holdability = statement.getResultSetHoldability();
+        this.maxRows = statement.getMaxRows();
+
+        List<List<Object>> fetchedRows = bridge.getRows();
+        List<List<Object>> rows = maxRows == 0 || maxRows >= fetchedRows.size()
+            ? fetchedRows
+            : fetchedRows.subList(0, maxRows);
+
+        switch (scrollType) {
+        case ResultSet.TYPE_FORWARD_ONLY:
+            iterator = new InMemoryForwardCursorIteratorImpl(rows);
+            break;
+        case ResultSet.TYPE_SCROLL_INSENSITIVE:
+            iterator = new InMemoryScrollableCursorIteratorImpl(rows);
+            break;
+        default:
+            throw new SQLNonTransientException("", SQLStates.INVALID_PARAMETER_VALUE.getSqlState());
+        }
     }
 
     public int getMaxRows() {
         return maxRows;
     }
 
-    public void setMaxRows(int maxRows) {
-        this.maxRows = maxRows;
-    }
-
-    List<Object> getCurrentRow() {
-        return row;
-    }
-
-    @Override
-    public boolean next() throws SQLException {
+    public List<Object> getCurrentRow() throws SQLException {
         checkNotClosed();
-        if (iterator.hasNext() && (maxRows == 0 || iterator.nextIndex() < maxRows)) {
-            row = iterator.next();
-            return true;
-        }
-        row = null;
-        return false;
+        return iterator.getItem();
     }
 
     @Override
     public void close() throws SQLException {
-
+        if (isClosed.compareAndSet(false, true)) {
+            iterator.close();
+        }
     }
 
     @Override
     public boolean wasNull() throws SQLException {
         return false;
+    }
+
+    protected Object getRaw(int columnIndex) throws SQLException {
+        checkNotClosed();
+        metaData.checkColumnIndex(columnIndex);
+        List<Object> row = getCurrentRow();
+        return row.get(columnIndex - 1);
     }
 
     @Override
@@ -98,17 +114,8 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public String getString(String columnLabel) throws SQLException {
-        return getString(getColumnIndex(columnLabel));
+        return getString(findColumn(columnLabel));
     }
-
-    protected Object getRaw(int columnIndex) {
-        return row.get(columnIndex - 1);
-    }
-
-    protected Integer getColumnIndex(String columnLabel) {
-        return bridge.getColumnIndex(columnLabel);
-    }
-
 
     @Override
     public boolean getBoolean(int columnIndex) throws SQLException {
@@ -117,7 +124,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean getBoolean(String columnLabel) throws SQLException {
-        return getBoolean(getColumnIndex(columnLabel));
+        return getBoolean(findColumn(columnLabel));
     }
 
     @Override
@@ -127,7 +134,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public byte getByte(String columnLabel) throws SQLException {
-        return getByte(getColumnIndex(columnLabel));
+        return getByte(findColumn(columnLabel));
     }
 
     @Override
@@ -137,7 +144,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public short getShort(String columnLabel) throws SQLException {
-        return getShort(getColumnIndex(columnLabel));
+        return getShort(findColumn(columnLabel));
     }
 
     @Override
@@ -147,10 +154,10 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public int getInt(String columnLabel) throws SQLException {
-        return getInt(getColumnIndex(columnLabel));
+        return getInt(findColumn(columnLabel));
     }
 
-    private Number getNumber(int columnIndex) {
+    private Number getNumber(int columnIndex) throws SQLException {
         Number raw = (Number) getRaw(columnIndex);
         return raw == null ? 0 : raw;
     }
@@ -162,7 +169,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public long getLong(String columnLabel) throws SQLException {
-        return getLong(getColumnIndex(columnLabel));
+        return getLong(findColumn(columnLabel));
     }
 
     @Override
@@ -172,7 +179,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public float getFloat(String columnLabel) throws SQLException {
-        return getFloat(getColumnIndex(columnLabel));
+        return getFloat(findColumn(columnLabel));
     }
 
     @Override
@@ -182,7 +189,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public double getDouble(String columnLabel) throws SQLException {
-        return getDouble(getColumnIndex(columnLabel));
+        return getDouble(findColumn(columnLabel));
     }
 
     @Override
@@ -193,7 +200,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-        return getBigDecimal(getColumnIndex(columnLabel));
+        return getBigDecimal(findColumn(columnLabel));
     }
 
     @Override
@@ -213,7 +220,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public byte[] getBytes(String columnLabel) throws SQLException {
-        return getBytes(getColumnIndex(columnLabel));
+        return getBytes(findColumn(columnLabel));
     }
 
     @Override
@@ -223,7 +230,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Date getDate(String columnLabel) throws SQLException {
-        return getDate(getColumnIndex(columnLabel));
+        return getDate(findColumn(columnLabel));
     }
 
     @Override
@@ -243,7 +250,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Time getTime(String columnLabel) throws SQLException {
-        return getTime(getColumnIndex(columnLabel));
+        return getTime(findColumn(columnLabel));
     }
 
     @Override
@@ -263,7 +270,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Timestamp getTimestamp(String columnLabel) throws SQLException {
-        return getTimestamp(getColumnIndex(columnLabel));
+        return getTimestamp(findColumn(columnLabel));
     }
 
     @Override
@@ -284,7 +291,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public InputStream getAsciiStream(String columnLabel) throws SQLException {
-        return getAsciiStream(getColumnIndex(columnLabel));
+        return getAsciiStream(findColumn(columnLabel));
     }
 
     @Override
@@ -294,7 +301,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public InputStream getUnicodeStream(String columnLabel) throws SQLException {
-        return getUnicodeStream(getColumnIndex(columnLabel));
+        return getUnicodeStream(findColumn(columnLabel));
     }
 
     @Override
@@ -304,7 +311,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public InputStream getBinaryStream(String columnLabel) throws SQLException {
-        return getBinaryStream(getColumnIndex(columnLabel));
+        return getBinaryStream(findColumn(columnLabel));
     }
 
     @Override
@@ -324,7 +331,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Object getObject(String columnLabel) throws SQLException {
-        return getRaw(getColumnIndex(columnLabel));
+        return getRaw(findColumn(columnLabel));
     }
 
     @Override
@@ -344,7 +351,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
-        return type.cast(getRaw(getColumnIndex(columnLabel)));
+        return type.cast(getRaw(findColumn(columnLabel)));
     }
 
     @Override
@@ -369,96 +376,103 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public int findColumn(String columnLabel) throws SQLException {
-        return getColumnIndex(columnLabel);
+        return findColumnIndex(columnLabel);
+    }
+
+    protected int findColumnIndex(String columnLabel) throws SQLException {
+        if (columnByNameLookups == null) {
+            columnByNameLookups = new LinkedHashMap<>();
+            // Spec quote: Column labels supplied to getter methods are case insensitive.
+            // If a select list contains the same column more than once, the first instance
+            // of the column will be returned.
+            for (int i = metaData.getColumnCount(); i > 0; i--) {
+                columnByNameLookups.put(metaData.getColumnLabel(i).toUpperCase(), i);
+            }
+        }
+        return columnByNameLookups.getOrDefault(columnLabel.toUpperCase(), 0);
+    }
+
+    //region Cursor movement API
+
+    @Override
+    public boolean next() throws SQLException {
+        checkNotClosed();
+        return iterator.next();
     }
 
     @Override
     public boolean isBeforeFirst() throws SQLException {
         checkNotClosed();
-        return row == null && iterator.previousIndex() == -1;
+        return iterator.isBeforeFirst();
     }
 
     @Override
     public boolean isAfterLast() throws SQLException {
         checkNotClosed();
-        return iterator.nextIndex() == bridge.size() && row == null;
+        return iterator.isAfterLast();
     }
 
     @Override
     public boolean isFirst() throws SQLException {
         checkNotClosed();
-        return iterator.previousIndex() == 0;
+        return iterator.isFirst();
     }
 
     @Override
     public boolean isLast() throws SQLException {
         checkNotClosed();
-        return iterator.nextIndex() == bridge.size();
+        return iterator.isLast();
     }
 
     @Override
     public void beforeFirst() throws SQLException {
         checkNotClosed();
-        row = null;
-        iterator = bridge.iterator();
+        iterator.beforeFirst();
     }
 
     @Override
     public void afterLast() throws SQLException {
         checkNotClosed();
-        while (next()) {
-        }
+        iterator.afterLast();
     }
 
     @Override
     public boolean first() throws SQLException {
-        beforeFirst();
-        return next();
+        checkNotClosed();
+        return iterator.first();
     }
 
     @Override
     public boolean last() throws SQLException {
         checkNotClosed();
-        while (iterator.hasNext()) {
-            next();
-        }
-        return row != null;
-    }
-
-    @Override
-    public int getRow() throws SQLException {
-        checkNotClosed();
-        return iterator.previousIndex() + 1;
+        return iterator.last();
     }
 
     @Override
     public boolean absolute(int row) throws SQLException {
-        beforeFirst();
-        for (int i = 0; i < row && iterator.hasNext(); i++) {
-            next();
-        }
-        return !(isAfterLast() || isBeforeFirst());
-
+        checkNotClosed();
+        return iterator.absolute(row);
     }
 
     @Override
     public boolean relative(int rows) throws SQLException {
         checkNotClosed();
-        for (int i = 0; i < rows && iterator.hasNext(); i++) {
-            next();
-        }
-        return !(isAfterLast() || isBeforeFirst());
+        return iterator.relative(rows);
     }
 
     @Override
     public boolean previous() throws SQLException {
         checkNotClosed();
-        if (iterator.hasPrevious()) {
-            iterator.previous();
-            return true;
-        }
-        return false;
+        return iterator.previous();
     }
+
+    @Override
+    public int getRow() throws SQLException {
+        checkNotClosed();
+        return iterator.getRow();
+    }
+
+    //endregion
 
     @Override
     public void setFetchDirection(int direction) throws SQLException {
@@ -487,7 +501,7 @@ public class SQLResultSet implements ResultSet {
     @Override
     public int getType() throws SQLException {
         checkNotClosed();
-        return type;
+        return scrollType;
     }
 
     @Override
@@ -798,7 +812,8 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Statement getStatement() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        return statement;
     }
 
     @Override
@@ -967,7 +982,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean isClosed() throws SQLException {
-        return statement.isClosed();
+        return isClosed.get() || statement.isClosed();
     }
 
     @Override
@@ -1096,9 +1111,12 @@ public class SQLResultSet implements ResultSet {
     @Override
     public String toString() {
         return "SQLResultSet{" +
-                "metaData=" + metaData +
-                ", row=" + row +
-                '}';
+            "metaData=" + metaData +
+            ", statement=" + statement +
+            ", scrollType=" + scrollType +
+            ", concurrencyLevel=" + concurrencyLevel +
+            ", holdability=" + holdability +
+            '}';
     }
 
     protected void checkNotClosed() throws SQLException {

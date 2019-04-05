@@ -21,7 +21,6 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 
-@SuppressWarnings("Since15")
 public class JdbcConnectionIT extends AbstractJdbcIT {
 
     @Test
@@ -172,10 +171,10 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
             ResultSet.HOLD_CURSORS_OVER_COMMIT
         );
         assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
+    }
 
-        assertThrows(SQLException.class, () -> {
-            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, Integer.MAX_VALUE);
-        });
+    @Test
+    public void testCreateUnsupportedHoldableStatement() throws SQLException {
         assertThrows(
             SQLFeatureNotSupportedException.class,
             () -> conn.createStatement(
@@ -183,12 +182,18 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
                 ResultSet.CONCUR_READ_ONLY,
                 ResultSet.CLOSE_CURSORS_AT_COMMIT
             ));
+    }
+
+    @Test
+    public void testCreateWrongHoldableStatement() throws SQLException {
         assertThrows(SQLException.class, () -> {
-            conn.close();
+            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, Integer.MAX_VALUE);
+        });
+        assertThrows(SQLException.class, () -> {
             conn.createStatement(
                 ResultSet.TYPE_FORWARD_ONLY,
                 ResultSet.CONCUR_READ_ONLY,
-                ResultSet.HOLD_CURSORS_OVER_COMMIT
+                -65
             );
         });
     }
@@ -209,30 +214,228 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
             ResultSet.HOLD_CURSORS_OVER_COMMIT
         );
         assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
+    }
 
-        assertThrows(
-            SQLException.class,
-            () -> conn.prepareStatement(
-                sqlString,
-                ResultSet.TYPE_FORWARD_ONLY,
+    @Test
+    public void testPrepareUnsupportedHoldableStatement() throws SQLException {
+        assertThrows(SQLFeatureNotSupportedException.class,
+            () -> {
+                String sqlString = "SELECT * FROM TEST";
+                conn.prepareStatement(
+                    sqlString,
+                    ResultSet.TYPE_FORWARD_ONLY,
+                    ResultSet.CONCUR_READ_ONLY,
+                    ResultSet.CLOSE_CURSORS_AT_COMMIT
+                );
+            });
+    }
+
+    @Test
+    public void testPrepareWrongHoldableStatement() throws SQLException {
+        String sqlString = "SELECT * FROM TEST";
+        assertThrows(SQLException.class,
+            () -> {
+                conn.prepareStatement(
+                    sqlString,
+                    ResultSet.TYPE_FORWARD_ONLY,
+                    ResultSet.CONCUR_READ_ONLY,
+                    Integer.MAX_VALUE
+                );
+            });
+        assertThrows(SQLException.class,
+            () -> {
+                conn.prepareStatement(
+                    sqlString,
+                    ResultSet.TYPE_FORWARD_ONLY,
+                    ResultSet.CONCUR_READ_ONLY, -190
+                );
+            });
+    }
+
+    @Test
+    public void testCreateScrollableStatement() throws SQLException {
+        Statement statement = conn.createStatement();
+        assertEquals(ResultSet.TYPE_FORWARD_ONLY, statement.getResultSetType());
+
+        statement = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+        assertEquals(ResultSet.TYPE_FORWARD_ONLY, statement.getResultSetType());
+
+        statement = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        assertEquals(ResultSet.TYPE_SCROLL_INSENSITIVE, statement.getResultSetType());
+
+        statement = conn.createStatement(
+            ResultSet.TYPE_FORWARD_ONLY,
+            ResultSet.CONCUR_READ_ONLY,
+            ResultSet.HOLD_CURSORS_OVER_COMMIT
+        );
+        assertEquals(ResultSet.TYPE_FORWARD_ONLY, statement.getResultSetType());
+
+        statement = conn.createStatement(
+            ResultSet.TYPE_SCROLL_INSENSITIVE,
+            ResultSet.CONCUR_READ_ONLY,
+            ResultSet.HOLD_CURSORS_OVER_COMMIT
+        );
+        assertEquals(ResultSet.TYPE_SCROLL_INSENSITIVE, statement.getResultSetType());
+    }
+
+    @Test
+    public void testCreateUnsupportedScrollableStatement() throws SQLException {
+        assertThrows(SQLFeatureNotSupportedException.class, () -> {
+            conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        });
+        assertThrows(SQLFeatureNotSupportedException.class, () -> {
+            conn.createStatement(
+                ResultSet.TYPE_SCROLL_SENSITIVE,
                 ResultSet.CONCUR_READ_ONLY,
-                Integer.MAX_VALUE
-            ));
-        assertThrows(
-            SQLFeatureNotSupportedException.class,
-            () -> conn.prepareStatement(
+                ResultSet.HOLD_CURSORS_OVER_COMMIT
+            );
+        });
+    }
+
+    @Test
+    public void testCreateWrongScrollableStatement() {
+        assertThrows(SQLException.class, () -> {
+            conn.createStatement(Integer.MAX_VALUE, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        });
+        assertThrows(SQLException.class, () -> {
+            conn.createStatement(-47, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        });
+    }
+
+    @Test
+    public void testPrepareScrollableStatement() throws SQLException {
+        String sqlString = "TEST";
+        Statement statement = conn.prepareStatement(sqlString);
+        assertEquals(ResultSet.TYPE_FORWARD_ONLY, statement.getResultSetType());
+
+        statement = conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+        assertEquals(ResultSet.TYPE_FORWARD_ONLY, statement.getResultSetType());
+
+        statement = conn.prepareStatement(
+            sqlString,
+            ResultSet.TYPE_FORWARD_ONLY,
+            ResultSet.CONCUR_READ_ONLY,
+            ResultSet.HOLD_CURSORS_OVER_COMMIT
+        );
+        assertEquals(ResultSet.TYPE_FORWARD_ONLY, statement.getResultSetType());
+    }
+
+    @Test
+    public void testPrepareUnsupportedScrollableStatement() throws SQLException {
+        assertThrows(SQLFeatureNotSupportedException.class, () -> {
+            String sqlString = "SELECT * FROM TEST";
+            conn.prepareStatement(sqlString, ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        });
+        assertThrows(SQLFeatureNotSupportedException.class, () -> {
+            String sqlString = "SELECT * FROM TEST";
+            conn.prepareStatement(
                 sqlString,
-                ResultSet.TYPE_FORWARD_ONLY,
+                ResultSet.TYPE_SCROLL_SENSITIVE,
                 ResultSet.CONCUR_READ_ONLY,
                 ResultSet.CLOSE_CURSORS_AT_COMMIT
-            ));
-        assertThrows(
-            SQLException.class,
+            );
+        });
+    }
+
+    @Test
+    public void testPrepareWrongScrollableStatement() throws SQLException {
+        String sqlString = "SELECT * FROM TEST";
+        assertThrows(SQLException.class,
+            () -> {
+                conn.prepareStatement(
+                    sqlString,
+                    ResultSet.TYPE_FORWARD_ONLY,
+                    ResultSet.CONCUR_READ_ONLY,
+                    Integer.MAX_VALUE
+                );
+            });
+        assertThrows(SQLException.class, () -> {
+            conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, -90);
+        });
+    }
+
+    @Test
+    public void testCreateConcurrentStatement() throws SQLException {
+        Statement statement = conn.createStatement();
+        assertEquals(ResultSet.CONCUR_READ_ONLY, statement.getResultSetConcurrency());
+
+        statement = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+        assertEquals(ResultSet.CONCUR_READ_ONLY, statement.getResultSetConcurrency());
+
+        statement = conn.createStatement(
+            ResultSet.TYPE_FORWARD_ONLY,
+            ResultSet.CONCUR_READ_ONLY,
+            ResultSet.HOLD_CURSORS_OVER_COMMIT
+        );
+        assertEquals(ResultSet.CONCUR_READ_ONLY, statement.getResultSetConcurrency());
+    }
+
+    @Test
+    public void testCreateUnsupportedConcurrentStatement() throws SQLException {
+        assertThrows(SQLFeatureNotSupportedException.class, () -> {
+            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_UPDATABLE);
+        });
+        assertThrows(SQLFeatureNotSupportedException.class,
+            () -> {
+                conn.createStatement(
+                    ResultSet.TYPE_FORWARD_ONLY,
+                    ResultSet.CONCUR_UPDATABLE,
+                    ResultSet.HOLD_CURSORS_OVER_COMMIT
+                );
+            });
+    }
+
+    @Test
+    public void testCreateWrongConcurrentStatement() {
+        assertThrows(SQLException.class, () -> {
+            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, Integer.MAX_VALUE, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        });
+        assertThrows(SQLException.class, () -> {
+            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, -7213, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        });
+    }
+
+    @Test
+    public void testCreateStatementWithClosedConnection() {
+        assertThrows(SQLException.class,
+            () -> {
+                conn.close();
+                conn.createStatement(
+                    ResultSet.TYPE_FORWARD_ONLY,
+                    ResultSet.CONCUR_READ_ONLY,
+                    ResultSet.HOLD_CURSORS_OVER_COMMIT
+                );
+            });
+        assertThrows(SQLException.class,
+            () -> {
+                conn.close();
+                conn.createStatement(
+                    ResultSet.TYPE_SCROLL_INSENSITIVE,
+                    ResultSet.CONCUR_READ_ONLY,
+                    ResultSet.HOLD_CURSORS_OVER_COMMIT
+                );
+            });
+    }
+
+    @Test
+    public void testPrepareStatementWithClosedConnection() {
+        String sqlString = "SELECT * FROM TEST";
+        assertThrows(SQLException.class,
             () -> {
                 conn.close();
                 conn.prepareStatement(
                     sqlString,
                     ResultSet.TYPE_FORWARD_ONLY,
+                    ResultSet.CONCUR_READ_ONLY,
+                    ResultSet.HOLD_CURSORS_OVER_COMMIT
+                );
+            });
+        assertThrows(SQLException.class,
+            () -> {
+                conn.close();
+                conn.prepareStatement(
+                    sqlString,
+                    ResultSet.TYPE_SCROLL_INSENSITIVE,
                     ResultSet.CONCUR_READ_ONLY,
                     ResultSet.HOLD_CURSORS_OVER_COMMIT
                 );

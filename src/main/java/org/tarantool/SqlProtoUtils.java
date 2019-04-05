@@ -12,7 +12,7 @@ public abstract class SqlProtoUtils {
         List<List<?>> data = (List<List<?>>) pack.getBody().get(Key.DATA.getId());
 
         List<Map<String, Object>> values = new ArrayList<>(data.size());
-        List<TarantoolBase.SQLMetaData> metaData = getSQLMetadata(pack);
+        List<SQLMetaData> metaData = getSQLMetadata(pack);
         for (List row : data) {
             LinkedHashMap<String, Object> value = new LinkedHashMap<>();
             for (int i = 0; i < row.size(); i++) {
@@ -27,11 +27,11 @@ public abstract class SqlProtoUtils {
         return (List<List<Object>>) pack.getBody().get(Key.DATA.getId());
     }
 
-    public static List<TarantoolBase.SQLMetaData> getSQLMetadata(TarantoolPacket pack) {
+    public static List<SQLMetaData> getSQLMetadata(TarantoolPacket pack) {
         List<Map<Integer, Object>> meta = (List<Map<Integer, Object>>) pack.getBody().get(Key.SQL_METADATA.getId());
-        List<TarantoolBase.SQLMetaData> values = new ArrayList<TarantoolBase.SQLMetaData>(meta.size());
+        List<SQLMetaData> values = new ArrayList<>(meta.size());
         for (Map<Integer, Object> c : meta) {
-            values.add(new TarantoolBase.SQLMetaData((String) c.get(Key.SQL_FIELD_NAME.getId())));
+            values.add(new SQLMetaData((String) c.get(Key.SQL_FIELD_NAME.getId())));
         }
         return values;
     }
@@ -43,5 +43,24 @@ public abstract class SqlProtoUtils {
             return rowCount.longValue();
         }
         return null;
+    }
+
+    public static class SQLMetaData {
+        protected String name;
+
+        public SQLMetaData(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public String toString() {
+            return "SQLMetaData{" +
+                    "name='" + name + '\'' +
+                    '}';
+        }
     }
 }

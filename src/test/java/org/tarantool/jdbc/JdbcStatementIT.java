@@ -145,4 +145,9 @@ public class JdbcStatementIT extends AbstractJdbcIT {
         }
     }
 
+    @Test
+    void testStatementConnection() throws SQLException {
+        Statement statement = conn.createStatement();
+        assertEquals(conn, statement.getConnection());
+    }
 }

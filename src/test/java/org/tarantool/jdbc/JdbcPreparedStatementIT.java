@@ -202,6 +202,12 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
     }
 
     @Test
+    void testStatementConnection() throws SQLException {
+        Statement statement = conn.prepareStatement("SELECT * FROM TEST");
+        assertEquals(conn, statement.getConnection());
+    }
+
+    @Test
     public void testSetByte() throws SQLException {
         makeHelper(Byte.class)
             .setColumns(TntSqlType.INT, TntSqlType.INTEGER)

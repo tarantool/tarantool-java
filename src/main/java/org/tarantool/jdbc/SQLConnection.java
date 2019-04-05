@@ -41,6 +41,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 
+/**
+ * Tarantool {@link Connection} implementation.
+ * <p>
+ * Supports creating {@link Statement} and {@link PreparedStatement} instances
+ */
 public class SQLConnection implements Connection {
 
     private static final int UNSET_HOLDABILITY = 0;
@@ -171,7 +176,7 @@ public class SQLConnection implements Connection {
                                      int resultSetConcurrency,
                                      int resultSetHoldability) throws SQLException {
         checkNotClosed();
-        checkHoldabilitySupport(resultSetHoldability);
+        checkStatementParams(resultSetType, resultSetConcurrency, resultSetHoldability);
         return new SQLStatement(this, resultSetType, resultSetConcurrency, resultSetHoldability);
     }
 
@@ -192,7 +197,7 @@ public class SQLConnection implements Connection {
                                               int resultSetConcurrency,
                                               int resultSetHoldability) throws SQLException {
         checkNotClosed();
-        checkHoldabilitySupport(resultSetHoldability);
+        checkStatementParams(resultSetType, resultSetConcurrency, resultSetHoldability);
         return new SQLPreparedStatement(this, sql, resultSetType, resultSetConcurrency, resultSetHoldability);
     }
 
@@ -242,7 +247,7 @@ public class SQLConnection implements Connection {
 
     @Override
     public void setAutoCommit(boolean autoCommit) throws SQLException {
-        if (autoCommit == false) {
+        if (!autoCommit) {
             throw new SQLFeatureNotSupportedException();
         }
     }
@@ -586,6 +591,61 @@ public class SQLConnection implements Connection {
             } catch (SQLException ignored) {
                 // No-op.
             }
+        }
+    }
+
+    /**
+     * Checks all params required to make statements.
+     *
+     * @param resultSetType        scroll type
+     * @param resultSetConcurrency concurrency level
+     * @param resultSetHoldability holdability type
+     *
+     * @throws SQLFeatureNotSupportedException if any param is not supported
+     * @throws SQLNonTransientException        if any param has an invalid value
+     */
+    private void checkStatementParams(int resultSetType,
+                                      int resultSetConcurrency,
+                                      int resultSetHoldability) throws SQLException {
+        checkResultSetType(resultSetType);
+        checkResultSetConcurrency(resultSetType, resultSetConcurrency);
+        checkHoldabilitySupport(resultSetHoldability);
+    }
+
+    /**
+     * Checks whether <code>resultSetType</code> is supported.
+     *
+     * @param resultSetType param to be checked
+     *
+     * @throws SQLFeatureNotSupportedException param is not supported
+     * @throws SQLNonTransientException        param has invalid value
+     */
+    private void checkResultSetType(int resultSetType) throws SQLException {
+        if (resultSetType != ResultSet.TYPE_FORWARD_ONLY &&
+            resultSetType != ResultSet.TYPE_SCROLL_INSENSITIVE &&
+            resultSetType != ResultSet.TYPE_SCROLL_SENSITIVE) {
+            throw new SQLNonTransientException("", SQLStates.INVALID_PARAMETER_VALUE.getSqlState());
+        }
+        if (!getMetaData().supportsResultSetType(resultSetType)) {
+            throw new SQLFeatureNotSupportedException();
+        }
+    }
+
+    /**
+     * Checks whether <code>resultSetType</code> is supported.
+     *
+     * @param resultSetConcurrency param to be checked
+     *
+     * @throws SQLFeatureNotSupportedException param is not supported
+     * @throws SQLNonTransientException        param has invalid value
+     */
+    private void checkResultSetConcurrency(int resultSetType, int resultSetConcurrency) throws SQLException {
+        if (resultSetConcurrency != ResultSet.CONCUR_READ_ONLY &&
+            resultSetConcurrency != ResultSet.CONCUR_UPDATABLE) {
+            throw new SQLNonTransientException("", SQLStates.INVALID_PARAMETER_VALUE.getSqlState());
+        }
+        if (!getMetaData().supportsResultSetConcurrency(resultSetType, resultSetConcurrency)) {
+            throw new SQLFeatureNotSupportedException();
         }
     }
 

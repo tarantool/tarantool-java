@@ -239,8 +239,7 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     @Override
     public boolean execute() throws SQLException {
         checkNotClosed();
-        discardLastResults();
-        return handleResult(connection.execute(sql, getParams()));
+        return executeInternal(sql, getParams());
     }
 
     @Override
