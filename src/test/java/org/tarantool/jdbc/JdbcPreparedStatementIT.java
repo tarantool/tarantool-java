@@ -170,6 +170,22 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
     }
 
     @Test
+    public void testUnwrap() throws SQLException {
+        prep = conn.prepareStatement("SELECT val FROM test");
+        assertEquals(prep, prep.unwrap(SQLPreparedStatement.class));
+        assertEquals(prep, prep.unwrap(SQLStatement.class));
+        assertThrows(SQLException.class, () -> prep.unwrap(Integer.class));
+    }
+
+    @Test
+    public void testIsWrapperFor() throws SQLException {
+        prep = conn.prepareStatement("SELECT val FROM test");
+        assertTrue(prep.isWrapperFor(SQLPreparedStatement.class));
+        assertTrue(prep.isWrapperFor(SQLStatement.class));
+        assertFalse(prep.isWrapperFor(Integer.class));
+    }
+
+    @Test
     public void testSetByte() throws SQLException {
         makeHelper(Byte.class)
             .setColumns(TntSqlType.INT, TntSqlType.INTEGER)

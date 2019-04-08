@@ -5,6 +5,7 @@ import org.tarantool.JDBCBridge;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLNonTransientException;
 import java.sql.Types;
 
 public class SQLResultSetMetaData implements ResultSetMetaData {
@@ -120,13 +121,16 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
     }
 
     @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public <T> T unwrap(Class<T> type) throws SQLException {
+        if (isWrapperFor(type)) {
+            return type.cast(this);
+        }
+        throw new SQLNonTransientException("ResultSetMetadata does not wrap " + type.getName());
     }
 
     @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public boolean isWrapperFor(Class<?> type) throws SQLException {
+        return type.isAssignableFrom(this.getClass());
     }
 
     @Override

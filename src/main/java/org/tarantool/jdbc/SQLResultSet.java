@@ -1081,13 +1081,16 @@ public class SQLResultSet implements ResultSet {
     }
 
     @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public <T> T unwrap(Class<T> type) throws SQLException {
+        if (isWrapperFor(type)) {
+            return type.cast(this);
+        }
+        throw new SQLNonTransientException("ResultSet does not wrap " + type.getName());
     }
 
     @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public boolean isWrapperFor(Class<?> type) throws SQLException {
+        return type.isAssignableFrom(this.getClass());
     }
 
     @Override

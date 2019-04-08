@@ -94,4 +94,17 @@ public class JdbcStatementIT extends AbstractJdbcIT {
         }
         assertEquals(3, i);
     }
+
+    @Test
+    public void testUnwrap() throws SQLException {
+        assertEquals(stmt, stmt.unwrap(SQLStatement.class));
+        assertThrows(SQLException.class, () -> stmt.unwrap(Integer.class));
+    }
+
+    @Test
+    public void testIsWrapperFor() throws SQLException {
+        assertTrue(stmt.isWrapperFor(SQLStatement.class));
+        assertFalse(stmt.isWrapperFor(Integer.class));
+    }
+
 }

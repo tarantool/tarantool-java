@@ -8,7 +8,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.RowIdLifetime;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLNonTransientException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1117,13 +1117,16 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     }
 
     @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public <T> T unwrap(Class<T> type) throws SQLException {
+        if (isWrapperFor(type)) {
+            return type.cast(this);
+        }
+        throw new SQLNonTransientException("SQLDatabaseMetadata does not wrap " + type.getName());
     }
 
     @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public boolean isWrapperFor(Class<?> type) throws SQLException {
+        return type.isAssignableFrom(this.getClass());
     }
 
     private ResultSet asMetadataResultSet(JDBCBridge jdbcBridge) throws SQLException {

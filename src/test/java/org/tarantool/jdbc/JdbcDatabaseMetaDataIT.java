@@ -255,4 +255,16 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         assertFalse(meta.supportsResultSetHoldability(42));
     }
 
+    @Test
+    public void testUnwrap() throws SQLException {
+        assertEquals(meta, meta.unwrap(SQLDatabaseMetadata.class));
+        assertThrows(SQLException.class, () -> meta.unwrap(Integer.class));
+    }
+
+    @Test
+    public void testIsWrapperFor() throws SQLException {
+        assertTrue(meta.isWrapperFor(SQLDatabaseMetadata.class));
+        assertFalse(meta.isWrapperFor(Integer.class));
+    }
+
 }

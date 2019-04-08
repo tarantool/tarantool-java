@@ -3,6 +3,7 @@ package org.tarantool.jdbc;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
@@ -131,6 +132,20 @@ public class JdbcResultSetIT extends JdbcTypesIT {
         ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
         assertNotNull(resultSet);
         assertEquals(metaData.getResultSetHoldability(), resultSet.getHoldability());
+    }
+
+    @Test
+    public void testUnwrap() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
+        assertEquals(resultSet, resultSet.unwrap(SQLResultSet.class));
+        assertThrows(SQLException.class, () -> resultSet.unwrap(Integer.class));
+    }
+
+    @Test
+    public void testIsWrapperFor() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
+        assertTrue(resultSet.isWrapperFor(SQLResultSet.class));
+        assertFalse(resultSet.isWrapperFor(Integer.class));
     }
 
 }

@@ -1,7 +1,10 @@
 package org.tarantool.jdbc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -30,5 +33,29 @@ public class JdbcResultSetMetaDataIT extends AbstractJdbcIT {
 
         rs.close();
         stmt.close();
+    }
+
+    @Test
+    public void testUnwrap() throws SQLException {
+        try (
+                Statement statement = conn.createStatement();
+                ResultSet resultSet = statement.executeQuery("SELECT * FROM test")
+        ) {
+            ResultSetMetaData metaData = resultSet.getMetaData();
+            assertEquals(metaData, metaData.unwrap(SQLResultSetMetaData.class));
+            assertThrows(SQLException.class, () -> metaData.unwrap(Integer.class));
+        }
+    }
+
+    @Test
+    public void testIsWrapperFor() throws SQLException {
+        try (
+                Statement statement = conn.createStatement();
+                ResultSet resultSet = statement.executeQuery("SELECT * FROM test")
+        ) {
+            ResultSetMetaData metaData = resultSet.getMetaData();
+            assertTrue(metaData.isWrapperFor(SQLResultSetMetaData.class));
+            assertFalse(metaData.isWrapperFor(Integer.class));
+        }
     }
 }
