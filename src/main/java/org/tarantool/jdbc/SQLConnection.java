@@ -19,6 +19,7 @@ import java.net.SocketException;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
+import java.sql.ClientInfoStatus;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -36,6 +37,9 @@ import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -213,22 +217,24 @@ public class SQLConnection implements Connection {
 
     @Override
     public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public CallableStatement prepareCall(String sql) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return prepareCall(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     }
 
     @Override
     public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return prepareCall(sql, resultSetType, resultSetConcurrency, getHoldability());
     }
 
     @Override
@@ -237,16 +243,19 @@ public class SQLConnection implements Connection {
                                          int resultSetConcurrency,
                                          int resultSetHoldability)
         throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public String nativeSQL(String sql) throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public void setAutoCommit(boolean autoCommit) throws SQLException {
+        checkNotClosed();
         if (!autoCommit) {
             throw new SQLFeatureNotSupportedException();
         }
@@ -254,21 +263,43 @@ public class SQLConnection implements Connection {
 
     @Override
     public boolean getAutoCommit() throws SQLException {
+        checkNotClosed();
         return true;
     }
 
     @Override
     public void commit() throws SQLException {
+        checkNotClosed();
+        if (getAutoCommit()) {
+            throw new SQLNonTransientException(
+                    "Cannot commit when auto-commit is enabled.",
+                    SQLStates.INVALID_TRANSACTION_STATE.getSqlState()
+            );
+        }
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public void rollback() throws SQLException {
+        checkNotClosed();
+        if (getAutoCommit()) {
+            throw new SQLNonTransientException(
+                    "Cannot rollback when auto-commit is enabled.",
+                    SQLStates.INVALID_TRANSACTION_STATE.getSqlState()
+            );
+        }
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public void rollback(Savepoint savepoint) throws SQLException {
+        checkNotClosed();
+        if (getAutoCommit()) {
+            throw new SQLNonTransientException(
+                "Cannot roll back to a savepoint when auto-commit is enabled.",
+                SQLStates.INVALID_TRANSACTION_STATE.getSqlState()
+            );
+        }
         throw new SQLFeatureNotSupportedException();
     }
 
@@ -293,25 +324,30 @@ public class SQLConnection implements Connection {
 
     @Override
     public void setReadOnly(boolean readOnly) throws SQLException {
-
+        checkNotClosed();
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public boolean isReadOnly() throws SQLException {
+        checkNotClosed();
         return false;
     }
 
     @Override
     public void setCatalog(String catalog) throws SQLException {
+        checkNotClosed();
     }
 
     @Override
     public String getCatalog() throws SQLException {
+        checkNotClosed();
         return null;
     }
 
     @Override
     public void setTransactionIsolation(int level) throws SQLException {
+        checkNotClosed();
         if (level != Connection.TRANSACTION_NONE) {
             throw new SQLFeatureNotSupportedException();
         }
@@ -319,26 +355,30 @@ public class SQLConnection implements Connection {
 
     @Override
     public int getTransactionIsolation() throws SQLException {
+        checkNotClosed();
         return Connection.TRANSACTION_NONE;
     }
 
     @Override
     public SQLWarning getWarnings() throws SQLException {
+        checkNotClosed();
         return null;
     }
 
     @Override
     public void clearWarnings() throws SQLException {
-
+        checkNotClosed();
     }
 
     @Override
     public Map<String, Class<?>> getTypeMap() throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
@@ -360,36 +400,55 @@ public class SQLConnection implements Connection {
 
     @Override
     public Savepoint setSavepoint() throws SQLException {
+        checkNotClosed();
+        if (getAutoCommit()) {
+            throw new SQLNonTransientException(
+                    "Cannot set a savepoint when auto-commit is enabled.",
+                    SQLStates.INVALID_TRANSACTION_STATE.getSqlState()
+            );
+        }
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public Savepoint setSavepoint(String name) throws SQLException {
+        checkNotClosed();
+        if (getAutoCommit()) {
+            throw new SQLNonTransientException(
+                    "Cannot set a savepoint when auto-commit is enabled.",
+                    SQLStates.INVALID_TRANSACTION_STATE.getSqlState()
+            );
+        }
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public void releaseSavepoint(Savepoint savepoint) throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public Clob createClob() throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public Blob createBlob() throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public NClob createNClob() throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public SQLXML createSQLXML() throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
@@ -431,45 +490,99 @@ public class SQLConnection implements Connection {
 
     @Override
     public void setClientInfo(String name, String value) throws SQLClientInfoException {
-        throw new SQLClientInfoException();
+        try {
+            checkNotClosed();
+        } catch (SQLException cause) {
+            throwUnknownReasonClientProperties("Connection is closed", Collections.singleton(name), cause);
+        }
+        throwUnknownClientProperties(Collections.singleton(name));
     }
 
     @Override
     public void setClientInfo(Properties properties) throws SQLClientInfoException {
-        throw new SQLClientInfoException();
+        try {
+            checkNotClosed();
+        } catch (SQLException cause) {
+            throwUnknownReasonClientProperties("Connection is closed", properties.keySet(), cause);
+        }
+        throwUnknownClientProperties(properties.keySet());
+    }
+
+    /**
+     * Throws an exception caused by {@code cause} and marks all properties
+     * as {@link ClientInfoStatus#REASON_UNKNOWN}.
+     *
+     * @param reason     reason mesage
+     * @param properties client properties
+     * @param cause      original cause
+     *
+     * @throws SQLClientInfoException wrapped exception
+     */
+    private void throwUnknownReasonClientProperties(String reason,
+                                                    Collection<Object> properties,
+                                                    SQLException cause) throws SQLClientInfoException {
+        Map<String, ClientInfoStatus> failedProperties = new HashMap<>();
+        properties.forEach(property -> {
+            failedProperties.put(property.toString(), ClientInfoStatus.REASON_UNKNOWN);
+        });
+        throw new SQLClientInfoException(reason, cause.getSQLState(), failedProperties, cause);
+    }
+
+    /**
+     * Throws exception for unrecognizable properties.
+     *
+     * @param properties unknown property names.
+     *
+     * @throws SQLClientInfoException wrapped exception
+     */
+    private void throwUnknownClientProperties(Collection<Object> properties) throws SQLClientInfoException {
+        Map<String, ClientInfoStatus> failedProperties = new HashMap<>();
+        properties.forEach(property -> {
+            failedProperties.put(property.toString(), ClientInfoStatus.REASON_UNKNOWN_PROPERTY);
+        });
+        throw new SQLClientInfoException(failedProperties);
     }
 
     @Override
     public String getClientInfo(String name) throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public Properties getClientInfo() throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
+        checkNotClosed();
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public void setSchema(String schema) throws SQLException {
+        checkNotClosed();
     }
 
     @Override
     public String getSchema() throws SQLException {
+        checkNotClosed();
         return null;
     }
 
     @Override
     public void abort(Executor executor) throws SQLException {
+        if (isClosed()) {
+            return;
+        }
         throw new SQLFeatureNotSupportedException();
     }
 

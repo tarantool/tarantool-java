@@ -6,20 +6,26 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.tarantool.jdbc.SqlAssertions.assertSqlExceptionHasStatus;
 
 import org.tarantool.TarantoolConnection;
+import org.tarantool.util.SQLStates;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 import java.lang.reflect.Field;
 import java.net.Socket;
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
+import java.util.Collections;
+import java.util.Properties;
 
 public class JdbcConnectionIT extends AbstractJdbcIT {
 
@@ -150,11 +156,6 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
             () -> conn.setHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT)
         );
         assertThrows(SQLException.class, () -> conn.setHoldability(Integer.MAX_VALUE));
-
-        assertThrows(SQLException.class, () -> {
-            conn.close();
-            conn.setHoldability(ResultSet.HOLD_CURSORS_OVER_COMMIT);
-        });
     }
 
     @Test
@@ -459,6 +460,146 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
             SQLFeatureNotSupportedException.class,
             () -> conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
         );
+    }
+
+    @Test
+    public void testUnavailableMethodsAfterClose() throws SQLException {
+        conn.close();
+
+        SQLException sqlException;
+        sqlException = assertThrows(SQLException.class, () -> conn.clearWarnings());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.getWarnings());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.createArrayOf("INTEGER", new Object[] { 1, 2, 3 }));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.createBlob());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.createClob());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.createNClob());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.createSQLXML());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.createStatement());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () ->
+            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
+        );
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () ->
+            conn.createStatement(
+                ResultSet.TYPE_FORWARD_ONLY,
+                ResultSet.CONCUR_READ_ONLY,
+                ResultSet.HOLD_CURSORS_OVER_COMMIT
+            )
+        );
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.prepareStatement(""));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () ->
+            conn.prepareStatement("", ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
+        );
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () ->
+            conn.prepareStatement(
+                "",
+                ResultSet.TYPE_FORWARD_ONLY,
+                ResultSet.CONCUR_READ_ONLY,
+                ResultSet.HOLD_CURSORS_OVER_COMMIT
+            )
+        );
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.prepareStatement("", Statement.NO_GENERATED_KEYS));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.prepareStatement("", new int[] { }));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.prepareStatement("", new String[] { }));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.prepareCall(""));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () ->
+            conn.prepareCall("", ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
+        );
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () ->
+            conn.prepareCall(
+                "",
+                ResultSet.TYPE_FORWARD_ONLY,
+                ResultSet.CONCUR_READ_ONLY,
+                ResultSet.HOLD_CURSORS_OVER_COMMIT
+            )
+        );
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.getHoldability());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.getMetaData());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.getNetworkTimeout());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.nativeSQL(""));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.commit());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.rollback());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.rollback(null));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.setAutoCommit(true));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.getAutoCommit());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.setSavepoint());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.setSavepoint(""));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.isReadOnly());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.setReadOnly(true));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.getTransactionIsolation());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(
+            SQLException.class,
+            () -> conn.setTransactionIsolation(Connection.TRANSACTION_NONE)
+        );
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLClientInfoException.class, () -> conn.setClientInfo(new Properties()));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLClientInfoException.class, () -> conn.setClientInfo("key", "value"));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.getClientInfo("param1"));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.getClientInfo());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.setHoldability(ResultSet.HOLD_CURSORS_OVER_COMMIT));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.setNetworkTimeout(null, 1000));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.getSchema());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.getCatalog());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.setCatalog(""));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.setSchema(""));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+
+        sqlException = assertThrows(SQLException.class, () -> conn.getTypeMap());
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
+        sqlException = assertThrows(SQLException.class, () -> conn.setTypeMap(Collections.emptyMap()));
+        assertSqlExceptionHasStatus(sqlException, SQLStates.CONNECTION_DOES_NOT_EXIST);
     }
 
 }

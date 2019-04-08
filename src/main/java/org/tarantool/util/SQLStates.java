@@ -6,7 +6,8 @@ public enum SQLStates {
     NO_DATA("02000"),
     CONNECTION_DOES_NOT_EXIST("08003"),
     INVALID_PARAMETER_VALUE("22023"),
-    INVALID_CURSOR_STATE("24000");
+    INVALID_CURSOR_STATE("24000"),
+    INVALID_TRANSACTION_STATE("25000");
 
     private final String sqlState;
 
