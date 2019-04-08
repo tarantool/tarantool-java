@@ -3,6 +3,7 @@ package org.tarantool.jdbc;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,6 +18,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 public class JdbcResultSetIT extends JdbcTypesIT {
+
     private Statement stmt;
     private DatabaseMetaData metaData;
 
@@ -146,6 +148,34 @@ public class JdbcResultSetIT extends JdbcTypesIT {
         ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
         assertTrue(resultSet.isWrapperFor(SQLResultSet.class));
         assertFalse(resultSet.isWrapperFor(Integer.class));
+    }
+
+    @Test
+    public void testNullsSortingAsc() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT * FROM test_nulls ORDER BY val ASC");
+        for (int i = 0; i < 3; i++) {
+            assertTrue(resultSet.next());
+            assertNull(resultSet.getString(2));
+        }
+        for (int i = 0; i < 3; i++) {
+            assertTrue(resultSet.next());
+            assertNotNull(resultSet.getString(2));
+        }
+        assertFalse(resultSet.next());
+    }
+
+    @Test
+    public void testNullsSortingDesc() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT * FROM test_nulls ORDER BY val DESC");
+        for (int i = 0; i < 3; i++) {
+            assertTrue(resultSet.next());
+            assertNotNull(resultSet.getString(2));
+        }
+        for (int i = 0; i < 3; i++) {
+            assertTrue(resultSet.next());
+            assertNull(resultSet.getString(2));
+        }
+        assertFalse(resultSet.next());
     }
 
 }

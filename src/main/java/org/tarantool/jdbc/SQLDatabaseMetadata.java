@@ -80,22 +80,22 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public boolean nullsAreSortedHigh() throws SQLException {
-        return true;
+        return false;
     }
 
     @Override
     public boolean nullsAreSortedLow() throws SQLException {
-        return !nullsAreSortedHigh();
-    }
-
-    @Override
-    public boolean nullsAreSortedAtStart() throws SQLException {
         return true;
     }
 
     @Override
+    public boolean nullsAreSortedAtStart() throws SQLException {
+        return false;
+    }
+
+    @Override
     public boolean nullsAreSortedAtEnd() throws SQLException {
-        return !nullsAreSortedAtStart();
+        return false;
     }
 
     @Override

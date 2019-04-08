@@ -51,6 +51,9 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         assertEquals("TEST_COMPOUND", rs.getString("TABLE_NAME"));
 
         assertTrue(rs.next());
+        assertEquals("TEST_NULLS", rs.getString("TABLE_NAME"));
+
+        assertTrue(rs.next());
         assertEquals("TEST_TYPES", rs.getString("TABLE_NAME"));
 
         assertFalse(rs.next());
@@ -272,4 +275,12 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         assertFalse(meta.supportsGetGeneratedKeys());
     }
 
+    @Test
+    public void testNullsAreSortedProperties() throws SQLException {
+        assertTrue(meta.nullsAreSortedLow());
+        assertFalse(meta.nullsAreSortedHigh());
+
+        assertFalse(meta.nullsAreSortedAtStart());
+        assertFalse(meta.nullsAreSortedAtEnd());
+    }
 }
