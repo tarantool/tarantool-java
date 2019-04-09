@@ -44,6 +44,7 @@ import java.util.concurrent.Executor;
 public class SQLConnection implements Connection {
 
     private static final int UNSET_HOLDABILITY = 0;
+    private static final String PING_QUERY = "SELECT 1";
 
     private final TarantoolConnection connection;
 
@@ -382,9 +383,40 @@ public class SQLConnection implements Connection {
         throw new SQLFeatureNotSupportedException();
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @param timeout temporally ignored param
+     *
+     * @return connection activity status
+     */
     @Override
     public boolean isValid(int timeout) throws SQLException {
-        return true;
+        if (timeout < 0) {
+            throw new SQLNonTransientException(
+                    "Timeout cannot be negative",
+                    SQLStates.INVALID_PARAMETER_VALUE.getSqlState()
+            );
+        }
+        if (isClosed()) {
+            return false;
+        }
+        return checkConnection(timeout);
+    }
+
+    private boolean checkConnection(int timeout) {
+        ResultSet resultSet = null;
+        try (Statement pingStatement = createStatement()) {
+            // todo: before use timeout we need to provide query timeout per statement
+
+            resultSet = pingStatement.executeQuery(PING_QUERY);
+            boolean isValid = resultSet.next() && resultSet.getInt(1) == 1;
+            resultSet.close();
+
+            return isValid;
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     @Override

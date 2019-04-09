@@ -115,6 +115,15 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
     }
 
     @Test
+    void testIsValidCheck() throws SQLException {
+        assertTrue(conn.isValid(2000));
+        assertThrows(SQLException.class, () -> conn.isValid(-1000));
+
+        conn.close();
+        assertFalse(conn.isValid(2000));
+    }
+
+    @Test
     public void testConnectionUnwrap() throws SQLException {
         assertEquals(conn, conn.unwrap(SQLConnection.class));
         assertThrows(SQLException.class, () -> conn.unwrap(Integer.class));
