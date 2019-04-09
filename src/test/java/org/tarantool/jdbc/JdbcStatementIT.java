@@ -17,6 +17,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 public class JdbcStatementIT extends AbstractJdbcIT {
+
     private Statement stmt;
 
     @BeforeEach
@@ -79,14 +80,17 @@ public class JdbcStatementIT extends AbstractJdbcIT {
                 @Override
                 public void execute() throws Throwable {
                     switch (step) {
-                        case 0: stmt.executeQuery("TEST");
-                            break;
-                        case 1: stmt.executeUpdate("TEST");
-                            break;
-                        case 2: stmt.execute("TEST");
-                            break;
-                        default:
-                            fail();
+                    case 0:
+                        stmt.executeQuery("TEST");
+                        break;
+                    case 1:
+                        stmt.executeUpdate("TEST");
+                        break;
+                    case 2:
+                        stmt.execute("TEST");
+                        break;
+                    default:
+                        fail();
                     }
                 }
             });
@@ -105,6 +109,40 @@ public class JdbcStatementIT extends AbstractJdbcIT {
     public void testIsWrapperFor() throws SQLException {
         assertTrue(stmt.isWrapperFor(SQLStatement.class));
         assertFalse(stmt.isWrapperFor(Integer.class));
+    }
+
+    @Test
+    public void testSupportedGeneratedKeys() throws SQLException {
+        int affectedRows = stmt.executeUpdate(
+            "INSERT INTO test(id, val) VALUES (50, 'fifty')",
+            Statement.NO_GENERATED_KEYS
+        );
+        assertEquals(1, affectedRows);
+        ResultSet generatedKeys = stmt.getGeneratedKeys();
+        assertNotNull(generatedKeys);
+        assertEquals(ResultSet.TYPE_FORWARD_ONLY, generatedKeys.getType());
+        assertEquals(ResultSet.CONCUR_READ_ONLY, generatedKeys.getConcurrency());
+    }
+
+    @Test
+    void testUnsupportedGeneratedKeys() {
+        assertThrows(
+            SQLException.class,
+            () -> stmt.executeUpdate(
+                "INSERT INTO test(id, val) VALUES (100, 'hundred'), (1000, 'thousand')",
+                Statement.RETURN_GENERATED_KEYS
+            )
+        );
+
+        int[] wrongConstants = { Integer.MAX_VALUE, Integer.MIN_VALUE, -31, 344 };
+        for (int wrongConstant : wrongConstants) {
+            assertThrows(SQLException.class,
+                () -> stmt.executeUpdate(
+                    "INSERT INTO test(id, val) VALUES (100, 'hundred'), (1000, 'thousand')",
+                    wrongConstant
+                )
+            );
+        }
     }
 
 }

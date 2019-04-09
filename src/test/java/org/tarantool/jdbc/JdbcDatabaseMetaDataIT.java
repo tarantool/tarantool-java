@@ -267,4 +267,9 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         assertFalse(meta.isWrapperFor(Integer.class));
     }
 
+    @Test
+    public void testSupportGeneratedKeys() throws SQLException {
+        assertFalse(meta.supportsGetGeneratedKeys());
+    }
+
 }

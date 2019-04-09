@@ -89,23 +89,23 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
                 @Override
                 public void execute() throws Throwable {
                     switch (step) {
-                        case 0:
-                            conn.createStatement();
-                            break;
-                        case 1:
-                            conn.prepareStatement("TEST");
-                            break;
-                        case 2:
-                            conn.getMetaData();
-                            break;
-                        case 3:
-                            conn.getNetworkTimeout();
-                            break;
-                        case 4:
-                            conn.setNetworkTimeout(null, 1000);
-                            break;
-                        default:
-                            fail();
+                    case 0:
+                        conn.createStatement();
+                        break;
+                    case 1:
+                        conn.prepareStatement("TEST");
+                        break;
+                    case 2:
+                        conn.getMetaData();
+                        break;
+                    case 3:
+                        conn.getNetworkTimeout();
+                        break;
+                    case 4:
+                        conn.setNetworkTimeout(null, 1000);
+                        break;
+                    default:
+                        fail();
                     }
                 }
             });
@@ -230,4 +230,24 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
             });
     }
 
+    @Test
+    public void testGeneratedKeys() throws SQLException {
+        String sql = "SELECT * FROM test";
+        PreparedStatement preparedStatement = conn.prepareStatement(sql, Statement.NO_GENERATED_KEYS);
+        assertNotNull(preparedStatement);
+        preparedStatement.close();
+
+        assertThrows(SQLFeatureNotSupportedException.class, () -> conn.prepareStatement(sql, new int[] { 1 }));
+        assertThrows(SQLFeatureNotSupportedException.class, () -> conn.prepareStatement(sql, new String[] { "id" }));
+
+        assertThrows(SQLException.class, () -> conn.prepareStatement(sql, Integer.MAX_VALUE));
+        assertThrows(SQLException.class, () -> conn.prepareStatement(sql, Integer.MIN_VALUE));
+        assertThrows(SQLException.class, () -> conn.prepareStatement(sql, -76));
+        assertThrows(
+            SQLFeatureNotSupportedException.class,
+            () -> conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
+        );
+    }
+
 }
+

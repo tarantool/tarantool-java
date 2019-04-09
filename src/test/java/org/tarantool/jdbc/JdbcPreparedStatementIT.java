@@ -17,8 +17,10 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 public class JdbcPreparedStatementIT extends JdbcTypesIT {
+
     private PreparedStatement prep;
 
     @AfterEach
@@ -105,6 +107,8 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
 
         assertEquals("ten", getRow("test", 10).get(1));
         assertEquals("twenty", getRow("test", 20).get(1));
+
+        conn.createStatement().execute("DELETE FROM test WHERE id IN (10, 20)");
     }
 
     @Test
@@ -118,17 +122,17 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
                 @Override
                 public void execute() throws Throwable {
                     switch (step) {
-                        case 0:
-                            prep.executeQuery("TEST");
-                            break;
-                        case 1:
-                            prep.executeUpdate("TEST");
-                            break;
-                        case 2:
-                            prep.execute("TEST");
-                            break;
-                        default:
-                            fail();
+                    case 0:
+                        prep.executeQuery("TEST");
+                        break;
+                    case 1:
+                        prep.executeUpdate("TEST");
+                        break;
+                    case 2:
+                        prep.execute("TEST");
+                        break;
+                    default:
+                        fail();
                     }
                 }
             });
@@ -150,17 +154,17 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
                 @Override
                 public void execute() throws Throwable {
                     switch (step) {
-                        case 0:
-                            prep.executeQuery();
-                            break;
-                        case 1:
-                            prep.executeUpdate();
-                            break;
-                        case 2:
-                            prep.execute();
-                            break;
-                        default:
-                            fail();
+                    case 0:
+                        prep.executeQuery();
+                        break;
+                    case 1:
+                        prep.executeUpdate();
+                        break;
+                    case 2:
+                        prep.execute();
+                        break;
+                    default:
+                        fail();
                     }
                 }
             });
@@ -183,6 +187,18 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
         assertTrue(prep.isWrapperFor(SQLPreparedStatement.class));
         assertTrue(prep.isWrapperFor(SQLStatement.class));
         assertFalse(prep.isWrapperFor(Integer.class));
+    }
+
+    @Test
+    public void testSupportGeneratedKeys() throws SQLException {
+        prep = conn.prepareStatement("INSERT INTO test values (50, 'fifty')", Statement.NO_GENERATED_KEYS);
+        assertFalse(prep.execute());
+        assertEquals(1, prep.getUpdateCount());
+
+        ResultSet generatedKeys = prep.getGeneratedKeys();
+        assertNotNull(generatedKeys);
+        assertEquals(ResultSet.TYPE_FORWARD_ONLY, generatedKeys.getType());
+        assertEquals(ResultSet.CONCUR_READ_ONLY, generatedKeys.getConcurrency());
     }
 
     @Test
@@ -256,4 +272,5 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
             .setValues(DATE_VALS)
             .testSetParameter();
     }
+
 }
