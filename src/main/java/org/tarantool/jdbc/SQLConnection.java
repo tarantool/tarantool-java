@@ -9,6 +9,7 @@ import static org.tarantool.jdbc.SQLDriver.PROP_USER;
 import org.tarantool.CommunicationException;
 import org.tarantool.JDBCBridge;
 import org.tarantool.TarantoolConnection;
+import org.tarantool.util.JdbcConstants;
 import org.tarantool.util.SQLStates;
 
 import java.io.IOException;
@@ -40,7 +41,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 
-@SuppressWarnings("Since15")
 public class SQLConnection implements Connection {
 
     private static final int UNSET_HOLDABILITY = 0;
@@ -561,10 +561,7 @@ public class SQLConnection implements Connection {
      * @throws SQLNonTransientException        param has invalid value
      */
     private void checkHoldabilitySupport(int holdability) throws SQLException {
-        if (holdability != ResultSet.CLOSE_CURSORS_AT_COMMIT &&
-            holdability != ResultSet.HOLD_CURSORS_OVER_COMMIT) {
-            throw new SQLNonTransientException("", SQLStates.INVALID_PARAMETER_VALUE.getSqlState());
-        }
+        JdbcConstants.checkHoldabilityConstant(holdability);
         if (!getMetaData().supportsResultSetHoldability(holdability)) {
             throw new SQLFeatureNotSupportedException();
         }
@@ -581,4 +578,5 @@ public class SQLConnection implements Connection {
     private static String formatError(String sql, Object... params) {
         return "Failed to execute SQL: " + sql + ", params: " + Arrays.deepToString(params);
     }
+
 }
