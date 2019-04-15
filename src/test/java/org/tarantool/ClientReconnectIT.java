@@ -1,5 +1,12 @@
 package org.tarantool;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -17,13 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.LockSupport;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     private static final String INSTANCE_NAME = "jdk-testing";
@@ -284,8 +284,11 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
 
         // Restart tarantool several times in the foreground.
         while (deadline > System.currentTimeMillis()) {
+            System.out.println("before stop iteration");
             stopTarantool(INSTANCE_NAME);
+            System.out.println("after stop / before start iteration");
             startTarantool(INSTANCE_NAME);
+            System.out.println("after start iteration");
             try {
                 Thread.sleep(RESTART_TIMEOUT * 2);
             } catch (InterruptedException e) {

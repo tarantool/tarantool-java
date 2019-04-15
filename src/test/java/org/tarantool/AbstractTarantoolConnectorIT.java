@@ -1,11 +1,16 @@
 package org.tarantool;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.tarantool.TestUtils.makeInstanceEnv;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.opentest4j.AssertionFailedError;
 
-import java.math.BigInteger;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.List;
@@ -14,12 +19,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import static org.tarantool.TestUtils.makeInstanceEnv;
 
 /**
  * Abstract test. Provides environment control and frequently used functions.
@@ -234,12 +233,16 @@ public abstract class AbstractTarantoolConnectorIT {
 
     protected static void stopTarantool(String instance) {
         control.stop(instance);
+        System.out.println("tnt stopping");
         control.waitStopped("jdk-testing");
+        System.out.println("tnt stopped");
     }
 
     protected static void startTarantool(String instance) {
         control.start(instance);
+        System.out.println("tnt starting");
         control.waitStarted("jdk-testing");
+        System.out.println("tnt started");
     }
 
     /**
