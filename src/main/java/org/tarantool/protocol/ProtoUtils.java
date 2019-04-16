@@ -16,6 +16,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.nio.channels.NonReadableChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
@@ -26,15 +27,20 @@ import java.util.List;
 import java.util.Map;
 
 public abstract class ProtoUtils {
-    private final static int DEFAULT_INITIAL_REQUEST_SIZE = 4096;
+
+    public static final int LENGTH_OF_SIZE_MESSAGE = 5;
+
+    private static final int DEFAULT_INITIAL_REQUEST_SIZE = 4096;
     private static final String WELCOME = "Tarantool ";
 
     /**
-     * Reads tarantool binary protocol's packet from {@code inputStream}
+     * Reads tarantool binary protocol's packet from {@code inputStream}.
      *
      * @param inputStream ready to use input stream
-     * @return Nonnull instance of packet.
-     * @throws IOException in case of any io-error.
+     *
+     * @return Nonnull instance of packet
+     *
+     * @throws IOException in case of any io-error
      */
     public static TarantoolPacket readPacket(InputStream inputStream) throws IOException {
         CountInputStreamImpl msgStream = new CountInputStreamImpl(inputStream);
@@ -53,12 +59,70 @@ public abstract class ProtoUtils {
     }
 
     /**
+     * Reads a tarantool's binary protocol packet from the reader.
+     *
+     * @param bufferReader readable channel that have to be in blocking mode
+     *                     or instance of {@link ReadableViaSelectorChannel}
+     *
+     * @return tarantool binary protocol message wrapped by instance of {@link TarantoolPacket}
+     *
+     * @throws IOException                 if any IO-error occurred during read from the channel
+     * @throws CommunicationException      input stream bytes constitute msg pack message in wrong format
+     * @throws NonReadableChannelException If this channel was not opened for reading
+     */
+    public static TarantoolPacket readPacket(ReadableByteChannel bufferReader)
+        throws CommunicationException, IOException {
+
+        ByteBuffer buffer = ByteBuffer.allocate(LENGTH_OF_SIZE_MESSAGE);
+        bufferReader.read(buffer);
+
+        buffer.flip();
+        int size = ((Number) getMsgPackLite().unpack(new ByteBufferBackedInputStream(buffer))).intValue();
+
+        buffer = ByteBuffer.allocate(size);
+        bufferReader.read(buffer);
+
+        buffer.flip();
+        ByteBufferBackedInputStream msgBytesStream = new ByteBufferBackedInputStream(buffer);
+        Object unpackedHeaders = getMsgPackLite().unpack(msgBytesStream);
+        if (!(unpackedHeaders instanceof Map)) {
+            //noinspection ConstantConditions
+            throw new CommunicationException(
+                "Error while unpacking headers of tarantool response: " +
+                    "expected type Map but was " +
+                    unpackedHeaders != null ? unpackedHeaders.getClass().toString() : "null"
+            );
+        }
+        //noinspection unchecked (checked above)
+        Map<Integer, Object> headers = (Map<Integer, Object>) unpackedHeaders;
+
+        Map<Integer, Object> body = null;
+        if (msgBytesStream.hasAvailable()) {
+            Object unpackedBody = getMsgPackLite().unpack(msgBytesStream);
+            if (!(unpackedBody instanceof Map)) {
+                //noinspection ConstantConditions
+                throw new CommunicationException(
+                    "Error while unpacking body of tarantool response: " +
+                        "expected type Map but was " +
+                        unpackedBody != null ? unpackedBody.getClass().toString() : "null"
+                );
+            }
+            //noinspection unchecked (checked above)
+            body = (Map<Integer, Object>) unpackedBody;
+        }
+
+        return new TarantoolPacket(headers, body);
+    }
+
+    /**
      * Connects to a tarantool node described by {@code socket}. Performs an authentication if required
      *
      * @param socket   a socket channel to a tarantool node
      * @param username auth username
      * @param password auth password
+     *
      * @return object with information about a connection/
+     *
      * @throws IOException            in case of any IO fails
      * @throws CommunicationException when welcome string is invalid
      * @throws TarantoolException     in case of failed authentication
@@ -97,7 +161,9 @@ public abstract class ProtoUtils {
      * @param channel  a socket channel to tarantool node. The channel have to be in blocking mode
      * @param username auth username
      * @param password auth password
+     *
      * @return object with information about a connection/
+     *
      * @throws IOException            in case of any IO fails
      * @throws CommunicationException when welcome string is invalid
      * @throws TarantoolException     in case of failed authentication
@@ -110,7 +176,7 @@ public abstract class ProtoUtils {
 
         String firstLine = new String(welcomeBytes.array());
         assertCorrectWelcome(firstLine, channel.getRemoteAddress());
-        String serverVersion = firstLine.substring(WELCOME.length());
+        final String serverVersion = firstLine.substring(WELCOME.length());
 
         welcomeBytes.clear();
         channel.read(welcomeBytes);
@@ -129,8 +195,10 @@ public abstract class ProtoUtils {
 
     private static void assertCorrectWelcome(String firstLine, SocketAddress remoteAddress) {
         if (!firstLine.startsWith(WELCOME)) {
-            String errMsg = "Failed to connect to node " + remoteAddress.toString() + ":" +
-                    " Welcome message should starts with tarantool but starts with '" + firstLine + "'";
+            String errMsg = "Failed to connect to node " + remoteAddress.toString() +
+                ": Welcome message should starts with tarantool but starts with '" +
+                firstLine +
+                "'";
             throw new CommunicationException(errMsg, new IllegalStateException("Invalid welcome packet"));
         }
     }
@@ -156,58 +224,6 @@ public abstract class ProtoUtils {
         if (code < 0) {
             throw new SocketException("write failed code: " + code);
         }
-    }
-
-    public static final int LENGTH_OF_SIZE_MESSAGE = 5;
-
-    /**
-     * Reads a tarantool's binary protocol packet from the reader
-     *
-     * @param bufferReader readable channel that have to be in blocking mode
-     *                     or instance of {@link ReadableViaSelectorChannel}
-     * @return tarantool binary protocol message wrapped by instance of {@link TarantoolPacket}.
-     * @throws IOException if any IO-error occurred during read from the channel
-     * @throws CommunicationException input stream bytes consitute msg pack message in wrong format.
-     * @throws java.nio.channels.NonReadableChannelException – If this channel was not opened for reading
-     */
-    public static TarantoolPacket readPacket(ReadableByteChannel bufferReader)
-            throws CommunicationException, IOException {
-
-        ByteBuffer buffer = ByteBuffer.allocate(LENGTH_OF_SIZE_MESSAGE);
-        bufferReader.read(buffer);
-
-        buffer.flip();
-        int size = ((Number) getMsgPackLite().unpack(new ByteBufferBackedInputStream(buffer))).intValue();
-
-        buffer = ByteBuffer.allocate(size);
-        bufferReader.read(buffer);
-
-        buffer.flip();
-        ByteBufferBackedInputStream msgBytesStream = new ByteBufferBackedInputStream(buffer);
-        Object unpackedHeaders = getMsgPackLite().unpack(msgBytesStream);
-        if (!(unpackedHeaders instanceof Map)) {
-            //noinspection ConstantConditions
-            throw new CommunicationException("Error while unpacking headers of tarantool response: " +
-                    "expected type Map but was " +
-                    unpackedHeaders != null ? unpackedHeaders.getClass().toString() : "null");
-        }
-        //noinspection unchecked (checked above)
-        Map<Integer, Object> headers = (Map<Integer, Object>) unpackedHeaders;
-
-        Map<Integer, Object> body = null;
-        if (msgBytesStream.hasAvailable()) {
-            Object unpackedBody = getMsgPackLite().unpack(msgBytesStream);
-            if (!(unpackedBody instanceof Map)) {
-                //noinspection ConstantConditions
-                throw new CommunicationException("Error while unpacking body of tarantool response: " +
-                        "expected type Map but was " +
-                        unpackedBody != null ? unpackedBody.getClass().toString() : "null");
-            }
-            //noinspection unchecked (checked above)
-            body = (Map<Integer, Object>) unpackedBody;
-        }
-
-        return new TarantoolPacket(headers, body);
     }
 
     public static ByteBuffer createAuthPacket(String username,
@@ -237,7 +253,7 @@ public abstract class ProtoUtils {
         auth.add(p);
 
         return createPacket(DEFAULT_INITIAL_REQUEST_SIZE, Code.AUTH, 0L, null,
-                Key.USER_NAME, username, Key.TUPLE, auth);
+            Key.USER_NAME, username, Key.TUPLE, auth);
     }
 
     public static ByteBuffer createPacket(Code code, Long syncId, Long schemaId, Object... args) throws IOException {
@@ -260,7 +276,7 @@ public abstract class ProtoUtils {
                                           Object... args) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream(initialRequestSize);
         bos.write(new byte[5]);
-        DataOutputStream ds = new DataOutputStream(bos);
+        final DataOutputStream ds = new DataOutputStream(bos);
         Map<Key, Object> header = new EnumMap<>(Key.class);
         Map<Key, Object> body = new EnumMap<>(Key.class);
         header.put(Key.CODE, code);

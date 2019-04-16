@@ -1,5 +1,9 @@
 package org.tarantool;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.tarantool.TestUtils.makeInstanceEnv;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
@@ -7,10 +11,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.tarantool.TestUtils.makeInstanceEnv;
 
 /**
  * Abstract test. Provides environment control and frequently used functions which are related to SQL.
@@ -30,7 +30,7 @@ public abstract class AbstractTarantoolSQLConnectorIT {
     protected static final int RESTART_TIMEOUT = 2000;
 
     protected static final SocketChannelProvider socketChannelProvider = new TestSocketChannelProvider(
-            HOST, PORT, RESTART_TIMEOUT
+        HOST, PORT, RESTART_TIMEOUT
     );
 
     protected static TarantoolControl control;
@@ -38,20 +38,20 @@ public abstract class AbstractTarantoolSQLConnectorIT {
 
     protected static final String TABLE_NAME = "sql_test";
 
-    private static final String[] setupScript = new String[]{
-            "\\set language sql",
-            "\\set delimiter ;",
+    private static final String[] setupScript = new String[] {
+        "\\set language sql",
+        "\\set delimiter ;",
 
-            "CREATE TABLE sql_test (id INTEGER PRIMARY KEY, val VARCHAR(100));",
-            "CREATE UNIQUE INDEX sql_test_val_index_unique ON sql_test (val);",
+        "CREATE TABLE sql_test (id INTEGER PRIMARY KEY, val VARCHAR(100));",
+        "CREATE UNIQUE INDEX sql_test_val_index_unique ON sql_test (val);",
 
-            "INSERT INTO sql_test VALUES (1, 'A');",
-            "INSERT INTO sql_test VALUES (2, 'B');",
-            "INSERT INTO sql_test VALUES (3, 'C');",
+        "INSERT INTO sql_test VALUES (1, 'A');",
+        "INSERT INTO sql_test VALUES (2, 'B');",
+        "INSERT INTO sql_test VALUES (3, 'C');",
     };
 
-    private static final String[] cleanScript = new String[]{
-            "DROP TABLE sql_test;"
+    private static final String[] cleanScript = new String[] {
+        "DROP TABLE sql_test;"
     };
 
     @BeforeAll

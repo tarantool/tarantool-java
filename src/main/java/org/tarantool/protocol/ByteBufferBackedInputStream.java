@@ -4,13 +4,15 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 /**
- * Input stream based on ByteBuffer
+ * Input stream based on ByteBuffer.
  */
 class ByteBufferBackedInputStream extends InputStream {
 
     private final ByteBuffer buf;
 
     /**
+     * Constructs a new wrapper-stream for {@link ByteBuffer}.
+     *
      * @param buf a buffer that have to be ready for read (flipped)
      */
     public ByteBufferBackedInputStream(ByteBuffer buf) {

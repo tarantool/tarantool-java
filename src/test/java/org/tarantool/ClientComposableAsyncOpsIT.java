@@ -9,11 +9,14 @@ import java.util.concurrent.Future;
  */
 public class ClientComposableAsyncOpsIT extends AbstractAsyncClientOperationsIT {
 
-    private static class Composable2FutureClientOpsAdapter implements TarantoolClientOps<Integer, List<?>, Object, Future<List<?>>> {
+    private static class Composable2FutureClientOpsAdapter
+        implements TarantoolClientOps<Integer, List<?>, Object, Future<List<?>>> {
 
         private final TarantoolClientOps<Integer, List<?>, Object, CompletionStage<List<?>>> originOps;
 
-        private Composable2FutureClientOpsAdapter(TarantoolClientOps<Integer, List<?>, Object, CompletionStage<List<?>>> originOps) {
+        private Composable2FutureClientOpsAdapter(
+            TarantoolClientOps<Integer, List<?>, Object, CompletionStage<List<?>>> originOps) {
+
             this.originOps = originOps;
         }
 
@@ -23,7 +26,12 @@ public class ClientComposableAsyncOpsIT extends AbstractAsyncClientOperationsIT 
         }
 
         @Override
-        public Future<List<?>> select(Integer space, Integer index, List<?> key, int offset, int limit, Iterator iterator) {
+        public Future<List<?>> select(Integer space,
+                                      Integer index,
+                                      List<?> key,
+                                      int offset,
+                                      int limit,
+                                      Iterator iterator) {
             return originOps.select(space, index, key, offset, limit, iterator).toCompletableFuture();
         }
 

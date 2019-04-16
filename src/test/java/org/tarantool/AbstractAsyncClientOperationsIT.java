@@ -1,5 +1,11 @@
 package org.tarantool;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,8 +19,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Abstract class with test cases for asynchronous operations provided by getOps() method of a child class.
@@ -87,8 +91,9 @@ public abstract class AbstractAsyncClientOperationsIT extends AbstractTarantoolC
         futs.add(ops.call("box.space.basic_test:delete", Collections.singletonList(30)));
 
         // Wait completion of all operations.
-        for (Future<List<?>> f : futs)
+        for (Future<List<?>> f : futs) {
             f.get(TIMEOUT, TimeUnit.MILLISECONDS);
+        }
 
         // Check the effects.
         checkTupleResult(consoleSelect(SPACE_NAME, 10), Arrays.asList(10, "ten"));

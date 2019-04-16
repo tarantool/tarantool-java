@@ -1,22 +1,22 @@
 package org.tarantool.jdbc;
 
+import org.tarantool.JDBCBridge;
+
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Types;
 
-import org.tarantool.JDBCBridge;
-
 public class SQLResultSetMetaData implements ResultSetMetaData {
-    protected final JDBCBridge JDBCBridgeExecutor;
+    protected final JDBCBridge jdbcBridge;
 
-    public SQLResultSetMetaData(JDBCBridge JDBCBridgeExecutor) {
-        this.JDBCBridgeExecutor = JDBCBridgeExecutor;
+    public SQLResultSetMetaData(JDBCBridge jdbcBridge) {
+        this.jdbcBridge = jdbcBridge;
     }
 
     @Override
     public int getColumnCount() throws SQLException {
-        return JDBCBridgeExecutor.getColumnCount();
+        return jdbcBridge.getColumnCount();
     }
 
     @Override
@@ -56,12 +56,12 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
 
     @Override
     public String getColumnLabel(int column) throws SQLException {
-        return JDBCBridgeExecutor.getColumnName(column);
+        return jdbcBridge.getColumnName(column);
     }
 
     @Override
     public String getColumnName(int column) throws SQLException {
-        return JDBCBridgeExecutor.getColumnName(column);
+        return jdbcBridge.getColumnName(column);
     }
 
     @Override
@@ -132,7 +132,7 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
     @Override
     public String toString() {
         return "SQLResultSetMetaData{" +
-                "bridge=" + JDBCBridgeExecutor +
+                "bridge=" + jdbcBridge +
                 '}';
     }
 }

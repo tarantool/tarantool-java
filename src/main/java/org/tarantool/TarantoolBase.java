@@ -11,8 +11,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer, List<?>, Object, Result> {
     protected String serverVersion;
+
     /**
-     * Connection state
+     * Connection state.
      */
     protected MsgPackLite msgPackLite = MsgPackLite.INSTANCE;
     protected AtomicLong syncId = new AtomicLong();
@@ -45,8 +46,8 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
         @Override
         public String toString() {
             return "SQLMetaData{" +
-                    "name='" + name + '\'' +
-                    '}';
+                "name='" + name + '\'' +
+                '}';
         }
     }
 
@@ -59,7 +60,7 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
             try {
                 channel.close();
             } catch (IOException ignored) {
-
+                // No-op
             }
         }
     }

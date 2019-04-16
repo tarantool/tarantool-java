@@ -1,5 +1,9 @@
 package org.tarantool;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
@@ -7,10 +11,6 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests operations available in {@link TarantoolClientOps} interface.
@@ -172,8 +172,7 @@ public abstract class AbstractTarantoolOpsIT extends AbstractTarantoolConnectorI
             Arrays.asList("=", 2, "thirty"));
     }
 
-    private void checkUpdate(String space, int spaceId, List key, List initTuple, List expectedTuple,
-        Object ... ops) {
+    private void checkUpdate(String space, int spaceId, List key, List initTuple, List expectedTuple, Object... ops) {
         // Try update non-existing key.
         List<?> res = getOps().update(spaceId, key, ops);
         assertNotNull(res);
@@ -214,8 +213,7 @@ public abstract class AbstractTarantoolOpsIT extends AbstractTarantoolConnectorI
             Arrays.asList("=", 2, "fourty"));
     }
 
-    private void checkUpsert(String space, int spaceId, List key, List defTuple, List expectedTuple,
-        Object ... ops) {
+    private void checkUpsert(String space, int spaceId, List key, List defTuple, List expectedTuple, Object... ops) {
         // Check that key doesn't exist.
         assertEquals(Collections.emptyList(), consoleSelect(space, key));
 

@@ -1,5 +1,10 @@
 package org.tarantool.jdbc;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,11 +14,6 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class JdbcResultSetIT extends JdbcTypesIT {
     private Statement stmt;
@@ -27,8 +27,9 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @AfterEach
     public void tearDown() throws Exception {
-        if (stmt != null && !stmt.isClosed())
+        if (stmt != null && !stmt.isClosed()) {
             stmt.close();
+        }
     }
 
     @Test
@@ -56,73 +57,73 @@ public class JdbcResultSetIT extends JdbcTypesIT {
     @Test
     public void testGetByteColumn() throws SQLException {
         makeHelper(Byte.class)
-        .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-        .setValues(BYTE_VALS)
-        .testGetColumn();
+            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
+            .setValues(BYTE_VALS)
+            .testGetColumn();
     }
 
     @Test
     public void testGetShortColumn() throws SQLException {
         makeHelper(Short.class)
-        .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-        .setValues(SHORT_VALS)
-        .testGetColumn();
+            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
+            .setValues(SHORT_VALS)
+            .testGetColumn();
     }
 
     @Test
     public void testGetIntColumn() throws SQLException {
         makeHelper(Integer.class)
-        .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-        .setValues(INT_VALS)
-        .testGetColumn();
+            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
+            .setValues(INT_VALS)
+            .testGetColumn();
     }
 
     @Test
     public void testGetLongColumn() throws SQLException {
         makeHelper(Long.class)
-        .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-        .setValues(LONG_VALS)
-        .testGetColumn();
+            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
+            .setValues(LONG_VALS)
+            .testGetColumn();
     }
 
     @Test
     public void testGetBigDecimalColumn() throws SQLException {
         makeHelper(BigDecimal.class)
-        .setColumns(TntSqlType.REAL, TntSqlType.FLOAT, TntSqlType.DOUBLE)
-        .setValues(BIGDEC_VALS)
-        .testGetColumn();
+            .setColumns(TntSqlType.REAL, TntSqlType.FLOAT, TntSqlType.DOUBLE)
+            .setValues(BIGDEC_VALS)
+            .testGetColumn();
     }
 
     @Test
     public void testGetFloatColumn() throws SQLException {
         makeHelper(Float.class)
-        .setColumns(TntSqlType.REAL)
-        .setValues(FLOAT_VALS)
-        .testGetColumn();
+            .setColumns(TntSqlType.REAL)
+            .setValues(FLOAT_VALS)
+            .testGetColumn();
     }
 
     @Test
     public void testGetDoubleColumn() throws SQLException {
         makeHelper(Double.class)
-        .setColumns(TntSqlType.FLOAT, TntSqlType.DOUBLE)
-        .setValues(DOUBLE_VALS)
-        .testGetColumn();
+            .setColumns(TntSqlType.FLOAT, TntSqlType.DOUBLE)
+            .setValues(DOUBLE_VALS)
+            .testGetColumn();
     }
 
     @Test
     public void testGetStringColumn() throws SQLException {
         makeHelper(String.class)
-        .setColumns(TntSqlType.VARCHAR, TntSqlType.TEXT)
-        .setValues(STRING_VALS)
-        .testGetColumn();
+            .setColumns(TntSqlType.VARCHAR, TntSqlType.TEXT)
+            .setValues(STRING_VALS)
+            .testGetColumn();
     }
 
     @Test
     public void testGetByteArrayColumn() throws SQLException {
         makeHelper(byte[].class)
-        .setColumns(TntSqlType.SCALAR)
-        .setValues(BINARY_VALS)
-        .testGetColumn();
+            .setColumns(TntSqlType.SCALAR)
+            .setValues(BINARY_VALS)
+            .testGetColumn();
     }
 
     @Test

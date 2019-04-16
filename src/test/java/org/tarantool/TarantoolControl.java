@@ -1,17 +1,17 @@
 package org.tarantool;
 
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.util.HashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.Map;
-import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.channels.FileChannel;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Wrapper around tarantoolctl utility.
@@ -23,8 +23,12 @@ public class TarantoolControl {
         String stderr;
 
         TarantoolControlException(int code, String stdout, String stderr) {
-            super("returned exitcode " + code + "\n" +
-                "[stdout]\n" + stdout + "\n[stderr]\n" + stderr);
+            super(
+                "returned exitcode " + code + "\n" +
+                    "[stdout]\n" + stdout +
+                    "\n[stderr]\n" + stderr
+            );
+
             this.code = code;
             this.stdout = stdout;
             this.stderr = stderr;
@@ -33,8 +37,8 @@ public class TarantoolControl {
 
     protected static final String tntCtlWorkDir = System.getProperty("tntCtlWorkDir",
         new File("testroot").getAbsolutePath());
-    protected static final String instanceDir = new File("src/test").getAbsolutePath();
-    protected static final String tarantoolCtlConfig = new File("src/test/.tarantoolctl").getAbsolutePath();
+    protected static final String instanceDir = new File("src/test/resources").getAbsolutePath();
+    protected static final String tarantoolCtlConfig = new File("src/test/resources/.tarantoolctl").getAbsolutePath();
     protected static final int RESTART_TIMEOUT = 2000;
     // Per-instance environment.
     protected final Map<String, Map<String, String>> instanceEnv = new HashMap<String, Map<String, String>>();
@@ -55,17 +59,20 @@ public class TarantoolControl {
         }
 
         mkdir(tntCtlWorkDir);
-        for (File c : new File(instanceDir).listFiles())
-            if (c.getName().endsWith(".lua"))
+        for (File c : new File(instanceDir).listFiles()) {
+            if (c.getName().endsWith(".lua")) {
                 copyFile(c, tntCtlWorkDir);
+            }
+        }
         copyFile(tarantoolCtlConfig, tntCtlWorkDir);
     }
 
     // Based on https://stackoverflow.com/a/779529
     private static void rmdir(File f) throws IOException {
         if (f.isDirectory()) {
-            for (File c : f.listFiles())
+            for (File c : f.listFiles()) {
                 rmdir(c);
+            }
         }
         f.delete();
     }
@@ -83,8 +90,9 @@ public class TarantoolControl {
     }
 
     private static void copyFile(File source, File dest) throws IOException {
-        if (dest.isDirectory())
+        if (dest.isDirectory()) {
             dest = new File(dest, source.getName());
+        }
         FileChannel sourceChannel = null;
         FileChannel destChannel = null;
         try {
@@ -113,8 +121,9 @@ public class TarantoolControl {
         BufferedReader br = new BufferedReader(new InputStreamReader(s));
         StringBuilder sb = new StringBuilder();
         String line;
-        while ((line = br.readLine()) != null)
+        while ((line = br.readLine()) != null) {
             sb.append(line).append("\n");
+        }
         return sb.toString();
     }
 
@@ -145,8 +154,8 @@ public class TarantoolControl {
             public void run() {
                 try {
                     process.waitFor();
-                } catch (InterruptedException e) {
-                    // No-op.
+                } catch (InterruptedException ignored) {
+                    // no-op.
                 }
                 latch.countDown();
             }
@@ -176,8 +185,8 @@ public class TarantoolControl {
             try {
                 stdout = loadStream(process.getInputStream());
                 stderr = loadStream(process.getErrorStream());
-            } catch (IOException e) {
-                /* No-op. */
+            } catch (IOException ignored) {
+                /* no-op. */
             }
             throw new TarantoolControlException(code, stdout, stderr);
         }
@@ -192,8 +201,9 @@ public class TarantoolControl {
      * variable is set) or TarantoolLocalConsole.
      */
     public void waitStarted(String instanceName) {
-        while (status(instanceName) != 0)
+        while (status(instanceName) != 0) {
             sleep();
+        }
 
         while (true) {
             try {
@@ -212,8 +222,9 @@ public class TarantoolControl {
      * Use tarantoolctl status instanceName.
      */
     public void waitStopped(String instanceName) {
-        while (status(instanceName) != 1)
+        while (status(instanceName) != 1) {
             sleep();
+        }
     }
 
     public void start(String instanceName) {
@@ -257,8 +268,9 @@ public class TarantoolControl {
 
     public void createInstance(String instanceName, String luaFile, Map<String, String> env) {
         File src = new File(instanceDir, luaFile.endsWith(".lua") ? luaFile : luaFile.concat(".lua"));
-        if (!src.exists())
+        if (!src.exists()) {
             throw new RuntimeException("Lua file " + src + " doesn't exist.");
+        }
 
         File dst = new File(tntCtlWorkDir, instanceName + ".lua");
         try {
@@ -300,8 +312,9 @@ public class TarantoolControl {
      */
     public TarantoolConsole openConsole(String instanceName) {
         Map<String, String> env = instanceEnv.get(instanceName);
-        if (env == null)
-            throw new RuntimeException("No such instance '" + instanceName +"'.");
+        if (env == null) {
+            throw new RuntimeException("No such instance '" + instanceName + "'.");
+        }
 
         String admin = env.get("ADMIN");
         if (admin == null) {

@@ -17,25 +17,68 @@ import java.util.regex.Pattern;
 
 /**
  * Blocking console connection for test control purposes.
- *
+ * <p>
  * Provides the means of lua commands evaluation given
  * the host and port or the instance name of tarantool.
  */
 public abstract class TarantoolConsole implements Closeable {
-    private final static Pattern GREETING_PATTERN = Pattern.compile("^Tarantool.+\n.+\n");
-    private final static Pattern CONNECTED_PATTERN = Pattern.compile("^connected to (.*)\n");
-    private final static Pattern REPLY_PATTERN = Pattern.compile("^.*\\n\\.{3}\\n",
+
+    private static final int TIMEOUT = 2000;
+    private static final Pattern GREETING_PATTERN = Pattern.compile("^Tarantool.+\n.+\n");
+    private static final Pattern CONNECTED_PATTERN = Pattern.compile("^connected to (.*)\n");
+    private static final Pattern REPLY_PATTERN = Pattern.compile("^.*\\n\\.{3}\\n",
         Pattern.UNIX_LINES | Pattern.DOTALL);
 
-    private final static int TIMEOUT = 2000;
     private final StringBuilder unmatched = new StringBuilder();
 
     protected BufferedReader reader;
     protected OutputStreamWriter writer;
 
+    private static void appendApplyBackspaces(StringBuilder sb, char[] buf, int len) {
+        for (int i = 0; i < len; i++) {
+            char c = buf[i];
+            if (c == '\b') {
+                if (sb.length() > 0) {
+                    sb.deleteCharAt(sb.length() - 1);
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+    }
+
+    /**
+     * A direct tarantool console connection.
+     *
+     * @param host Tarantool host name.
+     * @param port Console port of tarantool instance.
+     *
+     * @return Console connection object.
+     */
+    public static TarantoolConsole open(String host, int port) {
+        return new TarantoolTcpConsole(host, port);
+    }
+
+    /**
+     * An indirect tarantool console connection via tarantoolctl utility.
+     * <p>
+     * &gt; tarantoolctl enter &lt;instance&gt;
+     * <p>
+     * This facility is aimed at support of multi-instance tests in future.
+     *
+     * @param workDir  Directory where .tarantoolctl file is located.
+     * @param instance Tarantool instance name as per  command.
+     *
+     * @return Console connection object.
+     */
+    public static TarantoolConsole open(String workDir, String instance) {
+        return new TarantoolLocalConsole(workDir, instance);
+    }
+
     private Matcher checkMatch(Pattern p) {
-        if (unmatched.length() == 0)
+        if (unmatched.length() == 0) {
             return null;
+        }
 
         Matcher m = p.matcher(unmatched.toString());
 
@@ -49,8 +92,9 @@ public abstract class TarantoolConsole implements Closeable {
 
     protected Matcher expect(Pattern p) {
         Matcher result = checkMatch(p);
-        if (result != null)
+        if (result != null) {
             return result;
+        }
 
         char[] buf = new char[4096];
         int rc;
@@ -59,8 +103,9 @@ public abstract class TarantoolConsole implements Closeable {
                 appendApplyBackspaces(unmatched, buf, rc);
 
                 result = checkMatch(p);
-                if (result != null)
+                if (result != null) {
                     return result;
+                }
             }
         } catch (SocketTimeoutException e) {
             throw new RuntimeException("Timeout occurred. Unmatched: " + unmatched.toString() + ", pattern:" + p, e);
@@ -68,19 +113,6 @@ public abstract class TarantoolConsole implements Closeable {
             throw new RuntimeException(e);
         }
         throw new RuntimeException("Unexpected end of input.");
-    }
-
-    private static void appendApplyBackspaces(StringBuilder sb, char[] buf, int len) {
-        for (int i = 0; i < len ; i++) {
-            char c = buf[i];
-            if (c == '\b') {
-                if (sb.length() > 0) {
-                    sb.deleteCharAt(sb.length() - 1);
-                }
-            } else {
-                sb.append(c);
-            }
-        }
     }
 
     protected void write(String expr) {
@@ -96,13 +128,13 @@ public abstract class TarantoolConsole implements Closeable {
     public void close() {
         try {
             reader.close();
-        } catch (IOException e) {
-            // No-op.
+        } catch (IOException ignored) {
+            // no-op.
         }
         try {
             writer.close();
-        } catch (IOException e) {
-            // No-op.
+        } catch (IOException ignored) {
+            // no-op.
         }
     }
 
@@ -136,32 +168,6 @@ public abstract class TarantoolConsole implements Closeable {
     }
 
     /**
-     * A direct tarantool console connection.
-     *
-     * @param host Tarantool host name.
-     * @param port Console port of tarantool instance.
-     * @return Console connection object.
-     */
-    public static TarantoolConsole open(String host, int port) {
-        return new TarantoolTcpConsole(host, port);
-    }
-
-    /**
-     * An indirect tarantool console connection via tarantoolctl utility.
-     *
-     * &gt; tarantoolctl enter &lt;instance&gt;
-     *
-     * This facility is aimed at support of multi-instance tests in future.
-     *
-     * @param workDir Directory where .tarantoolctl file is located.
-     * @param instance Tarantool instance name as per  command.
-     * @return Console connection object.
-     */
-    public static TarantoolConsole open(String workDir, String instance) {
-        return new TarantoolLocalConsole(workDir, instance);
-    }
-
-    /**
      * A direct tarantool console connection (via TCP connection).
      */
     private static class TarantoolTcpConsole extends TarantoolConsole {
@@ -189,8 +195,8 @@ public abstract class TarantoolConsole implements Closeable {
 
             try {
                 socket.close();
-            } catch (IOException e) {
-                // No-op.
+            } catch (IOException ignored) {
+                // no-op.
             }
         }
     }

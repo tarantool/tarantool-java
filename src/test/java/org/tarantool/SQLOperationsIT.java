@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * Tests for synchronous operations of {@link TarantoolClientImpl#sqlSyncOps()} implementation.
- *
+ * <p>
  * Actual tests reside in base class.
  */
 public class SQLOperationsIT extends AbstractTarantoolSQLOpsIT {

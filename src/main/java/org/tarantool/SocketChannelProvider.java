@@ -1,6 +1,5 @@
 package org.tarantool;
 
-
 import java.nio.channels.SocketChannel;
 
 public interface SocketChannelProvider {

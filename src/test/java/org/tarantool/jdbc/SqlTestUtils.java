@@ -1,8 +1,8 @@
 package org.tarantool.jdbc;
 
-import java.sql.Date;
-
 import static org.tarantool.TestUtils.toHex;
+
+import java.sql.Date;
 
 public class SqlTestUtils {
     public static String getCreateTableSQL(String tableName, TntSqlType[] tntTypes) {
@@ -77,20 +77,25 @@ public class SqlTestUtils {
     }
 
     public static String quoteSqlValue(Object val) {
-        if (val == null)
+        if (val == null) {
             return "null";
+        }
 
-        if (val instanceof Boolean)
-            return (Boolean)val ? "1" : "0";
+        if (val instanceof Boolean) {
+            return (Boolean) val ? "1" : "0";
+        }
 
-        if (val instanceof String)
+        if (val instanceof String) {
             return "'" + val.toString() + "'";
+        }
 
-        if (val instanceof Date)
+        if (val instanceof Date) {
             return "'" + val.toString() + "'";
+        }
 
-        if (val instanceof byte[])
+        if (val instanceof byte[]) {
             return "X'" + toHex((byte[]) val) + "'";
+        }
 
         return val.toString();
     }

@@ -21,58 +21,58 @@ public class MsgPackLite {
 
     public static final MsgPackLite INSTANCE = new MsgPackLite();
 
-    protected final int MAX_4BIT = 0xf;
-    protected final int MAX_5BIT = 0x1f;
-    protected final int MAX_7BIT = 0x7f;
-    protected final int MAX_8BIT = 0xff;
-    protected final int MAX_15BIT = 0x7fff;
-    protected final int MAX_16BIT = 0xffff;
-    protected final int MAX_31BIT = 0x7fffffff;
-    protected final long MAX_32BIT = 0xffffffffL;
+    protected static final int MAX_4BIT = 0xf;
+    protected static final int MAX_5BIT = 0x1f;
+    protected static final int MAX_7BIT = 0x7f;
+    protected static final int MAX_8BIT = 0xff;
+    protected static final int MAX_15BIT = 0x7fff;
+    protected static final int MAX_16BIT = 0xffff;
+    protected static final int MAX_31BIT = 0x7fffffff;
+    protected static final long MAX_32BIT = 0xffffffffL;
 
-    protected final BigInteger BI_MIN_LONG = BigInteger.valueOf(Long.MIN_VALUE);
-    protected final BigInteger BI_MAX_LONG = BigInteger.valueOf(Long.MAX_VALUE);
-    protected final BigInteger BI_MAX_64BIT = BigInteger.valueOf(2).pow(64).subtract(BigInteger.ONE);
+    protected static final BigInteger BI_MIN_LONG = BigInteger.valueOf(Long.MIN_VALUE);
+    protected static final BigInteger BI_MAX_LONG = BigInteger.valueOf(Long.MAX_VALUE);
+    protected static final BigInteger BI_MAX_64BIT = BigInteger.valueOf(2).pow(64).subtract(BigInteger.ONE);
 
     //these values are from http://wiki.msgpack.org/display/MSGPACK/Format+specification
-    protected final byte MP_NULL = (byte) 0xc0;
-    protected final byte MP_FALSE = (byte) 0xc2;
-    protected final byte MP_TRUE = (byte) 0xc3;
-    protected final byte MP_BIN8 = (byte) 0xc4;
-    protected final byte MP_BIN16 = (byte) 0xc5;
-    protected final byte MP_BIN32 = (byte) 0xc6;
+    protected static final byte MP_NULL = (byte) 0xc0;
+    protected static final byte MP_FALSE = (byte) 0xc2;
+    protected static final byte MP_TRUE = (byte) 0xc3;
+    protected static final byte MP_BIN8 = (byte) 0xc4;
+    protected static final byte MP_BIN16 = (byte) 0xc5;
+    protected static final byte MP_BIN32 = (byte) 0xc6;
 
-    protected final byte MP_FLOAT = (byte) 0xca;
-    protected final byte MP_DOUBLE = (byte) 0xcb;
+    protected static final byte MP_FLOAT = (byte) 0xca;
+    protected static final byte MP_DOUBLE = (byte) 0xcb;
 
-    protected final byte MP_FIXNUM = (byte) 0x00;//last 7 bits is value
-    protected final byte MP_UINT8 = (byte) 0xcc;
-    protected final byte MP_UINT16 = (byte) 0xcd;
-    protected final byte MP_UINT32 = (byte) 0xce;
-    protected final byte MP_UINT64 = (byte) 0xcf;
+    protected static final byte MP_FIXNUM = (byte) 0x00;//last 7 bits is value
+    protected static final byte MP_UINT8 = (byte) 0xcc;
+    protected static final byte MP_UINT16 = (byte) 0xcd;
+    protected static final byte MP_UINT32 = (byte) 0xce;
+    protected static final byte MP_UINT64 = (byte) 0xcf;
 
-    protected final byte MP_NEGATIVE_FIXNUM = (byte) 0xe0;//last 5 bits is value
-    protected final int MP_NEGATIVE_FIXNUM_INT = 0xe0;//  /me wishes for signed numbers.
-    protected final byte MP_INT8 = (byte) 0xd0;
-    protected final byte MP_INT16 = (byte) 0xd1;
-    protected final byte MP_INT32 = (byte) 0xd2;
-    protected final byte MP_INT64 = (byte) 0xd3;
+    protected static final byte MP_NEGATIVE_FIXNUM = (byte) 0xe0;//last 5 bits is value
+    protected static final int MP_NEGATIVE_FIXNUM_INT = 0xe0;//  /me wishes for signed numbers.
+    protected static final byte MP_INT8 = (byte) 0xd0;
+    protected static final byte MP_INT16 = (byte) 0xd1;
+    protected static final byte MP_INT32 = (byte) 0xd2;
+    protected static final byte MP_INT64 = (byte) 0xd3;
 
-    protected final byte MP_FIXARRAY = (byte) 0x90;//last 4 bits is size
-    protected final int MP_FIXARRAY_INT = 0x90;
-    protected final byte MP_ARRAY16 = (byte) 0xdc;
-    protected final byte MP_ARRAY32 = (byte) 0xdd;
+    protected static final byte MP_FIXARRAY = (byte) 0x90;//last 4 bits is size
+    protected static final int MP_FIXARRAY_INT = 0x90;
+    protected static final byte MP_ARRAY16 = (byte) 0xdc;
+    protected static final byte MP_ARRAY32 = (byte) 0xdd;
 
-    protected final byte MP_FIXMAP = (byte) 0x80;//last 4 bits is size
-    protected final int MP_FIXMAP_INT = 0x80;
-    protected final byte MP_MAP16 = (byte) 0xde;
-    protected final byte MP_MAP32 = (byte) 0xdf;
+    protected static final byte MP_FIXMAP = (byte) 0x80;//last 4 bits is size
+    protected static final int MP_FIXMAP_INT = 0x80;
+    protected static final byte MP_MAP16 = (byte) 0xde;
+    protected static final byte MP_MAP32 = (byte) 0xdf;
 
-    protected final byte MP_FIXSTR = (byte) 0xa0;//last 5 bits is size
-    protected final int MP_FIXSTR_INT = 0xa0;
-    protected final byte MP_STR8 = (byte) 0xd9;
-    protected final byte MP_STR16 = (byte) 0xda;
-    protected final byte MP_STR32 = (byte) 0xdb;
+    protected static final byte MP_FIXSTR = (byte) 0xa0;//last 5 bits is size
+    protected static final int MP_FIXSTR_INT = 0xa0;
+    protected static final byte MP_STR8 = (byte) 0xd9;
+    protected static final byte MP_STR16 = (byte) 0xda;
+    protected static final byte MP_STR32 = (byte) 0xdb;
 
     public void pack(Object item, OutputStream os) throws IOException {
         DataOutputStream out = new DataOutputStream(os);
@@ -99,14 +99,16 @@ public class MsgPackLite {
                     BigInteger value = (BigInteger) item;
                     boolean isPositive = value.signum() >= 0;
                     if (isPositive && value.compareTo(BI_MAX_64BIT) > 0 ||
-                            value.compareTo(BI_MIN_LONG) < 0)
+                        value.compareTo(BI_MIN_LONG) < 0) {
                         throw new IllegalArgumentException(
                             "Cannot encode BigInteger as MsgPack: out of -2^63..2^64-1 range");
+                    }
                     if (isPositive && value.compareTo(BI_MAX_LONG) > 0) {
                         byte[] data = value.toByteArray();
                         // data can contain leading zero bytes
-                        for (int i = 0; i < data.length - 8; ++i)
+                        for (int i = 0; i < data.length - 8; ++i) {
                             assert data[i] == 0;
+                        }
                         out.write(MP_UINT64);
                         out.write(data, data.length - 8, 8);
                         return;
@@ -247,26 +249,26 @@ public class MsgPackLite {
         case MP_DOUBLE:
             return in.readDouble();
         case MP_UINT8:
-            return in.read();//read single byte, return as int
+            return in.read(); // read single byte, return as int
         case MP_UINT16:
-            return in.readShort() & MAX_16BIT;//read short, trick Java into treating it as unsigned, return int
+            return in.readShort() & MAX_16BIT; // read short, trick Java into treating it as unsigned, return int
         case MP_UINT32:
-            return in.readInt() & MAX_32BIT;//read int, trick Java into treating it as unsigned, return long
+            return in.readInt() & MAX_32BIT; // read int, trick Java into treating it as unsigned, return long
         case MP_UINT64: {
             long v = in.readLong();
             if (v >= 0) {
                 return v;
             } else {
-                //this is a little bit more tricky, since we don't have unsigned longs
-                byte[] bytes = new byte[]{
-                        (byte) ((v >> 56) & 0xff),
-                        (byte) ((v >> 48) & 0xff),
-                        (byte) ((v >> 40) & 0xff),
-                        (byte) ((v >> 32) & 0xff),
-                        (byte) ((v >> 24) & 0xff),
-                        (byte) ((v >> 16) & 0xff),
-                        (byte) ((v >> 8) & 0xff),
-                        (byte) (v & 0xff),
+                // this is a little bit more tricky, since we don't have unsigned longs
+                byte[] bytes = new byte[] {
+                    (byte) ((v >> 56) & 0xff),
+                    (byte) ((v >> 48) & 0xff),
+                    (byte) ((v >> 40) & 0xff),
+                    (byte) ((v >> 32) & 0xff),
+                    (byte) ((v >> 24) & 0xff),
+                    (byte) ((v >> 16) & 0xff),
+                    (byte) ((v >> 8) & 0xff),
+                    (byte) (v & 0xff),
                 };
                 return new BigInteger(1, bytes);
             }
@@ -299,6 +301,8 @@ public class MsgPackLite {
             return unpackBin(in.readShort() & MAX_16BIT, in);
         case MP_BIN32:
             return unpackBin(in.readInt(), in);
+        default:
+            break;
         }
 
         if (value >= MP_NEGATIVE_FIXNUM_INT && value <= MP_NEGATIVE_FIXNUM_INT + MAX_5BIT) {
@@ -309,7 +313,8 @@ public class MsgPackLite {
             return unpackMap(value - MP_FIXMAP_INT, in);
         } else if (value >= MP_FIXSTR_INT && value <= MP_FIXSTR_INT + MAX_5BIT) {
             return unpackStr(value - MP_FIXSTR_INT, in);
-        } else if (value <= MAX_7BIT) {//MP_FIXNUM - the value is value as an int
+        } else if (value <= MAX_7BIT) {
+            // MP_FIXNUM - the value is value as an int
             return value;
         } else {
             throw new IllegalArgumentException("Input contains invalid type value " + (byte) value);

@@ -1,5 +1,13 @@
 package org.tarantool.jdbc;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -10,14 +18,6 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
     private DatabaseMetaData meta;
@@ -220,8 +220,6 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
     public void testGetDriverNameVersion() throws SQLException {
         String name = meta.getDriverName();
         String version = meta.getDriverVersion();
-        int majorVersion = meta.getDriverMajorVersion();
-        int minorVersion = meta.getDriverMinorVersion();
 
         // Verify driver name.
         assertEquals("tarantool-java", name);
@@ -235,6 +233,9 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         // Verify the full version matches major/minor ones.
         int majorVersionMatched = Integer.parseInt(m.group("major"));
         int minorVersionMatched = Integer.parseInt(m.group("minor"));
+        int majorVersion = meta.getDriverMajorVersion();
+        int minorVersion = meta.getDriverMinorVersion();
+
         assertEquals(majorVersion, majorVersionMatched);
         assertEquals(minorVersion, minorVersionMatched);
     }

@@ -1,5 +1,10 @@
 package org.tarantool;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.tarantool.AbstractTarantoolConnectorIT.makeClusterClientConfig;
+import static org.tarantool.TestUtils.makeInstanceEnv;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -8,11 +13,6 @@ import org.junit.jupiter.api.function.Executable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.tarantool.AbstractTarantoolConnectorIT.makeClusterClientConfig;
-import static org.tarantool.TestUtils.makeInstanceEnv;
 
 public class ClientReconnectClusterIT {
     private static final int TIMEOUT = 500;
@@ -74,7 +74,8 @@ public class ClientReconnectClusterIT {
 
         List<?> ids = client.syncOps().eval(
             "return box.schema.space.create('rr_test').id, " +
-            "box.space.rr_test:create_index('primary').id");
+                "box.space.rr_test:create_index('primary').id"
+        );
 
         final int spaceId = ((Number)ids.get(0)).intValue();
         final int pkId = ((Number)ids.get(1)).intValue();

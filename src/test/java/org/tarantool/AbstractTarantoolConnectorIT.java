@@ -1,11 +1,16 @@
 package org.tarantool;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.tarantool.TestUtils.makeInstanceEnv;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.opentest4j.AssertionFailedError;
 
-import java.math.BigInteger;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.List;
@@ -15,16 +20,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import static org.tarantool.TestUtils.makeInstanceEnv;
-
 /**
  * Abstract test. Provides environment control and frequently used functions.
  */
 public abstract class AbstractTarantoolConnectorIT {
+
     protected static final String host = System.getProperty("tntHost", "localhost");
     protected static final int port = Integer.parseInt(System.getProperty("tntPort", "3301"));
     protected static final int consolePort = Integer.parseInt(System.getProperty("tntConsolePort", "3313"));
@@ -124,7 +124,7 @@ public abstract class AbstractTarantoolConnectorIT {
     protected void checkTupleResult(Object res, List tuple) {
         assertNotNull(res);
         assertTrue(List.class.isAssignableFrom(res.getClass()));
-        List list = (List)res;
+        List list = (List) res;
         assertEquals(1, list.size());
         assertNotNull(list.get(0));
         assertTrue(List.class.isAssignableFrom(list.get(0).getClass()));
@@ -155,7 +155,7 @@ public abstract class AbstractTarantoolConnectorIT {
         config.password = password;
         config.initTimeoutMillis = RESTART_TIMEOUT;
         config.sharedBufferSize = 128;
-        return (T)config;
+        return (T) config;
     }
 
     protected static TarantoolConsole openConsole() {
@@ -194,8 +194,9 @@ public abstract class AbstractTarantoolConnectorIT {
         if (List.class.isAssignableFrom(key.getClass())) {
             List parts = (List) key;
             for (int i = 0; i < parts.size(); i++) {
-                if (i != 0)
+                if (i != 0) {
                     sb.append(", ");
+                }
                 Object k = parts.get(i);
                 if (k instanceof BigInteger) {
                     appendBigInteger(sb, (BigInteger) k);
@@ -247,7 +248,7 @@ public abstract class AbstractTarantoolConnectorIT {
      *
      * @param timeout Timeout in ms.
      * @param message Error message.
-     * @param r Runnable.
+     * @param r       Runnable.
      */
     protected void assertTimeoutPreemptively(int timeout, String message, Runnable r) {
         ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -264,4 +265,5 @@ public abstract class AbstractTarantoolConnectorIT {
             executorService.shutdownNow();
         }
     }
+
 }

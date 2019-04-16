@@ -31,7 +31,9 @@ public class ReadableViaSelectorChannel implements ReadableByteChannel {
 
     @Override
     public int read(ByteBuffer buffer) throws IOException {
-        int count, n;
+        int count;
+        int n;
+
         count = n = channel.read(buffer);
 
         if (n < 0) {

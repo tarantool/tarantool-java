@@ -1,13 +1,13 @@
 package org.tarantool;
 
+import static org.tarantool.TarantoolClientImpl.StateHelper.CLOSED;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-
-import static org.tarantool.TarantoolClientImpl.StateHelper.CLOSED;
 
 /**
  * Basic implementation of a client that may work with the cluster
@@ -24,6 +24,8 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     private ConcurrentHashMap<Long, ExpirableOp<?>> retries = new ConcurrentHashMap<Long, ExpirableOp<?>>();
 
     /**
+     * Constructs a new cluster client.
+     *
      * @param config Configuration.
      * @param addrs  Array of addresses in the form of [host]:[port].
      */
@@ -32,14 +34,14 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
     }
 
     /**
+     * Constructs a new cluster client.
+     *
      * @param provider Socket channel provider.
      * @param config   Configuration.
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config, SocketChannelProvider provider) {
         super(provider, config);
-
-        this.executor = config.executor == null ?
-                Executors.newSingleThreadExecutor() : config.executor;
+        this.executor = config.executor == null ? Executors.newSingleThreadExecutor() : config.executor;
     }
 
     @Override
@@ -162,19 +164,21 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         /**
          * Moment in time when operation is not considered for retry.
          */
-        final private long deadline;
+        private final long deadline;
 
         /**
          * A task identifier used in {@link TarantoolClientImpl#futures}.
          */
-        final private long id;
+        private final long id;
 
         /**
          * Arguments of operation.
          */
-        final private Object[] args;
+        private final Object[] args;
 
         /**
+         * Constructs a new Expirable operation.
+         *
          * @param id         Sync.
          * @param expireTime Expiration time (relative) in ms.
          * @param code       Tarantool operation code.

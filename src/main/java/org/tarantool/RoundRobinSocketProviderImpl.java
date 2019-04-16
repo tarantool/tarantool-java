@@ -10,15 +10,30 @@ import java.util.Arrays;
  * To be used with {@link TarantoolClientImpl}.
  */
 public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
-    /** Timeout to establish socket connection with an individual server. */
-    private int timeout; // 0 is infinite.
-    /** Limit of retries. */
-    private int retriesLimit = -1; // No-limit.
-    /** Server addresses as configured. */
+    /**
+     * Timeout to establish socket connection with an individual server.
+     * 0 is infinite.
+     */
+    private int timeout;
+
+    /**
+     * Limit of retries (-1 = no limit).
+     */
+    private int retriesLimit = -1;
+
+    /**
+     * Server addresses as configured.
+     */
     private final String[] addrs;
-    /** Socket addresses. */
+
+    /**
+     * Socket addresses.
+     */
     private final InetSocketAddress[] sockAddrs;
-    /** Current position within {@link #sockAddrs} array. */
+
+    /**
+     * Current position within {@link #sockAddrs} array.
+     */
     private int pos;
 
     /**
@@ -27,8 +42,9 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
      * @param addrs Array of addresses in a form of [host]:[port].
      */
     public RoundRobinSocketProviderImpl(String... addrs) {
-        if (addrs == null || addrs.length == 0)
+        if (addrs == null || addrs.length == 0) {
             throw new IllegalArgumentException("addrs is null or empty.");
+        }
 
         this.addrs = Arrays.copyOf(addrs, addrs.length);
 
@@ -40,6 +56,8 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     }
 
     /**
+     * Gets raw addresses list.
+     *
      * @return Configured addresses in a form of [host]:[port].
      */
     public String[] getAddresses() {
@@ -57,8 +75,9 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
      * @throws IllegalArgumentException If timeout is negative.
      */
     public RoundRobinSocketProviderImpl setTimeout(int timeout) {
-        if (timeout < 0)
+        if (timeout < 0) {
             throw new IllegalArgumentException("timeout is negative.");
+        }
 
         this.timeout = timeout;
 
@@ -66,8 +85,10 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     }
 
     /**
-     * @return Maximum amount of time to wait for a socket connection establishment
-     *         with an individual server.
+     * Gets maximum amount of time to wait for a socket connection establishment
+     * with an individual server.
+     *
+     * @return timeout
      */
     public int getTimeout() {
         return timeout;
@@ -77,7 +98,7 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
      * Sets maximum amount of reconnect attempts to be made before an exception is raised.
      * The retry count is maintained by a {@link #get(int, Throwable)} caller
      * when a socket level connection was established.
-     *
+     * <p>
      * Negative value means unlimited.
      *
      * @param retriesLimit Limit of retries to use.
@@ -85,18 +106,21 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
      */
     public RoundRobinSocketProviderImpl setRetriesLimit(int retriesLimit) {
         this.retriesLimit = retriesLimit;
-
         return this;
     }
 
     /**
-     * @return Maximum reconnect attempts to make before raising exception.
+     * Gets number of maximum attempts to establish connection.
+     *
+     * @return max attempts number.
      */
     public int getRetriesLimit() {
         return retriesLimit;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public SocketChannel get(int retryNumber, Throwable lastError) {
         if (areRetriesExhausted(retryNumber)) {
@@ -138,6 +162,8 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     }
 
     /**
+     * Gets size of addresses pool.
+     *
      * @return Number of configured addresses.
      */
     protected int getAddressCount() {
@@ -145,6 +171,8 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
     }
 
     /**
+     * Gets next address from the pool to be used to connect.
+     *
      * @return Socket address to use for the next reconnection attempt.
      */
     protected InetSocketAddress getNextSocketAddress() {
@@ -175,8 +203,9 @@ public class RoundRobinSocketProviderImpl implements SocketChannelProvider {
      */
     private boolean areRetriesExhausted(int retries) {
         int limit = getRetriesLimit();
-        if (limit < 0)
+        if (limit < 0) {
             return false;
+        }
         return retries >= limit;
     }
 }

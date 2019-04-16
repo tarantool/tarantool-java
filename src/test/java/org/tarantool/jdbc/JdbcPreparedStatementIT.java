@@ -1,5 +1,13 @@
 package org.tarantool.jdbc;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -10,21 +18,14 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-
 public class JdbcPreparedStatementIT extends JdbcTypesIT {
     private PreparedStatement prep;
 
     @AfterEach
     public void tearDown() throws SQLException {
-        if (prep != null && !prep.isClosed())
+        if (prep != null && !prep.isClosed()) {
             prep.close();
+        }
     }
 
     @Test
@@ -106,7 +107,8 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
         assertEquals("twenty", getRow("test", 20).get(1));
     }
 
-    @Test void testForbiddenMethods() throws SQLException {
+    @Test
+    void testForbiddenMethods() throws SQLException {
         prep = conn.prepareStatement("TEST");
 
         int i = 0;
@@ -116,11 +118,14 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
                 @Override
                 public void execute() throws Throwable {
                     switch (step) {
-                        case 0: prep.executeQuery("TEST");
+                        case 0:
+                            prep.executeQuery("TEST");
                             break;
-                        case 1: prep.executeUpdate("TEST");
+                        case 1:
+                            prep.executeUpdate("TEST");
                             break;
-                        case 2: prep.execute("TEST");
+                        case 2:
+                            prep.execute("TEST");
                             break;
                         default:
                             fail();
@@ -145,11 +150,14 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
                 @Override
                 public void execute() throws Throwable {
                     switch (step) {
-                        case 0: prep.executeQuery();
+                        case 0:
+                            prep.executeQuery();
                             break;
-                        case 1: prep.executeUpdate();
+                        case 1:
+                            prep.executeUpdate();
                             break;
-                        case 2: prep.execute();
+                        case 2:
+                            prep.execute();
                             break;
                         default:
                             fail();
@@ -164,72 +172,72 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
     @Test
     public void testSetByte() throws SQLException {
         makeHelper(Byte.class)
-        .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-        .setValues(BYTE_VALS)
-        .testSetParameter();
+            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
+            .setValues(BYTE_VALS)
+            .testSetParameter();
     }
 
     @Test
     public void testSetInt() throws SQLException {
         makeHelper(Integer.class)
-        .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-        .setValues(INT_VALS)
-        .testSetParameter();
+            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
+            .setValues(INT_VALS)
+            .testSetParameter();
     }
 
     @Test
     public void testSetLong() throws SQLException {
         makeHelper(Long.class)
-        .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-        .setValues(LONG_VALS)
-        .testSetParameter();
+            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
+            .setValues(LONG_VALS)
+            .testSetParameter();
     }
 
     @Test
     public void testSetString() throws SQLException {
         makeHelper(String.class)
-        .setColumns(TntSqlType.VARCHAR, TntSqlType.TEXT)
-        .setValues(STRING_VALS)
-        .testSetParameter();
+            .setColumns(TntSqlType.VARCHAR, TntSqlType.TEXT)
+            .setValues(STRING_VALS)
+            .testSetParameter();
     }
 
     @Test
     public void testSetFloat() throws SQLException {
         makeHelper(Float.class)
-        .setColumns(TntSqlType.REAL)
-        .setValues(FLOAT_VALS)
-        .testSetParameter();
+            .setColumns(TntSqlType.REAL)
+            .setValues(FLOAT_VALS)
+            .testSetParameter();
     }
 
     @Test
     public void testSetDouble() throws SQLException {
         makeHelper(Double.class)
-        .setColumns(TntSqlType.FLOAT, TntSqlType.DOUBLE)
-        .setValues(DOUBLE_VALS)
-        .testSetParameter();
+            .setColumns(TntSqlType.FLOAT, TntSqlType.DOUBLE)
+            .setValues(DOUBLE_VALS)
+            .testSetParameter();
     }
 
     @Test
     public void testSetBigDecimal() throws SQLException {
         makeHelper(BigDecimal.class)
-        .setColumns(TntSqlType.REAL, TntSqlType.FLOAT, TntSqlType.DOUBLE)
-        .setValues(BIGDEC_VALS)
-        .testSetParameter();
+            .setColumns(TntSqlType.REAL, TntSqlType.FLOAT, TntSqlType.DOUBLE)
+            .setValues(BIGDEC_VALS)
+            .testSetParameter();
     }
 
     @Test
     public void testSetByteArray() throws SQLException {
         makeHelper(byte[].class)
-        .setColumns(TntSqlType.SCALAR)
-        .setValues(BINARY_VALS)
-        .testSetParameter();
+            .setColumns(TntSqlType.SCALAR)
+            .setValues(BINARY_VALS)
+            .testSetParameter();
     }
 
     @Test
     public void testSetDate() throws SQLException {
         makeHelper(Date.class)
-        .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-        .setValues(DATE_VALS)
-        .testSetParameter();
+            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
+            .setValues(DATE_VALS)
+            .testSetParameter();
     }
 }

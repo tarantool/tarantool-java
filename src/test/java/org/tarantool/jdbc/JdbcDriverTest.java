@@ -1,21 +1,5 @@
 package org.tarantool.jdbc;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
-import org.tarantool.CommunicationException;
-
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.net.URI;
-
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.sql.DriverPropertyInfo;
-import java.sql.SQLException;
-import java.util.Properties;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -30,6 +14,22 @@ import static org.tarantool.jdbc.SQLDriver.PROP_SOCKET_PROVIDER;
 import static org.tarantool.jdbc.SQLDriver.PROP_SOCKET_TIMEOUT;
 import static org.tarantool.jdbc.SQLDriver.PROP_USER;
 
+import org.tarantool.CommunicationException;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.net.URI;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.DriverPropertyInfo;
+import java.sql.SQLException;
+import java.util.Properties;
+
 public class JdbcDriverTest {
     @Test
     public void testParseQueryString() throws Exception {
@@ -40,9 +40,10 @@ public class JdbcDriverTest {
         prop.setProperty(PROP_PASSWORD, "secret");
 
         URI uri = new URI(String.format(
-                "tarantool://server.local:3302?%s=%s&%s=%d",
-                PROP_SOCKET_PROVIDER, "some.class",
-                PROP_SOCKET_TIMEOUT, 5000));
+            "tarantool://server.local:3302?%s=%s&%s=%d",
+            PROP_SOCKET_PROVIDER, "some.class",
+            PROP_SOCKET_TIMEOUT, 5000)
+        );
 
         Properties res = drv.parseQueryString(uri, prop);
         assertNotNull(res);
@@ -70,7 +71,11 @@ public class JdbcDriverTest {
     public void testParseQueryStringValidations() {
         // Check non-number port
         checkParseQueryStringValidation("tarantool://0",
-            new Properties() {{setProperty(PROP_PORT, "nan");}},
+            new Properties() {
+                {
+                    setProperty(PROP_PORT, "nan");
+                }
+            },
             "Port must be a valid number.");
 
         // Check zero port
@@ -81,11 +86,11 @@ public class JdbcDriverTest {
 
         // Check non-number timeout
         checkParseQueryStringValidation(String.format("tarantool://0:3301?%s=nan", PROP_SOCKET_TIMEOUT), null,
-                "Timeout must be a valid number.");
+            "Timeout must be a valid number.");
 
         // Check negative timeout
         checkParseQueryStringValidation(String.format("tarantool://0:3301?%s=-100", PROP_SOCKET_TIMEOUT), null,
-                "Timeout must not be negative.");
+            "Timeout must not be negative.");
     }
 
     @Test
@@ -96,7 +101,7 @@ public class JdbcDriverTest {
         assertNotNull(info);
         assertEquals(6, info.length);
 
-        for (DriverPropertyInfo e: info) {
+        for (DriverPropertyInfo e : info) {
             assertNotNull(e.name);
             assertNull(e.choices);
             assertNotNull(e.description);
@@ -119,24 +124,25 @@ public class JdbcDriverTest {
             } else if (PROP_SOCKET_TIMEOUT.equals(e.name)) {
                 assertFalse(e.required);
                 assertEquals("0", e.value);
-            } else
+            } else {
                 fail("Unknown property '" + e.name + "'");
+            }
         }
     }
 
     @Test
     public void testCustomSocketProviderFail() throws SQLException {
         checkCustomSocketProviderFail("nosuchclassexists",
-                "Couldn't instantiate socket provider");
+            "Couldn't instantiate socket provider");
 
         checkCustomSocketProviderFail(Integer.class.getName(),
-                "The socket provider java.lang.Integer does not implement org.tarantool.jdbc.SQLSocketProvider");
+            "The socket provider java.lang.Integer does not implement org.tarantool.jdbc.SQLSocketProvider");
 
         checkCustomSocketProviderFail(TestSQLProviderThatReturnsNull.class.getName(),
-                "The socket provider returned null socket");
+            "The socket provider returned null socket");
 
         checkCustomSocketProviderFail(TestSQLProviderThatThrows.class.getName(),
-                "Couldn't initiate connection using");
+            "Couldn't initiate connection using");
     }
 
     @Test

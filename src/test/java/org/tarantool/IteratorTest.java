@@ -1,12 +1,13 @@
 package org.tarantool;
 
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.mockito.Mockito.*;
-
 
 class IteratorTest {
     protected class MockOps extends AbstractTarantoolOps<Integer, List<?>, Object, List<?>> {

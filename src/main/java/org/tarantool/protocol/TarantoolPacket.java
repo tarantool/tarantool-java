@@ -23,9 +23,11 @@ public class TarantoolPacket {
 
         if (!(potenticalCode instanceof Long)) {
             //noinspection ConstantConditions
-            throw new IllegalStateException("A value contained in the header by key '" + Key.CODE.name() + "'" +
-                    " is not instance of Long class: " +
-                    potenticalCode != null ? potenticalCode.getClass().toString() : "null");
+            throw new IllegalStateException(
+                "A value contained in the header by key '" + Key.CODE.name() +
+                    "' is not instance of Long class: " +
+                    potenticalCode != null ? potenticalCode.getClass().toString() : "null"
+            );
         }
 
         return (Long) potenticalCode;

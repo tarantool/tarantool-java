@@ -1,5 +1,12 @@
 package org.tarantool.jdbc;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,13 +15,6 @@ import org.junit.jupiter.api.function.Executable;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 public class JdbcStatementIT extends AbstractJdbcIT {
     private Statement stmt;
@@ -26,8 +26,9 @@ public class JdbcStatementIT extends AbstractJdbcIT {
 
     @AfterEach
     public void tearDown() throws SQLException {
-        if (stmt != null && !stmt.isClosed())
+        if (stmt != null && !stmt.isClosed()) {
             stmt.close();
+        }
     }
 
     @Test

@@ -1,5 +1,14 @@
 package org.tarantool.jdbc;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.tarantool.TestUtils.fromHex;
+import static org.tarantool.jdbc.SqlTestUtils.getInsertSQL;
+import static org.tarantool.jdbc.SqlTestUtils.getParameterizedInsertSQL;
+import static org.tarantool.jdbc.SqlTestUtils.getSelectSQL;
+
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -9,15 +18,6 @@ import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.tarantool.TestUtils.fromHex;
-import static org.tarantool.jdbc.SqlTestUtils.getInsertSQL;
-import static org.tarantool.jdbc.SqlTestUtils.getParameterizedInsertSQL;
-import static org.tarantool.jdbc.SqlTestUtils.getSelectSQL;
 
 public class JdbcTypesIT extends AbstractJdbcIT {
     private static AtomicInteger KEY_CNTR = new AtomicInteger(1);

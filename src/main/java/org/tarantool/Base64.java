@@ -1,8 +1,7 @@
 package org.tarantool;
 
 public class Base64 {
-    static String charSet =
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    static final String CHAR_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     public static byte[] decode(String s) {
         int end = 0;
@@ -16,7 +15,7 @@ public class Base64 {
         byte[] result = new byte[len];
         int dst = 0;
         for (int src = 0; src < s.length(); src++) {
-            int code = charSet.indexOf(s.charAt(src));
+            int code = CHAR_SET.indexOf(s.charAt(src));
             if (code == -1) {
                 break;
             }
@@ -34,6 +33,8 @@ public class Base64 {
                 break;
             case 3:
                 result[dst++] |= (byte) (code & 0x3f);
+                break;
+            default:
                 break;
             }
         }

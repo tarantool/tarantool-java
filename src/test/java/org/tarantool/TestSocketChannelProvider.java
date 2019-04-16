@@ -1,8 +1,9 @@
 package org.tarantool;
 
+import static java.net.StandardSocketOptions.SO_LINGER;
+
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
-import static java.net.StandardSocketOptions.SO_LINGER;
 
 /**
  * Socket channel provider to be used throughout the tests.
@@ -39,8 +40,9 @@ public class TestSocketChannelProvider implements SocketChannelProvider {
                 channel.connect(new InetSocketAddress(host, port));
                 return channel;
             } catch (Exception e) {
-                if (budget < System.currentTimeMillis())
+                if (budget < System.currentTimeMillis()) {
                     throw new RuntimeException(e);
+                }
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException ex) {

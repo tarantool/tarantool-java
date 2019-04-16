@@ -26,7 +26,7 @@ import java.util.Map;
 
 public class SQLPreparedStatement extends SQLStatement implements PreparedStatement {
 
-    final static String INVALID_CALL_MSG = "The method cannot be called on a PreparedStatement.";
+    static final String INVALID_CALL_MSG = "The method cannot be called on a PreparedStatement.";
     final String sql;
     final Map<Integer, Object> params;
 
@@ -54,6 +54,11 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
         return createResultSet(connection.executeQuery(sql, getParams()));
     }
 
+    @Override
+    public ResultSet executeQuery(String sql) throws SQLException {
+        throw new SQLException(INVALID_CALL_MSG);
+    }
+
     protected Object[] getParams() throws SQLException {
         Object[] objects = new Object[params.size()];
         for (int i = 1; i <= params.size(); i++) {
@@ -74,7 +79,17 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
+    public int executeUpdate(String sql) throws SQLException {
+        throw new SQLException(INVALID_CALL_MSG);
+    }
+
+    @Override
     public void setNull(int parameterIndex, int sqlType) throws SQLException {
+        setParameter(parameterIndex, null);
+    }
+
+    @Override
+    public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
         setParameter(parameterIndex, null);
     }
 
@@ -85,6 +100,11 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public void setByte(int parameterIndex, byte parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
+    }
+
+    @Override
+    public void setBytes(int parameterIndex, byte[] parameterValue) throws SQLException {
         setParameter(parameterIndex, parameterValue);
     }
 
@@ -124,12 +144,12 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
-    public void setBytes(int parameterIndex, byte[] parameterValue) throws SQLException {
+    public void setDate(int parameterIndex, Date parameterValue) throws SQLException {
         setParameter(parameterIndex, parameterValue);
     }
 
     @Override
-    public void setDate(int parameterIndex, Date parameterValue) throws SQLException {
+    public void setDate(int parameterIndex, Date parameterValue, Calendar calendar) throws SQLException {
         setParameter(parameterIndex, parameterValue);
     }
 
@@ -139,13 +159,33 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
+    public void setTime(int parameterIndex, Time parameterValue, Calendar calendar) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
+    }
+
+    @Override
     public void setTimestamp(int parameterIndex, Timestamp parameterValue) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
+    }
+
+    @Override
+    public void setTimestamp(int parameterIndex, Timestamp parameterValue, Calendar calendar) throws SQLException {
         setParameter(parameterIndex, parameterValue);
     }
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream parameterValue, int length) throws SQLException {
         setParameter(parameterIndex, parameterValue);
+    }
+
+    @Override
+    public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
+    public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
@@ -156,6 +196,16 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     @Override
     public void setBinaryStream(int parameterIndex, InputStream parameterValue, int length) throws SQLException {
         setParameter(parameterIndex, parameterValue);
+    }
+
+    @Override
+    public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
+    public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
@@ -173,6 +223,14 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
         setParameter(parameterIndex, value);
     }
 
+    @Override
+    public void setObject(int parameterIndex,
+                          Object parameterValue,
+                          int targetSqlType,
+                          int scaleOrLength) throws SQLException {
+        setParameter(parameterIndex, parameterValue);
+    }
+
     private void setParameter(int parameterIndex, Object value) throws SQLException {
         checkNotClosed();
         params.put(parameterIndex, value);
@@ -186,7 +244,22 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
+    public boolean execute(String sql) throws SQLException {
+        throw new SQLException(INVALID_CALL_MSG);
+    }
+
+    @Override
     public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
+    public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
+    public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException {
         throw new SQLFeatureNotSupportedException();
     }
 
@@ -201,7 +274,27 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
+    public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
+    public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
     public void setClob(int parameterIndex, Clob x) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
+    public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
+    public void setClob(int parameterIndex, Reader reader) throws SQLException {
         throw new SQLFeatureNotSupportedException();
     }
 
@@ -213,26 +306,6 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     @Override
     public ResultSetMetaData getMetaData() throws SQLException {
         return getResultSet().getMetaData();
-    }
-
-    @Override
-    public void setDate(int parameterIndex, Date parameterValue, Calendar calendar) throws SQLException {
-        setParameter(parameterIndex, parameterValue);
-    }
-
-    @Override
-    public void setTime(int parameterIndex, Time parameterValue, Calendar calendar) throws SQLException {
-        setParameter(parameterIndex, parameterValue);
-    }
-
-    @Override
-    public void setTimestamp(int parameterIndex, Timestamp parameterValue, Calendar calendar) throws SQLException {
-        setParameter(parameterIndex, parameterValue);
-    }
-
-    @Override
-    public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
-        setParameter(parameterIndex, null);
     }
 
     @Override
@@ -261,17 +334,12 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
+    public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
     public void setNClob(int parameterIndex, NClob value) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
         throw new SQLFeatureNotSupportedException();
     }
 
@@ -281,67 +349,22 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     }
 
     @Override
-    public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setObject(int parameterIndex, Object parameterValue, int targetSqlType, int scaleOrLength) throws SQLException {
-        setParameter(parameterIndex, parameterValue);
-    }
-
-    @Override
-    public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setClob(int parameterIndex, Reader reader) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
     public void setNClob(int parameterIndex, Reader reader) throws SQLException {
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
+    public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
     public void addBatch(String sql) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
+    public void addBatch() throws SQLException {
         throw new SQLFeatureNotSupportedException();
     }
 
@@ -355,23 +378,4 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
         throw new SQLFeatureNotSupportedException();
     }
 
-    @Override
-    public void addBatch() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public ResultSet executeQuery(String sql) throws SQLException {
-        throw new SQLException(INVALID_CALL_MSG);
-    }
-
-    @Override
-    public int executeUpdate(String sql) throws SQLException {
-        throw new SQLException(INVALID_CALL_MSG);
-    }
-
-    @Override
-    public boolean execute(String sql) throws SQLException {
-        throw new SQLException(INVALID_CALL_MSG);
-    }
 }

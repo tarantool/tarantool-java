@@ -12,13 +12,12 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-@SuppressWarnings("Since15")
 public class SQLDriver implements Driver {
 
     static {
         try {
             java.sql.DriverManager.registerDriver(new SQLDriver());
-        } catch (SQLException E) {
+        } catch (SQLException e) {
             throw new RuntimeException("Can't register driver!");
         }
     }
@@ -31,11 +30,13 @@ public class SQLDriver implements Driver {
     public static final String PROP_SOCKET_TIMEOUT = "socketTimeout";
 
     // Define default values once here.
-    final static Properties defaults = new Properties() {{
-        setProperty(PROP_HOST, "localhost");
-        setProperty(PROP_PORT, "3301");
-        setProperty(PROP_SOCKET_TIMEOUT, "0");
-    }};
+    static final Properties defaults = new Properties() {
+        {
+            setProperty(PROP_HOST, "localhost");
+            setProperty(PROP_PORT, "3301");
+            setProperty(PROP_SOCKET_TIMEOUT, "0");
+        }
+    };
 
     private final Map<String, SQLSocketProvider> providerCache = new ConcurrentHashMap<String, SQLSocketProvider>();
 
@@ -45,8 +46,9 @@ public class SQLDriver implements Driver {
         final Properties urlProperties = parseQueryString(uri, info);
         String providerClassName = urlProperties.getProperty(PROP_SOCKET_PROVIDER);
 
-        if (providerClassName == null)
+        if (providerClassName == null) {
             return new SQLConnection(url, urlProperties);
+        }
 
         final SQLSocketProvider provider = getSocketProviderInstance(providerClassName);
 
@@ -54,8 +56,9 @@ public class SQLDriver implements Driver {
             @Override
             protected Socket getConnectedSocket() throws SQLException {
                 Socket socket = provider.getConnectedSocket(uri, urlProperties);
-                if (socket == null)
+                if (socket == null) {
                     throw new SQLException("The socket provider returned null socket");
+                }
                 return socket;
             }
         };
@@ -94,8 +97,9 @@ public class SQLDriver implements Driver {
             // We need to convert port to string otherwise getProperty() will not see it.
             urlProperties.setProperty(PROP_PORT, String.valueOf(uri.getPort()));
         }
-        if (info != null)
+        if (info != null) {
             urlProperties.putAll(info);
+        }
 
         // Validate properties.
         int port;
@@ -128,7 +132,7 @@ public class SQLDriver implements Driver {
                     try {
                         Class<?> cls = Class.forName(className);
                         if (SQLSocketProvider.class.isAssignableFrom(cls)) {
-                            provider = (SQLSocketProvider)cls.newInstance();
+                            provider = (SQLSocketProvider) cls.newInstance();
                             providerCache.put(className, provider);
                         }
                     } catch (Exception e) {
@@ -172,19 +176,19 @@ public class SQLDriver implements Driver {
             password.description = "password";
 
             DriverPropertyInfo socketProvider = new DriverPropertyInfo(
-                    PROP_SOCKET_PROVIDER, properties.getProperty(PROP_SOCKET_PROVIDER));
+                PROP_SOCKET_PROVIDER, properties.getProperty(PROP_SOCKET_PROVIDER));
 
             socketProvider.required = false;
             socketProvider.description = "SocketProvider class implements org.tarantool.jdbc.SQLSocketProvider";
 
             DriverPropertyInfo socketTimeout = new DriverPropertyInfo(
-                    PROP_SOCKET_TIMEOUT, properties.getProperty(PROP_SOCKET_TIMEOUT));
+                PROP_SOCKET_TIMEOUT, properties.getProperty(PROP_SOCKET_TIMEOUT));
 
             socketTimeout.required = false;
             socketTimeout.description = "The number of milliseconds to wait before a timeout is occurred on a socket" +
-                    " connect or read. The default value is 0, which means infinite timeout.";
+                " connect or read. The default value is 0, which means infinite timeout.";
 
-            return new DriverPropertyInfo[]{host, port, user, password, socketProvider, socketTimeout};
+            return new DriverPropertyInfo[] { host, port, user, password, socketProvider, socketTimeout };
         } catch (Exception e) {
             throw new SQLException(e);
         }
@@ -215,17 +219,19 @@ public class SQLDriver implements Driver {
      * along with their sanitized values.
      *
      * @param props Connection properties.
+     *
      * @return Comma-separated pairs of property names and values.
      */
     protected static String diagProperties(Properties props) {
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<Object, Object> e : props.entrySet()) {
-            if (sb.length() > 0)
+            if (sb.length() > 0) {
                 sb.append(", ");
+            }
             sb.append(e.getKey());
             sb.append('=');
-            sb.append(PROP_USER.equals(e.getKey()) || PROP_PASSWORD.equals(e.getKey()) ?
-                    "*****" : e.getValue().toString());
+            sb.append((PROP_USER.equals(e.getKey()) || PROP_PASSWORD.equals(e.getKey()))
+                ? "*****" : e.getValue().toString());
         }
         return sb.toString();
     }

@@ -1,8 +1,16 @@
 package org.tarantool.jdbc;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import org.tarantool.TarantoolConnection;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
-import org.tarantool.TarantoolConnection;
 
 import java.lang.reflect.Field;
 import java.net.Socket;
@@ -12,13 +20,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 @SuppressWarnings("Since15")
 public class JdbcConnectionIT extends AbstractJdbcIT {
@@ -136,7 +137,10 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
         conn.setHoldability(ResultSet.HOLD_CURSORS_OVER_COMMIT);
         assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, conn.getHoldability());
 
-        assertThrows(SQLFeatureNotSupportedException.class, () -> conn.setHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT));
+        assertThrows(
+            SQLFeatureNotSupportedException.class,
+            () -> conn.setHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT)
+        );
         assertThrows(SQLException.class, () -> conn.setHoldability(Integer.MAX_VALUE));
 
         assertThrows(SQLException.class, () -> {
@@ -153,18 +157,30 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
         statement = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
 
-        statement = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        statement = conn.createStatement(
+            ResultSet.TYPE_FORWARD_ONLY,
+            ResultSet.CONCUR_READ_ONLY,
+            ResultSet.HOLD_CURSORS_OVER_COMMIT
+        );
         assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
 
         assertThrows(SQLException.class, () -> {
             conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, Integer.MAX_VALUE);
         });
-        assertThrows(SQLFeatureNotSupportedException.class, () -> {
-            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
-        });
+        assertThrows(
+            SQLFeatureNotSupportedException.class,
+            () -> conn.createStatement(
+                ResultSet.TYPE_FORWARD_ONLY,
+                ResultSet.CONCUR_READ_ONLY,
+                ResultSet.CLOSE_CURSORS_AT_COMMIT
+            ));
         assertThrows(SQLException.class, () -> {
             conn.close();
-            conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+            conn.createStatement(
+                ResultSet.TYPE_FORWARD_ONLY,
+                ResultSet.CONCUR_READ_ONLY,
+                ResultSet.HOLD_CURSORS_OVER_COMMIT
+            );
         });
     }
 
@@ -177,19 +193,41 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
         statement = conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
 
-        statement = conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
+        statement = conn.prepareStatement(
+            sqlString,
+            ResultSet.TYPE_FORWARD_ONLY,
+            ResultSet.CONCUR_READ_ONLY,
+            ResultSet.HOLD_CURSORS_OVER_COMMIT
+        );
         assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
 
-        assertThrows(SQLException.class, () -> {
-            conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, Integer.MAX_VALUE);
-        });
-        assertThrows(SQLFeatureNotSupportedException.class, () -> {
-            conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
-        });
-        assertThrows(SQLException.class, () -> {
-            conn.close();
-            conn.prepareStatement(sqlString, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
-        });
+        assertThrows(
+            SQLException.class,
+            () -> conn.prepareStatement(
+                sqlString,
+                ResultSet.TYPE_FORWARD_ONLY,
+                ResultSet.CONCUR_READ_ONLY,
+                Integer.MAX_VALUE
+            ));
+        assertThrows(
+            SQLFeatureNotSupportedException.class,
+            () -> conn.prepareStatement(
+                sqlString,
+                ResultSet.TYPE_FORWARD_ONLY,
+                ResultSet.CONCUR_READ_ONLY,
+                ResultSet.CLOSE_CURSORS_AT_COMMIT
+            ));
+        assertThrows(
+            SQLException.class,
+            () -> {
+                conn.close();
+                conn.prepareStatement(
+                    sqlString,
+                    ResultSet.TYPE_FORWARD_ONLY,
+                    ResultSet.CONCUR_READ_ONLY,
+                    ResultSet.HOLD_CURSORS_OVER_COMMIT
+                );
+            });
     }
 
 }

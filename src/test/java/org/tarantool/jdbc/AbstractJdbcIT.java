@@ -1,11 +1,16 @@
 package org.tarantool.jdbc;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.tarantool.TestUtils.makeInstanceEnv;
+import static org.tarantool.jdbc.SqlTestUtils.getCreateTableSQL;
+
+import org.tarantool.TarantoolConnection;
+import org.tarantool.TarantoolControl;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.tarantool.TarantoolConnection;
-import org.tarantool.TarantoolControl;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -16,10 +21,6 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.tarantool.TestUtils.makeInstanceEnv;
-import static org.tarantool.jdbc.SqlTestUtils.getCreateTableSQL;
 
 //mvn -DtntHost=localhost -DtntPort=3301 -DtntUser=test -DtntPass=test verify
 public abstract class AbstractJdbcIT {
@@ -34,16 +35,16 @@ public abstract class AbstractJdbcIT {
     protected static final int ADMIN = 3313;
 
     private static String[] initSql = new String[] {
-            "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100))",
-            "INSERT INTO test VALUES (1, 'one'), (2, 'two'), (3, 'three')",
-            "CREATE TABLE test_compound(id1 INT, id2 INT, val VARCHAR(100), PRIMARY KEY (id2, id1))",
-            getCreateTableSQL("test_types", TntSqlType.values())
+        "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100))",
+        "INSERT INTO test VALUES (1, 'one'), (2, 'two'), (3, 'three')",
+        "CREATE TABLE test_compound(id1 INT, id2 INT, val VARCHAR(100), PRIMARY KEY (id2, id1))",
+        getCreateTableSQL("test_types", TntSqlType.values())
     };
 
     private static String[] cleanSql = new String[] {
-            "DROP TABLE IF EXISTS test",
-            "DROP TABLE IF EXISTS test_types",
-            "DROP TABLE IF EXISTS test_compound"
+        "DROP TABLE IF EXISTS test",
+        "DROP TABLE IF EXISTS test_types",
+        "DROP TABLE IF EXISTS test_compound"
     };
 
     protected static TarantoolControl control;
@@ -78,15 +79,17 @@ public abstract class AbstractJdbcIT {
 
     @AfterEach
     public void tearDownConnection() throws SQLException {
-        if (conn != null && !conn.isClosed())
+        if (conn != null && !conn.isClosed()) {
             conn.close();
+        }
     }
 
     protected static void sqlExec(String... text) {
         TarantoolConnection con = makeConnection();
         try {
-            for (String cmd : text)
+            for (String cmd : text) {
                 con.eval("box.execute(\"" + cmd + "\")");
+            }
         } finally {
             con.close();
         }

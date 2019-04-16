@@ -1,24 +1,20 @@
 package org.tarantool;
 
-
-import java.util.concurrent.TimeUnit;
-
 public class TarantoolClientConfig {
 
     /**
-     * username and password for authorization
+     * Username and password for authorization.
      */
     public String username;
-
     public String password;
 
     /**
-     * default ByteArrayOutputStream size  when make query serialization
+     * Default ByteArrayOutputStream size  when make query serialization.
      */
     public int defaultRequestSize = 4096;
 
     /**
-     * initial size for map which holds futures of sent request
+     * Initial size for map which holds futures of sent request.
      */
     public int predictedFutures = (int) ((1024 * 1024) / 0.75) + 1;
 
@@ -29,25 +25,25 @@ public class TarantoolClientConfig {
 
 
     /**
-     * shared buffer is place where client collect requests when socket is busy on write
+     * shared buffer is place where client collect requests when socket is busy on write.
      */
     public int sharedBufferSize = 8 * 1024 * 1024;
     /**
-     * not put request into the shared buffer if request size is ge directWriteFactor * sharedBufferSize
+     * not put request into the shared buffer if request size is ge directWriteFactor * sharedBufferSize.
      */
     public double directWriteFactor = 0.5d;
 
     /**
      *  Use old call command https://github.com/tarantool/doc/issues/54,
-     *  please ensure that you server supports new call command
+     *  please ensure that you server supports new call command.
      */
     public boolean useNewCall = false;
 
     /**
-     * Any blocking ops timeout
+     * Any blocking ops timeout.
      */
-    public long initTimeoutMillis = 60*1000L;
+    public long initTimeoutMillis = 60 * 1000L;
 
-    public long writeTimeoutMillis = 60*1000L;
+    public long writeTimeoutMillis = 60 * 1000L;
 
 }

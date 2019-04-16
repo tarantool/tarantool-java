@@ -1,5 +1,12 @@
 package org.tarantool;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -17,14 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.LockSupport;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     private static final String INSTANCE_NAME = "jdk-testing";
@@ -227,13 +226,12 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     public void testLongParallelCloseReconnects() {
         int numThreads = 4;
         int numClients = 4;
-        int timeBudget = 30*1000;
+        int timeBudget = 30 * 1000;
 
         SocketChannelProvider provider = new TestSocketChannelProvider(host,
             port, RESTART_TIMEOUT).setSoLinger(0);
 
-        final AtomicReferenceArray<TarantoolClient> clients =
-            new AtomicReferenceArray<TarantoolClient>(numClients);
+        final AtomicReferenceArray<TarantoolClient> clients = new AtomicReferenceArray<TarantoolClient>(numClients);
 
         for (int idx = 0; idx < clients.length(); idx++) {
             clients.set(idx, makeClient(provider));
@@ -250,8 +248,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
             threads[idx] = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    while (!Thread.currentThread().isInterrupted() &&
-                        deadline > System.currentTimeMillis()) {
+                    while (!Thread.currentThread().isInterrupted() && deadline > System.currentTimeMillis()) {
 
                         int idx = rnd.nextInt(clients.length());
 
@@ -293,9 +290,11 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
                 fail(e);
             }
             if (deadline > System.currentTimeMillis()) {
-                System.out.println("testLongParallelCloseReconnects: " +
-                    (deadline - System.currentTimeMillis()) / 1000 +
-                    "s remain");
+                System.out.println(
+                    "testLongParallelCloseReconnects: " +
+                        (deadline - System.currentTimeMillis()) / 1000 +
+                        "s remain"
+                );
             }
         }
 
@@ -331,9 +330,9 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         config.initTimeoutMillis = 100;
         config.password = config.password + 'x';
         for (int i = 0; i < 100; ++i) {
-            if (i % 10 == 0)
-                System.out.println("testReconnectWrongAuth: " + (100 - i) +
-                    " iterations remain");
+            if (i % 10 == 0) {
+                System.out.println("testReconnectWrongAuth: " + (100 - i) + " iterations remain");
+            }
             CommunicationException e = assertThrows(CommunicationException.class,
                 new Executable() {
                     @Override
@@ -344,7 +343,8 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
             );
             assertEquals(e.getMessage(), "100ms is exceeded when waiting " +
                 "for client initialization. You could configure init " +
-                "timeout in TarantoolConfig");
+                "timeout in TarantoolConfig"
+            );
         }
 
         /*

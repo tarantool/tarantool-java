@@ -645,13 +645,16 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getProcedures(String catalog, String schemaPattern, String procedureNamePattern)
-            throws SQLException {
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
-    public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern, String columnNamePattern)
-            throws SQLException {
+    public ResultSet getProcedureColumns(String catalog,
+                                         String schemaPattern,
+                                         String procedureNamePattern,
+                                         String columnNamePattern)
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
@@ -678,8 +681,10 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
                 connection.checkNotClosed();
                 return asMetadataResultSet(JDBCBridge.EMPTY);
             }
-            String[] parts = tableNamePattern == null ? new String[]{""} : tableNamePattern.split("%");
-            List<List<Object>> spaces = (List<List<Object>>) connection.nativeSelect(_VSPACE, 0, Arrays.asList(), 0, SPACES_MAX, 0);
+            String[] parts = tableNamePattern == null ? new String[] { "" } : tableNamePattern.split("%");
+            List<List<Object>> spaces = (List<List<Object>>) connection.nativeSelect(
+                _VSPACE, 0, Arrays.asList(), 0, SPACES_MAX, 0
+            );
             List<List<Object>> rows = new ArrayList<List<Object>>();
             for (List<Object> space : spaces) {
                 String tableName = (String) space.get(NAME_IDX);
@@ -693,23 +698,29 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
                 }
             }
             List<String> columnNames = Arrays.asList(
-                    "TABLE_NAME", "TABLE_TYPE",
-                    //nulls
-                    "REMARKS", "TABLE_CAT",
-                    "TABLE_SCHEM", "TABLE_TYPE",
-                    "TYPE_CAT", "TYPE_SCHEM",
-                    "TYPE_NAME", "SELF_REFERENCING_COL_NAME",
-                    "REF_GENERATION"
+                "TABLE_NAME", "TABLE_TYPE",
+                //nulls
+                "REMARKS", "TABLE_CAT",
+                "TABLE_SCHEM", "TABLE_TYPE",
+                "TYPE_CAT", "TYPE_SCHEM",
+                "TYPE_NAME", "SELF_REFERENCING_COL_NAME",
+                "REF_GENERATION"
             );
             return sqlNullResultSet(columnNames, rows);
         } catch (Exception e) {
-            throw new SQLException("Failed to retrieve table(s) description: " +
-                "tableNamePattern=\"" + tableNamePattern + "\".", e);
+            throw new SQLException(
+                "Failed to retrieve table(s) description: " +
+                    "tableNamePattern=\"" + tableNamePattern + "\".", e);
         }
     }
 
     @Override
     public ResultSet getSchemas() throws SQLException {
+        return rowOfNullsResultSet();
+    }
+
+    @Override
+    public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException {
         return rowOfNullsResultSet();
     }
 
@@ -720,17 +731,19 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getTableTypes() throws SQLException {
-        return asMetadataResultSet(JDBCBridge.mock(Arrays.asList("TABLE_TYPE"), Arrays.asList(Arrays.<Object>asList("TABLE"))));
+        return asMetadataResultSet(JDBCBridge.mock(Arrays.asList("TABLE_TYPE"), Arrays.asList(Arrays.asList("TABLE"))));
     }
 
     @Override
     public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
-            throws SQLException {
+        throws SQLException {
         try {
-            String[] tableParts = tableNamePattern == null ? new String[]{""} : tableNamePattern.split("%");
-            String[] colParts = columnNamePattern == null ? new String[]{""} : columnNamePattern.split("%");
-            List<List<Object>> spaces = (List<List<Object>>) connection.nativeSelect(_VSPACE, 0, Arrays.asList(), 0, SPACES_MAX, 0);
-            List<List<Object>> rows = new ArrayList<List<Object>>();
+            String[] tableParts = tableNamePattern == null ? new String[] { "" } : tableNamePattern.split("%");
+            String[] colParts = columnNamePattern == null ? new String[] { "" } : columnNamePattern.split("%");
+            List<List<Object>> spaces = (List<List<Object>>) connection.nativeSelect(
+                _VSPACE, 0, Arrays.asList(), 0, SPACES_MAX, 0
+            );
+            List<List<Object>> rows = new ArrayList<>();
             for (List<Object> space : spaces) {
                 String tableName = (String) space.get(NAME_IDX);
                 List<Map<String, Object>> format = (List<Map<String, Object>>) space.get(FORMAT_IDX);
@@ -744,53 +757,60 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
                         String columnName = (String) f.get("name");
                         String dbType = (String) f.get("type");
                         if (like(columnName, colParts)) {
-                            rows.add(Arrays.<Object>asList(tableName, columnName, columnIdx, Types.OTHER, dbType, 10, 1, "YES", Types.OTHER, "NO", "NO"));
+                            rows.add(Arrays.asList(
+                                tableName, columnName,
+                                columnIdx, Types.OTHER,
+                                dbType, 10, 1,
+                                "YES", Types.OTHER,
+                                "NO", "NO")
+                            );
                         }
                     }
                 }
             }
 
             List<String> columnNames = Arrays.asList(
-                    "TABLE_NAME", "COLUMN_NAME",
-                    "ORDINAL_POSITION", "DATA_TYPE",
-                    "TYPE_NAME", "NUM_PREC_RADIX",
-                    "NULLABLE", "IS_NULLABLE",
-                    "SOURCE_DATA_TYPE", "IS_AUTOINCREMENT",
-                    "IS_GENERATEDCOLUMN",
-                    //nulls
-                    "TABLE_CAT", "TABLE_SCHEM",
-                    "COLUMN_SIZE", "BUFFER_LENGTH",
-                    "DECIMAL_DIGITS", "REMARKS",
-                    "COLUMN_DEF", "SQL_DATA_TYPE",
-                    "SQL_DATETIME_SUB", "CHAR_OCTET_LENGTH",
-                    "SCOPE_CATALOG", "SCOPE_SCHEMA",
-                    "SCOPE_TABLE"
+                "TABLE_NAME", "COLUMN_NAME",
+                "ORDINAL_POSITION", "DATA_TYPE",
+                "TYPE_NAME", "NUM_PREC_RADIX",
+                "NULLABLE", "IS_NULLABLE",
+                "SOURCE_DATA_TYPE", "IS_AUTOINCREMENT",
+                "IS_GENERATEDCOLUMN",
+                //nulls
+                "TABLE_CAT", "TABLE_SCHEM",
+                "COLUMN_SIZE", "BUFFER_LENGTH",
+                "DECIMAL_DIGITS", "REMARKS",
+                "COLUMN_DEF", "SQL_DATA_TYPE",
+                "SQL_DATETIME_SUB", "CHAR_OCTET_LENGTH",
+                "SCOPE_CATALOG", "SCOPE_SCHEMA",
+                "SCOPE_TABLE"
             );
             return sqlNullResultSet(
-                    columnNames,
-                    rows);
+                columnNames,
+                rows);
         } catch (Exception e) {
-            throw new SQLException("Error processing table column metadata: " +
-                "tableNamePattern=\"" + tableNamePattern + "\"; " +
-                "columnNamePattern=\"" + columnNamePattern + "\".", e);
+            throw new SQLException(
+                "Error processing table column metadata: " +
+                    "tableNamePattern=\"" + tableNamePattern + "\"; " +
+                    "columnNamePattern=\"" + columnNamePattern + "\".", e);
         }
     }
 
     @Override
     public ResultSet getColumnPrivileges(String catalog, String schema, String table, String columnNamePattern)
-            throws SQLException {
+        throws SQLException {
         return rowOfNullsResultSet();
     }
 
     @Override
     public ResultSet getTablePrivileges(String catalog, String schemaPattern, String tableNamePattern)
-            throws SQLException {
+        throws SQLException {
         return rowOfNullsResultSet();
     }
 
     @Override
     public ResultSet getBestRowIdentifier(String catalog, String schema, String table, int scope, boolean nullable)
-            throws SQLException {
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
@@ -802,7 +822,8 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     @Override
     public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException {
         final List<String> colNames = Arrays.asList(
-                "TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "COLUMN_NAME", "KEY_SEQ", "PK_NAME");
+            "TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "COLUMN_NAME", "KEY_SEQ", "PK_NAME"
+        );
 
         if (table == null || table.isEmpty()) {
             connection.checkNotClosed();
@@ -812,8 +833,9 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
         try {
             List spaces = connection.nativeSelect(_VSPACE, 2, Collections.singletonList(table), 0, 1, 0);
 
-            if (spaces == null || spaces.size() == 0)
+            if (spaces == null || spaces.size() == 0) {
                 return emptyResultSet(colNames);
+            }
 
             List space = ensureType(List.class, spaces.get(0));
             List fields = ensureType(List.class, space.get(FORMAT_IDX));
@@ -822,13 +844,14 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
             List primaryKey = ensureType(List.class, indexes.get(0));
             List parts = ensureType(List.class, primaryKey.get(INDEX_FORMAT_IDX));
 
-            List<List<Object>> rows = new ArrayList<List<Object>>();
+            List<List<Object>> rows = new ArrayList<>();
             for (int i = 0; i < parts.size(); i++) {
                 // For native spaces, the 'parts' is 'List of Lists'.
                 // We only accept SQL spaces, for which the parts is 'List of Maps'.
                 Map part = checkType(Map.class, parts.get(i));
-                if (part == null)
+                if (part == null) {
                     return emptyResultSet(colNames);
+                }
 
                 int ordinal = ensureType(Number.class, part.get("field")).intValue();
                 Map field = ensureType(Map.class, fields.get(ordinal));
@@ -862,8 +885,13 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     }
 
     @Override
-    public ResultSet getCrossReference(String parentCatalog, String parentSchema, String parentTable, String foreignCatalog, String foreignSchema, String foreignTable)
-            throws SQLException {
+    public ResultSet getCrossReference(String parentCatalog,
+                                       String parentSchema,
+                                       String parentTable,
+                                       String foreignCatalog,
+                                       String foreignSchema,
+                                       String foreignTable)
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
@@ -874,7 +902,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)
-            throws SQLException {
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
@@ -940,7 +968,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getUDTs(String catalog, String schemaPattern, String typeNamePattern, int[] types)
-            throws SQLException {
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
@@ -980,14 +1008,17 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     }
 
     @Override
-    public ResultSet getAttributes(String catalog, String schemaPattern, String typeNamePattern, String attributeNamePattern)
-            throws SQLException {
+    public ResultSet getAttributes(String catalog,
+                                   String schemaPattern,
+                                   String typeNamePattern,
+                                   String attributeNamePattern)
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     /**
      * {@inheritDoc}
-     *
+     * <p>
      * Support of {@link ResultSet#CLOSE_CURSORS_AT_COMMIT} is not
      * available now because it requires cursor transaction support.
      */
@@ -1042,11 +1073,6 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     }
 
     @Override
-    public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException {
-        return rowOfNullsResultSet();
-    }
-
-    @Override
     public boolean supportsStoredFunctionsUsingCallSyntax() throws SQLException {
         return false;
     }
@@ -1063,19 +1089,25 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public ResultSet getFunctions(String catalog, String schemaPattern, String functionNamePattern)
-            throws SQLException {
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
-    public ResultSet getFunctionColumns(String catalog, String schemaPattern, String functionNamePattern, String columnNamePattern)
-            throws SQLException {
+    public ResultSet getFunctionColumns(String catalog,
+                                        String schemaPattern,
+                                        String functionNamePattern,
+                                        String columnNamePattern)
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
     @Override
-    public ResultSet getPseudoColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
-            throws SQLException {
+    public ResultSet getPseudoColumns(String catalog,
+                                      String schemaPattern,
+                                      String tableNamePattern,
+                                      String columnNamePattern)
+        throws SQLException {
         return asMetadataResultSet(JDBCBridge.EMPTY);
     }
 
@@ -1105,7 +1137,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
     private static <T> T ensureType(Class<T> cls, Object v) throws Exception {
         if (v == null || !cls.isAssignableFrom(v.getClass())) {
             throw new Exception(String.format("Wrong value type '%s', expected '%s'.",
-                    v == null ? "null" : v.getClass().getName(), cls.getName()));
+                v == null ? "null" : v.getClass().getName(), cls.getName()));
         }
         return cls.cast(v);
     }

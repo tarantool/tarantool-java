@@ -12,11 +12,12 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
-public class TarantoolConnection extends TarantoolBase<List<?>> implements TarantoolSQLOps<Object,Long,List<Map<String,Object>>> {
+public class TarantoolConnection extends TarantoolBase<List<?>>
+        implements TarantoolSQLOps<Object,Long,List<Map<String,Object>>> {
+
     protected InputStream in;
     protected OutputStream out;
     protected Socket socket;
-
 
     public TarantoolConnection(String username, String password, Socket socket) throws IOException {
         super(username, password, socket);
@@ -65,11 +66,14 @@ public class TarantoolConnection extends TarantoolBase<List<?>> implements Taran
         call("box.rollback");
     }
 
+    /**
+     * Closes current connection.
+     */
     public void close() {
         try {
             socket.close();
         } catch (IOException ignored) {
-
+            // No-op
         }
     }
 

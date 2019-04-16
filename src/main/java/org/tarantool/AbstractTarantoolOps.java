@@ -1,7 +1,9 @@
 package org.tarantool;
 
 
-public abstract class AbstractTarantoolOps<Space, Tuple, Operation, Result> implements TarantoolClientOps<Space, Tuple, Operation, Result> {
+public abstract class AbstractTarantoolOps<Space, Tuple, Operation, Result>
+    implements TarantoolClientOps<Space, Tuple, Operation, Result> {
+
     private Code callCode = Code.OLD_CALL;
 
     protected abstract Result exec(Code code, Object... args);
@@ -11,7 +13,15 @@ public abstract class AbstractTarantoolOps<Space, Tuple, Operation, Result> impl
     }
 
     public Result select(Space space, Space index, Tuple key, int offset, int limit, int iterator) {
-        return exec(Code.SELECT, Key.SPACE, space, Key.INDEX, index, Key.KEY, key, Key.ITERATOR, iterator, Key.LIMIT, limit, Key.OFFSET, offset);
+        return exec(
+            Code.SELECT,
+            Key.SPACE, space,
+            Key.INDEX, index,
+            Key.KEY, key,
+            Key.ITERATOR, iterator,
+            Key.LIMIT, limit,
+            Key.OFFSET, offset
+        );
     }
 
     public Result insert(Space space, Tuple tuple) {

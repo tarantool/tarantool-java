@@ -25,21 +25,23 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
-
 public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements TarantoolClient {
-    public static final CommunicationException NOT_INIT_EXCEPTION = new CommunicationException("Not connected, initializing connection");
+    public static final CommunicationException NOT_INIT_EXCEPTION
+        = new CommunicationException("Not connected, initializing connection");
+
     protected TarantoolClientConfig config;
 
     /**
-     * External
+     * External.
      */
     protected SocketChannelProvider socketProvider;
     protected volatile Exception thumbstone;
 
     protected Map<Long, TarantoolOp<?>> futures;
     protected AtomicInteger wait = new AtomicInteger();
+
     /**
-     * Write properties
+     * Write properties.
      */
     protected SocketChannel channel;
     protected ReadableViaSelectorChannel readChannel;
@@ -52,14 +54,14 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     protected ReentrantLock writeLock = new ReentrantLock(true);
 
     /**
-     * Interfaces
+     * Interfaces.
      */
     protected SyncOps syncOps;
     protected FireAndForgetOps fireAndForgetOps;
     protected ComposableAsyncOps composableAsyncOps;
 
     /**
-     * Inner
+     * Inner.
      */
     protected TarantoolClientStats stats;
     protected StateHelper state = new StateHelper(StateHelper.RECONNECT);
@@ -102,9 +104,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         connector.start();
         try {
             if (!waitAlive(config.initTimeoutMillis, TimeUnit.MILLISECONDS)) {
-                CommunicationException e = new CommunicationException(config.initTimeoutMillis +
+                CommunicationException e = new CommunicationException(
+                    config.initTimeoutMillis +
                         "ms is exceeded when waiting for client initialization. " +
-                        "You could configure init timeout in TarantoolConfig");
+                        "You could configure init timeout in TarantoolConfig"
+                );
 
                 close(e);
                 throw e;
@@ -130,21 +134,22 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             } catch (Exception e) {
                 closeChannel(channel);
                 lastError = e;
-                if (e instanceof InterruptedException)
+                if (e instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
+                }
             }
         }
     }
 
     protected void connect(final SocketChannel channel) throws Exception {
         try {
-            TarantoolGreeting greeting = ProtoUtils.connect(channel,
-                config.username, config.password);
+            TarantoolGreeting greeting = ProtoUtils.connect(channel, config.username, config.password);
             this.serverVersion = greeting.getServerVersion();
         } catch (IOException e) {
             try {
                 channel.close();
             } catch (IOException ignored) {
+                // No-op
             }
 
             throw new CommunicationException("Couldn't connect to tarantool", e);
@@ -174,8 +179,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                         readThread();
                     } finally {
                         state.release(StateHelper.READING);
-                        if (state.compareAndSet(0, StateHelper.RECONNECT))
+                        if (state.compareAndSet(0, StateHelper.RECONNECT)) {
                             LockSupport.unpark(connector);
+                        }
                     }
                 }
             }
@@ -189,8 +195,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                         writeThread();
                     } finally {
                         state.release(StateHelper.WRITING);
-                        if (state.compareAndSet(0, StateHelper.RECONNECT))
+                        if (state.compareAndSet(0, StateHelper.RECONNECT)) {
                             LockSupport.unpark(connector);
+                        }
                     }
                 }
             }
@@ -268,7 +275,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     protected void write(Code code, Long syncId, Long schemaId, Object... args)
-            throws Exception {
+        throws Exception {
         ByteBuffer buffer = ProtoUtils.createPacket(code, syncId, schemaId, args);
 
         if (directWrite(buffer)) {
@@ -293,7 +300,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                     try {
                         if (remaining < 1 || !bufferEmpty.await(remaining, TimeUnit.MILLISECONDS)) {
                             stats.sharedEmptyAwaitTimeouts++;
-                            throw new TimeoutException(config.writeTimeoutMillis + "ms is exceeded while waiting for empty buffer you could configure write timeout it in TarantoolConfig");
+                            throw new TimeoutException(
+                                config.writeTimeoutMillis +
+                                    "ms is exceeded while waiting for empty buffer. " +
+                                    "You could configure write timeout it in TarantoolConfig"
+                            );
                         }
                     } catch (InterruptedException e) {
                         throw new CommunicationException("Interrupted", e);
@@ -308,7 +319,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             }
         } else {
             stats.sharedWriteLockTimeouts++;
-            throw new TimeoutException(config.writeTimeoutMillis + "ms is exceeded while waiting for shared buffer lock you could configure write timeout in TarantoolConfig");
+            throw new TimeoutException(
+                config.writeTimeoutMillis +
+                    "ms is exceeded while waiting for shared buffer lock. " +
+                    "You could configure write timeout in TarantoolConfig"
+            );
         }
     }
 
@@ -330,7 +345,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 return true;
             } else {
                 stats.directWriteLockTimeouts++;
-                throw new TimeoutException(config.writeTimeoutMillis + "ms is exceeded while waiting for channel lock you could configure write timeout in TarantoolConfig");
+                throw new TimeoutException(
+                    config.writeTimeoutMillis +
+                        "ms is exceeded while waiting for channel lock. " +
+                        "You could configure write timeout in TarantoolConfig"
+                );
             }
         }
         return false;
@@ -468,9 +487,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
         if (readChannel != null) {
             try {
-                readChannel.close();//also closes this.channel
+                readChannel.close(); // also closes this.channel
             } catch (IOException ignored) {
-
+                // No-op
             }
         }
         closeChannel(channel);
@@ -498,7 +517,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     @Override
     public TarantoolClientOps<Integer, List<?>, Object, Future<List<?>>> asyncOps() {
-        return (TarantoolClientOps)this;
+        return (TarantoolClientOps) this;
     }
 
     @Override
@@ -514,7 +533,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     @Override
     public TarantoolSQLOps<Object, Long, List<Map<String, Object>>> sqlSyncOps() {
-        return new TarantoolSQLOps<Object, Long, List<Map<String,Object>>>() {
+        return new TarantoolSQLOps<Object, Long, List<Map<String, Object>>>() {
 
             @Override
             public Long update(String sql, Object... bind) {
@@ -530,7 +549,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     @Override
     public TarantoolSQLOps<Object, Future<Long>, Future<List<Map<String, Object>>>> sqlAsyncOps() {
-        return new TarantoolSQLOps<Object, Future<Long>, Future<List<Map<String,Object>>>>() {
+        return new TarantoolSQLOps<Object, Future<Long>, Future<List<Map<String, Object>>>>() {
             @Override
             public Future<Long> update(String sql, Object... bind) {
                 return (Future<Long>) exec(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, bind);
@@ -578,7 +597,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     }
 
-    protected class ComposableAsyncOps extends AbstractTarantoolOps<Integer, List<?>, Object, CompletionStage<List<?>>> {
+    protected class ComposableAsyncOps
+        extends AbstractTarantoolOps<Integer, List<?>, Object, CompletionStage<List<?>>> {
+
         @Override
         public CompletionStage<List<?>> exec(Code code, Object... args) {
             return (CompletionStage<List<?>>) TarantoolClientImpl.this.doExec(code, args);
@@ -640,34 +661,40 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
 
         protected boolean close() {
-            for (;;) {
+            for (; ; ) {
                 int st = getState();
-                if ((st & CLOSED) == CLOSED)
+                if ((st & CLOSED) == CLOSED) {
                     return false;
-                if (compareAndSet(st, (st & ~RECONNECT) | CLOSED))
+                }
+                if (compareAndSet(st, (st & ~RECONNECT) | CLOSED)) {
                     return true;
+                }
             }
         }
 
         protected boolean acquire(int mask) {
-            for (;;) {
+            for (; ; ) {
                 int st = getState();
-                if ((st & CLOSED) == CLOSED)
+                if ((st & CLOSED) == CLOSED) {
                     return false;
+                }
 
-                if ((st & mask) != 0)
+                if ((st & mask) != 0) {
                     throw new IllegalStateException("State is already " + mask);
+                }
 
-                if (compareAndSet(st, st | mask))
+                if (compareAndSet(st, st | mask)) {
                     return true;
+                }
             }
         }
 
         protected void release(int mask) {
-            for (;;) {
+            for (; ; ) {
                 int st = getState();
-                if (compareAndSet(st, st & ~mask))
+                if (compareAndSet(st, st & ~mask)) {
                     return;
+                }
             }
         }
 
@@ -709,7 +736,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 CountDownLatch latch = nextAliveLatch.get();
                 /* It may happen so that an error is detected but the state is still alive.
                  Wait for the 'next' alive state in such cases. */
-                return  (getState() == ALIVE && thumbstone == null) ? null : latch;
+                return (getState() == ALIVE && thumbstone == null) ? null : latch;
             }
             return null;
         }
@@ -720,7 +747,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         /**
          * Tarantool binary protocol operation code.
          */
-        final private Code code;
+        private final Code code;
 
         public TarantoolOp(Code code) {
             this.code = code;
