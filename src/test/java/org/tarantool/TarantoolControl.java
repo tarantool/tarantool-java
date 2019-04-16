@@ -28,7 +28,6 @@ public class TarantoolControl {
                     "[stdout]\n" + stdout +
                     "\n[stderr]\n" + stderr
             );
-
             this.code = code;
             this.stdout = stdout;
             this.stderr = stderr;

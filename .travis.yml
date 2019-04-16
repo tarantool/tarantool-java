@@ -3,25 +3,29 @@ language: java
 sudo: required
 dist: trusty
 
-jdk:
-  - oraclejdk11
-  - openjdk10
-  - openjdk11
+stages:
+  - checkstyle
+  - test
+
+jobs:
+  include:
+    - stage: checkstyle
+      jdk: openjdk11
+      before_script: skip
+      script: mvn checkstyle:check
+      after_success: skip
+    - stage: test
+      jdk: oraclejdk11
+    - stage: test
+      jdk: openjdk10
+    - stage: test
+      jdk: openjdk11
 
 before_script:
-  - src/test/travis.pre.sh
+  - .travis/travis.pre.sh
 
 script:
-  - |
-    if [ "${TRAVIS_JDK_VERSION}" = openjdk11 ]; then
-        mvn verify jacoco:report
-    else
-        mvn verify
-    fi
-  - head -n -0 testroot/*.log
+  - .travis/travis.build.sh
 
 after_success:
-  - |
-    if [ "${TRAVIS_JDK_VERSION}" = openjdk11 ]; then
-        mvn coveralls:report -DrepoToken=${COVERALLS_TOKEN}
-    fi
+  - .travis/travis.post.sh

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -exuo pipefail # Strict shell
 
 # We need tarantool 2.* for jdbc/sql.
 curl http://download.tarantool.org/tarantool/2x/gpgkey | sudo apt-key add -
