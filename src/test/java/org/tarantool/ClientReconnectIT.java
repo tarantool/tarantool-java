@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.LockSupport;
 
 public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
+
     private static final String INSTANCE_NAME = "jdk-testing";
     private TarantoolClient client;
 
@@ -99,7 +100,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         client.syncOps().ping();
 
         // The park() will return inside connector thread.
-        LockSupport.unpark(((TarantoolClientImpl)client).connector);
+        LockSupport.unpark(((TarantoolClientImpl) client).connector);
 
         // Wait on latch as a proof that reconnect did not happen.
         // In case of a failure, latch will reach 0 before timeout occurs.
@@ -213,11 +214,54 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         });
     }
 
+    // DO NOT REMOVE THIS TEST
+    // Motivation: this test checks start/stop correctness
+    // of TarantoolControl class which is used by other tests.
+    // This test is commented out because the class is used
+    // for internal purposes only and isn't related to
+    // the connector testing.
+    //    @Test
+    //    @DisplayName("follow up the issue #164")
+    //    void testStartStopTarantoolInstance() throws InterruptedException {
+    //        int numberOfParallelInstances = 4;
+    //        CountDownLatch finished = new CountDownLatch(numberOfParallelInstances);
+    //        List<String> instancesNames = new ArrayList<>(numberOfParallelInstances);
+    //
+    //        for (int i = 0; i < numberOfParallelInstances; i++) {
+    //            String instance = "startStop" + (i + 1);
+    //            instancesNames.add(instance);
+    //            control.createInstance(
+    //                instancesNames.get(i),
+    //                LUA_FILE,
+    //                makeInstanceEnv(3401 + i + 1, 3501 + i + 1)
+    //            );
+    //            startTarantool(instancesNames.get(i));
+    //            new Thread(() -> {
+    //                for (int j = 0; j < 100; j++) {
+    //                    stopTarantool(instance);
+    //                    startTarantool(instance);
+    //                    if (j % 10 == 0) {
+    //                        System.out.println(
+    //                            Thread.currentThread().getName() + ": " + j + "% completed"
+    //                        );
+    //                    }
+    //                }
+    //                finished.countDown();
+    //            }, "Thread" + (i + 1)).start();
+    //        }
+    //
+    //        assertTrue(finished.await(2, TimeUnit.MINUTES));
+    //
+    //        for (int i = 0; i < numberOfParallelInstances; i++) {
+    //            stopTarantool(instancesNames.get(i));
+    //        }
+    //    }
+
     /**
      * Test concurrent operations, reconnects and close.
-     *
+     * <p>
      * Expected situation is nothing gets stuck.
-     *
+     * <p>
      * The test sets SO_LINGER to 0 for outgoing connections to avoid producing
      * many TIME_WAIT sockets, because an available port range can be
      * exhausted.
@@ -316,7 +360,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
      * Verify that we don't exceed a file descriptor limit (and so likely don't
      * leak file descriptors) when trying to connect to an existing node with
      * wrong authentification credentials.
-     *
+     * <p>
      * The test sets SO_LINGER to 0 for outgoing connections to avoid producing
      * many TIME_WAIT sockets, because an available port range can be
      * exhausted.
@@ -354,4 +398,5 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         client.syncOps().ping();
         client.close();
     }
+
 }

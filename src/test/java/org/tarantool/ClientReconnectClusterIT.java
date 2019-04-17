@@ -36,8 +36,8 @@ public class ClientReconnectClusterIT {
     private static final String SRV1 = "replica1";
     private static final String SRV2 = "replica2";
     private static final String SRV3 = "replica3";
-    private static final int[] PORTS = { 3302, 3303, 3304 };
-    private static final int[] CONSOLE_PORTS = { 3312, 3313, 3314 };
+    private static final int[] PORTS = { 3401, 3402, 3403 };
+    private static final int[] CONSOLE_PORTS = { 3501, 3502, 3503 };
     private static TarantoolControl control;
 
     private static String REPLICATION_CONFIG = TestUtils.makeReplicationString(
@@ -410,7 +410,7 @@ public class ClientReconnectClusterIT {
 
     private void startInstancesAndAwait(String... instances) {
         for (String instance : instances) {
-            control.start(instance);
+            control.start(instance, false);
         }
         for (String instance : instances) {
             control.waitStarted(instance);
@@ -420,9 +420,6 @@ public class ClientReconnectClusterIT {
     private void stopInstancesAndAwait(String... instances) {
         for (String instance : instances) {
             control.stop(instance);
-        }
-        for (String instance : instances) {
-            control.waitStopped(instance);
         }
     }
 

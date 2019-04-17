@@ -8,16 +8,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Wrapper around tarantoolctl utility.
  */
 public class TarantoolControl {
-    public class TarantoolControlException extends RuntimeException {
+
+    public static class TarantoolControlException extends RuntimeException {
+
         int code;
         String stdout;
         String stderr;
@@ -32,6 +37,7 @@ public class TarantoolControl {
             this.stdout = stdout;
             this.stderr = stderr;
         }
+
     }
 
     protected static final String tntCtlWorkDir = System.getProperty("tntCtlWorkDir",
@@ -127,75 +133,61 @@ public class TarantoolControl {
     }
 
     /**
-     * Control the given tarantool instance via tarantoolctl utility.
+     * Executes a command of the given tarantool instance via
+     * tarantoolctl utility.
      *
-     * @param command A tarantoolctl utility command.
-     * @param instanceName Name of tarantool instance to control.
+     * @param command      tarantoolctl utility command.
+     * @param instanceName name of tarantool instance to control.
      */
-    protected void executeCommand(String command, String instanceName) {
-        ProcessBuilder builder = new ProcessBuilder("env", "tarantoolctl", command, instanceName);
-        builder.directory(new File(tntCtlWorkDir));
-        Map<String, String> env = builder.environment();
-        env.putAll(buildInstanceEnvironment(instanceName));
-
-        final Process process;
-        try {
-            process = builder.start();
-        } catch (IOException e) {
-            throw new RuntimeException("environment failure", e);
-        }
-
-        final CountDownLatch latch = new CountDownLatch(1);
-        // The thread below is necessary to organize timed wait on the process.
-        // We cannot use Process.waitFor(long, TimeUnit) because we're on java 6.
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    process.waitFor();
-                } catch (InterruptedException ignored) {
-                    // no-op.
-                }
-                latch.countDown();
-            }
-        });
-
-        thread.start();
-
-        boolean res;
-        try {
-            res = latch.await(RESTART_TIMEOUT, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            throw new RuntimeException("wait interrupted", e);
-        }
-
-        if (!res) {
-            thread.interrupt();
-            process.destroy();
-
-            throw new RuntimeException("timeout");
-        }
-
-        int code = process.exitValue();
-
-        if (code != 0) {
-            String stdout = "";
-            String stderr = "";
-            try {
-                stdout = loadStream(process.getInputStream());
-                stderr = loadStream(process.getErrorStream());
-            } catch (IOException ignored) {
-                /* no-op. */
-            }
-            throw new TarantoolControlException(code, stdout, stderr);
+    protected void executeControlCommand(String command, String instanceName) {
+        ProcessCommand controlCommand =
+            new ProcessCommand(buildInstanceEnvironment(instanceName), "env", "tarantoolctl", command, instanceName);
+        if (!controlCommand.execute()) {
+            throw new TarantoolControlException(
+                controlCommand.getExitCode(),
+                controlCommand.getOutput(),
+                controlCommand.getError()
+            );
         }
     }
 
     /**
-     * Wait until the instance will be started.
+     * Sends <code>start</code> command using tarantoolctl
+     * and blocks until the process will be up.
+     * <p>
+     * Calling this method has the same effect as
+     * {@code start(instanceName, true)}
      *
+     * @param instanceName target instance name
+     *
+     * @see #start(String, boolean)
+     */
+    public void start(String instanceName) {
+        start(instanceName, true);
+    }
+
+    /**
+     * Sends <code>start</code> command using tarantoolctl
+     * and optionally blocks until the process will be up.
+     * <p>
+     * The block includes real connection establishment using
+     * {@link org.tarantool.TarantoolConsole}.
+     *
+     * @param instanceName target instance name
+     * @see #waitStarted(String)
+     */
+    public void start(String instanceName, boolean wait) {
+        executeControlCommand("start", instanceName);
+        if (wait) {
+            waitStarted(instanceName);
+        }
+    }
+
+    /**
+     * Waits until the instance will be started.
+     * <p>
      * Use tarantoolctl status instanceName.
-     *
+     * <p>
      * Then test the instance with TarantoolTcpConsole (ADMIN environment
      * variable is set) or TarantoolLocalConsole.
      */
@@ -216,36 +208,54 @@ public class TarantoolControl {
     }
 
     /**
-     * Wait until the instance will be stopped.
+     * Sends <code>stop</code> command using tarantoolctl
+     * and blocks until the process will be down.
      *
-     * Use tarantoolctl status instanceName.
+     * @param instanceName target instance name
      */
-    public void waitStopped(String instanceName) {
-        while (status(instanceName) != 1) {
+    public void stop(String instanceName) {
+        try {
+            Path path = Paths.get(tntCtlWorkDir, instanceName + ".pid");
+            if (Files.exists(path)) {
+                String pid = new String(Files.readAllBytes(path));
+                executeControlCommand("stop", instanceName);
+                waitStopped(pid, instanceName);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Waits until the instance will be stopped.
+     *
+     * @param pid          instance PID
+     * @param instanceName target instance name
+     */
+    private void waitStopped(String pid, String instanceName) {
+        while (status(instanceName) != 1 || isProcessAlive(pid)) {
             sleep();
         }
     }
 
-    public void start(String instanceName) {
-        executeCommand("start", instanceName);
-    }
-
-    public void stop(String instanceName) {
-        executeCommand("stop", instanceName);
+    private boolean isProcessAlive(String pid) {
+        ProcessCommand sendSignal0Command =
+            new ProcessCommand(Collections.emptyMap(), "kill", "-0", pid);
+        return sendSignal0Command.execute();
     }
 
     /**
      * Wrapper for `tarantoolctl status instanceName`.
-     *
+     * <p>
      * Return exit code of the command:
-     *
+     * <p>
      * * 0 -- started;
      * * 1 -- stopped;
      * * 2 -- pid file exists, control socket inaccessible.
      */
     public int status(String instanceName) {
         try {
-            executeCommand("status", instanceName);
+            executeControlCommand("status", instanceName);
         } catch (TarantoolControlException e) {
             return e.code;
         }
@@ -253,7 +263,7 @@ public class TarantoolControl {
         return 0;
     }
 
-    public Map<String,String> buildInstanceEnvironment(String instanceName) {
+    public Map<String, String> buildInstanceEnvironment(String instanceName) {
         Map<String, String> env = new HashMap<String, String>();
         env.put("PWD", tntCtlWorkDir);
         env.put("TEST_WORKDIR", tntCtlWorkDir);
@@ -321,7 +331,7 @@ public class TarantoolControl {
         } else {
             int idx = admin.indexOf(':');
             return TarantoolConsole.open(idx < 0 ? "localhost" : admin.substring(0, idx),
-                 Integer.valueOf(idx < 0 ? admin : admin.substring(idx + 1)));
+                Integer.valueOf(idx < 0 ? admin : admin.substring(idx + 1)));
         }
     }
 
@@ -332,4 +342,67 @@ public class TarantoolControl {
             throw new RuntimeException(e);
         }
     }
+
+    static class ProcessCommand {
+
+        final ProcessBuilder processBuilder;
+
+        String lastOutput = "";
+        String lastError = "";
+        int lastExitCode = -1;
+
+        public ProcessCommand(Map<String, String> environment, String... commands) {
+            processBuilder = new ProcessBuilder(commands);
+            processBuilder.directory(new File(tntCtlWorkDir));
+            Map<String, String> env = processBuilder.environment();
+            env.putAll(environment);
+        }
+
+        boolean execute() {
+            final Process process;
+            try {
+                process = processBuilder.start();
+            } catch (IOException e) {
+                throw new RuntimeException("environment failure", e);
+            }
+
+            boolean res;
+            try {
+                res = process.waitFor(RESTART_TIMEOUT, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                throw new RuntimeException("wait interrupted", e);
+            }
+
+            if (!res) {
+                process.destroy();
+                throw new RuntimeException("timeout");
+            }
+
+            lastExitCode = process.exitValue();
+            try {
+                lastOutput = loadStream(process.getInputStream()).trim();
+                lastError = loadStream(process.getErrorStream()).trim();
+            } catch (IOException ignored) {
+                lastOutput = "";
+                lastError = "";
+            }
+
+            return lastExitCode == 0;
+        }
+
+        String getOutput() {
+            return lastOutput;
+        }
+
+        String getError() {
+            return lastError;
+        }
+
+        int getExitCode() {
+            return lastExitCode;
+        }
+
+    }
+
 }
+

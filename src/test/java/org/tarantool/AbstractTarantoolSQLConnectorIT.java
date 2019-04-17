@@ -131,12 +131,10 @@ public abstract class AbstractTarantoolSQLConnectorIT {
 
     protected static void stopTarantool(String instance) {
         control.stop(instance);
-        control.waitStopped("jdk-testing");
     }
 
     protected static void startTarantool(String instance) {
         control.start(instance);
-        control.waitStarted("jdk-testing");
     }
 
 }

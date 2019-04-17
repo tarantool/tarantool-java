@@ -47,7 +47,6 @@ public class ClusterServiceStoredFunctionDiscovererIT {
         control.createInstance(INSTANCE_NAME, LUA_FILE, makeInstanceEnv(INSTANCE_LISTEN_PORT, INSTANCE_ADMIN_PORT));
 
         control.start(INSTANCE_NAME);
-        control.waitStarted(INSTANCE_NAME);
     }
 
     @BeforeEach
@@ -61,7 +60,6 @@ public class ClusterServiceStoredFunctionDiscovererIT {
     @AfterAll
     public static void tearDownEnv() {
         control.stop(INSTANCE_NAME);
-        control.waitStopped(INSTANCE_NAME);
     }
 
     @Test
