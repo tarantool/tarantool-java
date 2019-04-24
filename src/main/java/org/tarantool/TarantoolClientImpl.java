@@ -73,7 +73,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         @Override
         public void run() {
             while (!Thread.currentThread().isInterrupted()) {
-                reconnect(0, thumbstone);
+                reconnect(thumbstone);
                 try {
                     state.awaitReconnection();
                 } catch (InterruptedException e) {
@@ -88,7 +88,16 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     public TarantoolClientImpl(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
-        super();
+        initClient(socketProvider, config);
+        if (socketProvider instanceof ConfigurableSocketChannelProvider) {
+            ConfigurableSocketChannelProvider configurableProvider = (ConfigurableSocketChannelProvider) socketProvider;
+            configurableProvider.setConnectionTimeout(config.connectionTimeout);
+            configurableProvider.setRetriesLimit(config.retryCount);
+        }
+        startConnector(config.initTimeoutMillis);
+    }
+
+    private void initClient(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
         this.thumbstone = NOT_INIT_EXCEPTION;
         this.config = config;
         this.initialRequestSize = config.defaultRequestSize;
@@ -108,16 +117,14 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             this.fireAndForgetOps.setCallCode(Code.CALL);
             this.composableAsyncOps.setCallCode(Code.CALL);
         }
-
-        startConnector(config);
     }
 
-    private void startConnector(TarantoolClientConfig config) {
+    private void startConnector(long initTimeoutMillis) {
         connector.start();
         try {
-            if (!waitAlive(config.initTimeoutMillis, TimeUnit.MILLISECONDS)) {
+            if (!waitAlive(initTimeoutMillis, TimeUnit.MILLISECONDS)) {
                 CommunicationException e = new CommunicationException(
-                    config.initTimeoutMillis +
+                    initTimeoutMillis +
                         "ms is exceeded when waiting for client initialization. " +
                         "You could configure init timeout in TarantoolConfig"
                 );
@@ -131,18 +138,25 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     }
 
-    protected void reconnect(int retry, Throwable lastError) {
-        SocketChannel channel;
+    protected void reconnect(Throwable lastError) {
+        SocketChannel channel = null;
+        int retryNumber = 0;
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                channel = socketProvider.get(retry++, lastError == NOT_INIT_EXCEPTION ? null : lastError);
+                channel = socketProvider.get(retryNumber++, lastError == NOT_INIT_EXCEPTION ? null : lastError);
             } catch (Exception e) {
-                close(e);
-                return;
+                closeChannel(channel);
+                lastError = e;
+                if (!(e instanceof SocketProviderTransientException)) {
+                    close(e);
+                    return;
+                }
             }
             try {
-                connect(channel);
-                return;
+                if (channel != null) {
+                    connect(channel);
+                    return;
+                }
             } catch (Exception e) {
                 closeChannel(channel);
                 lastError = e;
@@ -838,6 +852,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         public Code getCode() {
             return code;
         }
+
     }
 
 }

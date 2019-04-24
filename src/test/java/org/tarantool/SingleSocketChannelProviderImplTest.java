@@ -31,7 +31,7 @@ class SingleSocketChannelProviderImplTest extends AbstractSocketProviderTest {
     public void testDefaultTimeout() {
         RoundRobinSocketProviderImpl socketProvider
                 = new RoundRobinSocketProviderImpl("localhost");
-        assertEquals(RoundRobinSocketProviderImpl.NO_TIMEOUT, socketProvider.getTimeout());
+        assertEquals(RoundRobinSocketProviderImpl.NO_TIMEOUT, socketProvider.getConnectionTimeout());
     }
 
     @Test
@@ -40,8 +40,8 @@ class SingleSocketChannelProviderImplTest extends AbstractSocketProviderTest {
         RoundRobinSocketProviderImpl socketProvider
                 = new RoundRobinSocketProviderImpl("localhost");
         int expectedTimeout = 10_000;
-        socketProvider.setTimeout(expectedTimeout);
-        assertEquals(expectedTimeout, socketProvider.getTimeout());
+        socketProvider.setConnectionTimeout(expectedTimeout);
+        assertEquals(expectedTimeout, socketProvider.getConnectionTimeout());
     }
 
     @Test
@@ -50,7 +50,7 @@ class SingleSocketChannelProviderImplTest extends AbstractSocketProviderTest {
         RoundRobinSocketProviderImpl socketProvider
                 = new RoundRobinSocketProviderImpl("localhost");
         int negativeValue = -100;
-        assertThrows(IllegalArgumentException.class, () -> socketProvider.setTimeout(negativeValue));
+        assertThrows(IllegalArgumentException.class, () -> socketProvider.setConnectionTimeout(negativeValue));
     }
 
     @Test

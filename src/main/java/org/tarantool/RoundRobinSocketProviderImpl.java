@@ -3,6 +3,7 @@ package org.tarantool;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider implements RefreshableSocketProvider {
 
     private static final int UNSET_POSITION = -1;
+    private static final int DEFAULT_RETRIES_PER_CONNECTION = 3;
 
     /**
      * Socket addresses pool.
@@ -59,6 +61,7 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
      */
     public RoundRobinSocketProviderImpl(String... addresses) {
         updateAddressList(Arrays.asList(addresses));
+        setRetriesLimit(DEFAULT_RETRIES_PER_CONNECTION);
     }
 
     private void updateAddressList(Collection<String> addresses) {
@@ -116,9 +119,55 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
         }
     }
 
+    /**
+     * Tries to open a socket channel to a next instance
+     * for the addresses list.
+     *
+     * There are {@link #getRetriesLimit()} attempts per
+     * call to initiate a connection to the instance.
+     *
+     * @param retryNumber reconnection attempt number
+     * @param lastError   reconnection reason
+     *
+     * @return opened socket channel
+     *
+     * @throws IOException            if any IO errors occur
+     * @throws CommunicationException if retry number exceeds addresses size
+     *
+     * @see #setRetriesLimit(int)
+     * @see #getAddresses()
+     */
     @Override
-    protected InetSocketAddress getAddress(int retryNumber, Throwable lastError) throws IOException {
-        return getNextSocketAddress();
+    protected SocketChannel makeAttempt(int retryNumber, Throwable lastError) throws IOException {
+        if (retryNumber > getAddressCount()) {
+            throwFatalError("No more connection addresses are left.");
+        }
+
+        int retriesLimit = getRetriesLimit();
+        InetSocketAddress socketAddress = getNextSocketAddress();
+        IOException connectionError = null;
+        for (int i = 0; i < retriesLimit; i++) {
+            try {
+                return openChannel(socketAddress);
+            } catch (IOException e) {
+                connectionError = e;
+            }
+        }
+        throw connectionError;
+    }
+
+    /**
+     * Sets a retries count per instance.
+     * 0 (infinite) count is not supported by this provider.
+     *
+     * @param retriesLimit limit of retries to use.
+     */
+    @Override
+    public void setRetriesLimit(int retriesLimit) {
+        if (retriesLimit == 0) {
+            throwFatalError("Retries count should be at least 1 or more");
+        }
+        super.setRetriesLimit(retriesLimit);
     }
 
     /**
@@ -161,6 +210,10 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
      */
     public void refreshAddresses(Collection<String> addresses) {
         updateAddressList(addresses);
+    }
+
+    private void throwFatalError(String message) {
+        throw new CommunicationException(message);
     }
 
 }

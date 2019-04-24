@@ -22,7 +22,7 @@ To get the Java connector for Tarantool 1.6.9, visit
 
 ## Getting started
 
-1. Add a dependency to your `pom.xml` file.
+1. Add a dependency to your `pom.xml` file:
 
 ```xml
 <dependency>
@@ -32,7 +32,7 @@ To get the Java connector for Tarantool 1.6.9, visit
 </dependency>
 ```
 
-2. Configure `TarantoolClientConfig`.
+2. Configure `TarantoolClientConfig`:
 
 ```java
 TarantoolClientConfig config = new TarantoolClientConfig();
@@ -40,66 +40,72 @@ config.username = "test";
 config.password = "test";
 ```
 
-3. Implement your `SocketChannelProvider`.
-   It should return a connected `SocketChannel`.
+3. Create a client:
 
 ```java
-SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
-           @Override
-           public SocketChannel get(int retryNumber, Throwable lastError) {
-               if (lastError != null) {
-                   lastError.printStackTrace(System.out);
-               }
-               try {
-                   return SocketChannel.open(new InetSocketAddress("localhost", 3301));
-               } catch (IOException e) {
-                   throw new IllegalStateException(e);
-               }
-           }
-       };
+TarantoolClient client = new TarantoolClientImpl("host:3301", config);
 ```
 
-Here you could also implement some reconnection or fallback policy.
-Remember that `TarantoolClient` adopts a
-[fail-fast](https://en.wikipedia.org/wiki/Fail-fast) policy
-when a client is not connected.
+using `TarantoolClientImpl(String, TarantoolClientConfig)` is equivalent to:
 
-The `TarantoolClient` will stop functioning if your implementation of a socket
-channel provider raises an exception or returns a null. You will need a new
-instance of client to recover. Hence, you should only throw in case you have
-met unrecoverable error.
+```java
+SocketChannelProvider socketChannelProvider = new SingleSocketChannelProviderImpl("host:3301")
+TarantoolClient client = new TarantoolClientImpl(socketChannelProvider, config);
+```
 
-Below is an example of `SocketChannelProvider` implementation that handles short
-tarantool restarts.
+You could implement your own `SocketChannelProvider`. It should return 
+a connected `SocketChannel`. Feel free to implement `get(int retryNumber, Throwable lastError)`
+using your appropriate strategy to obtain the channel. The strategy can take into
+account current attempt number (retryNumber) and the last transient error occurred on
+the previous attempt.
+
+The `TarantoolClient` will be closed if your implementation of a socket
+channel provider raises exceptions. However, throwing a `SocketProviderTransientException`
+or returning `null` value are handled by the client as recoverable errors. In these cases,
+the client will make next attempt to obtain the socket channel. Otherwise, you will need
+a new instance of client to recover. Hence, you should only throw an error different
+to `SocketProviderTransientException` in case you have met unrecoverable error.
+
+Below is an example of `SocketChannelProvider` implementation that tries
+to connect no more than 3 times, two seconds for each attempt at max.
 
 ```java
 SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
     @Override
     public SocketChannel get(int retryNumber, Throwable lastError) {
-        long deadline = System.currentTimeMillis() + RESTART_TIMEOUT;
-        while (!Thread.currentThread().isInterrupted()) {
-            try {
-                return SocketChannel.open(new InetSocketAddress("localhost", 3301));
-            } catch (IOException e) {
-                if (deadline < System.currentTimeMillis())
-                    throw new RuntimeException(e);
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+        if (retryNumber > 3) {
+            throw new RuntimeException("Too many attempts");
         }
-        throw new RuntimeException(new TimeoutException("Connect timed out."));
+        SocketChannel channel = null;
+        try {
+            channel = SocketChannel.open();
+            channel.socket().connect(new InetSocketAddress("localhost", 3301), 2000);
+            return channel;
+        } catch (IOException e) {
+            if (channel != null) {
+                 try {
+                     channel.close();
+                 } catch (IOException ignored) { }
+            }
+            throw new SocketProviderTransientException("Couldn't connect to server", e);
+        }
     }
 };
 ```
 
-4. Create a client.
+Same behaviour can be achieved using built-in `SingleSocketChannelProviderImpl`:
 
 ```java
+TarantoolClientConfig config = new TarantoolClientConfig();
+config.connectionTimeout = 2_000; // two seconds timeout per attempt
+config.retryCount = 3;            // three attempts at max
+
+SocketChannelProvider socketChannelProvider = new SingleSocketChannelProviderImpl("localhost:3301")
 TarantoolClient client = new TarantoolClientImpl(socketChannelProvider, config);
 ```
+
+`SingleSocketChannelProviderImpl` implements `ConfigurableSocketChannelProvider` that
+makes possible for the client to configure a socket provider.
 
 > **Notes:**
 > * `TarantoolClient` is thread-safe and asynchronous, so you should use one
@@ -168,6 +174,21 @@ a list of nodes which will be used by the cluster client to provide such
 ability. Also you can prefer to use a [discovery mechanism](#auto-discovery)
 in order to dynamically fetch and apply the node list.
 
+### The RoundRobinSocketProviderImpl class
+
+This cluster-aware provider uses addresses pool to connect to DB server.
+The provider picks up next address in order the addresses were passed.
+
+Similar to `SingleSocketChannelProviderImpl` this RR provider also
+relies on two options from the config: `TarantoolClientConfig.connectionTimeout`
+and `TarantoolClientConfig.retryCount` but in a bit different way.
+The latter option says how many times the provider should try to establish a
+connection to _one instance_ before failing an attempt. The provider requires
+positive retry count to work properly. The socket timeout is used to limit
+an interval between connections attempts per instance. In other words, the provider
+follows a pattern _connection should succeed after N attempts with M interval between
+them at max_. 
+
 ### Basic cluster client usage
 
 1. Configure `TarantoolClusterClientConfig`:
@@ -198,7 +219,7 @@ client.syncOps().insert(23, Arrays.asList(1, 1));
 Auto-discovery feature allows a cluster client to fetch addresses of 
 cluster nodes to reflect changes related to the cluster topology. To achieve
 this you have to create a Lua function on the server side which returns 
-a single array result. Client periodically pools the server to obtain a 
+a single array result. Client periodically polls the server to obtain a 
 fresh list and apply it if its content changes.
 
 1. On the server side create a function which returns nodes:

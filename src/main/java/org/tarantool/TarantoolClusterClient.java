@@ -52,7 +52,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
      * @param addresses Array of addresses in the form of host[:port].
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config, String... addresses) {
-        this(config, makeClusterSocketProvider(addresses, config.operationExpiryTimeMillis));
+        this(config, makeClusterSocketProvider(addresses));
     }
 
     /**
@@ -268,11 +268,8 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         }
     }
 
-    private static RoundRobinSocketProviderImpl makeClusterSocketProvider(String[] addresses,
-                                                                          int connectionTimeout) {
-        RoundRobinSocketProviderImpl socketProvider = new RoundRobinSocketProviderImpl(addresses);
-        socketProvider.setTimeout(connectionTimeout);
-        return socketProvider;
+    private static RoundRobinSocketProviderImpl makeClusterSocketProvider(String[] addresses) {
+        return new RoundRobinSocketProviderImpl(addresses);
     }
 
     private Runnable createDiscoveryTask(TarantoolClusterDiscoverer serviceDiscoverer) {

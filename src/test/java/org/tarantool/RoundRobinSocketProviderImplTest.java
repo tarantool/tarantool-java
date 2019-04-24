@@ -68,7 +68,7 @@ public class RoundRobinSocketProviderImplTest extends AbstractSocketProviderTest
     public void testDefaultTimeout() {
         RoundRobinSocketProviderImpl socketProvider
                 = new RoundRobinSocketProviderImpl("localhost");
-        assertEquals(RoundRobinSocketProviderImpl.NO_TIMEOUT, socketProvider.getTimeout());
+        assertEquals(RoundRobinSocketProviderImpl.NO_TIMEOUT, socketProvider.getConnectionTimeout());
     }
 
     @Test
@@ -77,8 +77,8 @@ public class RoundRobinSocketProviderImplTest extends AbstractSocketProviderTest
         RoundRobinSocketProviderImpl socketProvider
                 = new RoundRobinSocketProviderImpl("localhost");
         int expectedTimeout = 10_000;
-        socketProvider.setTimeout(expectedTimeout);
-        assertEquals(expectedTimeout, socketProvider.getTimeout());
+        socketProvider.setConnectionTimeout(expectedTimeout);
+        assertEquals(expectedTimeout, socketProvider.getConnectionTimeout());
     }
 
     @Test
@@ -87,7 +87,7 @@ public class RoundRobinSocketProviderImplTest extends AbstractSocketProviderTest
         RoundRobinSocketProviderImpl socketProvider
                 = new RoundRobinSocketProviderImpl("localhost");
         int negativeValue = -200;
-        assertThrows(IllegalArgumentException.class, () -> socketProvider.setTimeout(negativeValue));
+        assertThrows(IllegalArgumentException.class, () -> socketProvider.setConnectionTimeout(negativeValue));
     }
 
     @Test
@@ -125,11 +125,11 @@ public class RoundRobinSocketProviderImplTest extends AbstractSocketProviderTest
         RoundRobinSocketProviderImpl socketProvider
                 = wrapWithMockChannelProvider(new RoundRobinSocketProviderImpl(addresses));
 
-        int retriesLimit = 5;
+        int retriesLimit = addresses.length + 1;
         socketProvider.setRetriesLimit(retriesLimit);
 
         for (int i = 0; i < retriesLimit; i++) {
-            socketProvider.get(0, null);
+            socketProvider.get(i, null);
             assertEquals(expectedAddress, extractRawHostAndPortString(socketProvider.getLastObtainedAddress()));
         }
 
@@ -141,7 +141,7 @@ public class RoundRobinSocketProviderImplTest extends AbstractSocketProviderTest
     public void testWrongAddress() throws IOException {
         RoundRobinSocketProviderImpl socketProvider
                 = wrapWithMockErroredChannelProvider(new RoundRobinSocketProviderImpl("unreachable-host:3301"));
-        assertThrows(CommunicationException.class, () -> socketProvider.get(0, null));
+        assertThrows(SocketProviderTransientException.class, () -> socketProvider.get(0, null));
     }
 
     @Test
@@ -149,7 +149,7 @@ public class RoundRobinSocketProviderImplTest extends AbstractSocketProviderTest
     public void testWrongRefreshAddress() throws IOException {
         RoundRobinSocketProviderImpl socketProvider
                 = wrapWithMockErroredChannelProvider(new RoundRobinSocketProviderImpl("unreachable-host:3301"));
-        assertThrows(CommunicationException.class, () -> socketProvider.get(0, null));
+        assertThrows(SocketProviderTransientException.class, () -> socketProvider.get(0, null));
     }
 
 }

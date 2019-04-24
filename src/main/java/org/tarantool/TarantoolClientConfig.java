@@ -37,15 +37,34 @@ public class TarantoolClientConfig {
     public double directWriteFactor = 0.5d;
 
     /**
+     * Write operation timeout.
+     */
+    public long writeTimeoutMillis = 60 * 1000L;
+
+    /**
      * Use old call command https://github.com/tarantool/doc/issues/54,
      * please ensure that you server supports new call command.
      */
     public boolean useNewCall = false;
 
     /**
-     * Limits for synchronous operations.
+     *  Max time to establish connection to the server
+     *  and be completely configured (to have an {@code ALIVE} status).
+     *
+     * @see TarantoolClient#isAlive()
      */
     public long initTimeoutMillis = 60 * 1000L;
-    public long writeTimeoutMillis = 60 * 1000L;
+
+    /**
+     * Connection timeout per attempt.
+     * {@code 0} means no timeout.
+     */
+    public int connectionTimeout = 2 * 1000;
+
+    /**
+     * Total attempts number to connect to DB.
+     * {@code 0} means unlimited attempts.
+     */
+    public int retryCount = 3;
 
 }

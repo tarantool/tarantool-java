@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
 
-public abstract class BaseSocketChannelProvider implements SocketChannelProvider {
+public abstract class BaseSocketChannelProvider implements ConfigurableSocketChannelProvider {
 
     /**
      * Limit of retries.
@@ -14,61 +14,39 @@ public abstract class BaseSocketChannelProvider implements SocketChannelProvider
     /**
      * Timeout to establish socket connection with an individual server.
      */
-    private int timeout = NO_TIMEOUT;
+    private int connectionTimeout = NO_TIMEOUT;
 
     /**
      * Tries to establish a new connection to the Tarantool instances.
      *
-     * @param retryNumber number of current retry. Reset after successful connect.
+     * @param retryNumber number of current retry
      * @param lastError   the last error occurs when reconnecting
      *
      * @return connected socket channel
      *
-     * @throws CommunicationException if any I/O errors happen or there are
-     *                                no addresses available
+     * @throws CommunicationException           if number of retries or socket timeout are exceeded
+     * @throws SocketProviderTransientException if any I/O errors happen
      */
     @Override
     public final SocketChannel get(int retryNumber, Throwable lastError) {
-        if (areRetriesExhausted(retryNumber)) {
-            throw new CommunicationException("Connection retries exceeded.", lastError);
-        }
-
-        long deadline = System.currentTimeMillis() + timeout;
-        while (!Thread.currentThread().isInterrupted()) {
-            try {
-                InetSocketAddress address = getAddress(retryNumber, lastError);
-                return openChannel(address);
-            } catch (IOException e) {
-                checkTimeout(deadline, e);
-            }
-        }
-        throw new CommunicationException("Thread interrupted.", new InterruptedException());
-    }
-
-    private void checkTimeout(long deadline, Exception e) {
-        long timeLeft = deadline - System.currentTimeMillis();
-        if (timeLeft <= 0) {
-            throw new CommunicationException("Connection time out.", e);
-        }
         try {
-            Thread.sleep(timeLeft / 10);
-        } catch (InterruptedException ignored) {
-            Thread.currentThread().interrupt();
+            return makeAttempt(retryNumber, lastError);
+        } catch (IOException e) {
+            throw new SocketProviderTransientException("Couldn't connect to the server", e);
         }
     }
 
     /**
-     * Gets address to be used to establish a new connection
-     * Address can be null.
+     * Obtains a connected socket channel.
      *
      * @param retryNumber reconnection attempt number
      * @param lastError   reconnection reason
      *
-     * @return available address which is depended on implementation
+     * @return opened socket channel
      *
      * @throws IOException if any I/O errors occur
      */
-    protected abstract InetSocketAddress getAddress(int retryNumber, Throwable lastError) throws IOException;
+    protected abstract SocketChannel makeAttempt(int retryNumber, Throwable lastError) throws IOException;
 
     /**
      * Sets maximum amount of reconnect attempts to be made before an exception is raised.
@@ -79,7 +57,11 @@ public abstract class BaseSocketChannelProvider implements SocketChannelProvider
      *
      * @param retriesLimit Limit of retries to use.
      */
+    @Override
     public void setRetriesLimit(int retriesLimit) {
+        if (retriesLimit < 0) {
+            throw new IllegalArgumentException("Retries count cannot be negative.");
+        }
         this.retriesLimit = retriesLimit;
     }
 
@@ -111,7 +93,7 @@ public abstract class BaseSocketChannelProvider implements SocketChannelProvider
         SocketChannel channel = null;
         try {
             channel = SocketChannel.open();
-            channel.socket().connect(socketAddress, timeout);
+            channel.socket().connect(socketAddress, connectionTimeout);
             return channel;
         } catch (IOException e) {
             if (channel != null) {
@@ -126,44 +108,31 @@ public abstract class BaseSocketChannelProvider implements SocketChannelProvider
     }
 
     /**
-     * Sets maximum amount of time to wait for a socket connection establishment
-     * with an individual server.
-     * <p>
-     * Zero means infinite timeout.
-     *
-     * @param timeout timeout value, ms.
-     *
-     * @throws IllegalArgumentException if timeout is negative.
-     */
-    public void setTimeout(int timeout) {
-        if (timeout < 0) {
-            throw new IllegalArgumentException("timeout is negative.");
-        }
-        this.timeout = timeout;
-    }
-
-    /**
-     * Gest maximum amount of time to wait for a socket
+     * Gets maximum amount of time to wait for a socket
      * connection establishment with an individual server.
      *
      * @return timeout
      */
-    public int getTimeout() {
-        return timeout;
+    public int getConnectionTimeout() {
+        return connectionTimeout;
     }
 
     /**
-     * Provides a decision on whether retries limit is hit.
+     * Sets maximum amount of time to wait for a socket connection establishment
+     * with an individual server.
+     * <p>
+     * Zero means infinite connectionTimeout.
      *
-     * @param retries Current count of retries.
+     * @param connectionTimeout connectionTimeout value, ms.
      *
-     * @return {@code true} if retries are exhausted.
+     * @throws IllegalArgumentException if connectionTimeout is negative.
      */
-    private boolean areRetriesExhausted(int retries) {
-        int limit = getRetriesLimit();
-        if (limit < 0) {
-            return false;
+    @Override
+    public void setConnectionTimeout(int connectionTimeout) {
+        if (connectionTimeout < 0) {
+            throw new IllegalArgumentException("Connection timeout cannot be negative.");
         }
-        return retries >= limit;
+        this.connectionTimeout = connectionTimeout;
     }
+
 }
