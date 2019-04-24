@@ -15,11 +15,11 @@ jobs:
       script: mvn checkstyle:check
       after_success: skip
     - stage: test
-      jdk: oraclejdk11
-    - stage: test
-      jdk: openjdk10
+      jdk: openjdk8
     - stage: test
       jdk: openjdk11
+    - stage: test
+      jdk: openjdk12
 
 before_script:
   - .travis/travis.pre.sh
