@@ -5,12 +5,10 @@ align="right">
 
 # Java connector for Tarantool 1.7.4+
 
-[![Coverage Status][coveralls-badge]][coveralls-page]
-
-[coveralls-badge]: https://coveralls.io/repos/github/tarantool/tarantool-java/badge.svg?branch=master
-[coveralls-page]: https://coveralls.io/github/tarantool/tarantool-java?branch=master
-
 [![Join the chat at https://gitter.im/tarantool/tarantool-java](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tarantool/tarantool-java?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.tarantool/connector/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.tarantool/connector)
+[![Build Status](https://travis-ci.org/tarantool/tarantool-java.svg?branch=master)](https://travis-ci.com/tarantool/tarantool-java)
+[![Coverage Status](https://coveralls.io/repos/github/tarantool/tarantool-java/badge.svg?branch=master)](https://coveralls.io/github/tarantool/tarantool-java?branch=master)
 
 To get the Java connector for Tarantool 1.6.9, visit
 [this GitHub page](https://github.com/tarantool/tarantool-java/tree/connector-1.6.9).
@@ -28,7 +26,7 @@ To get the Java connector for Tarantool 1.6.9, visit
 <dependency>
   <groupId>org.tarantool</groupId>
   <artifactId>connector</artifactId>
-  <version>1.7.4</version>
+  <version>1.9.1</version>
 </dependency>
 ```
 
