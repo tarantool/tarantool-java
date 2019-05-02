@@ -7,13 +7,7 @@ import java.util.concurrent.Executor;
  */
 public class TarantoolClusterClientConfig extends TarantoolClientConfig {
 
-    public static final int DEFAULT_OPERATION_EXPIRY_TIME_MILLIS = 500;
     public static final int DEFAULT_CLUSTER_DISCOVERY_DELAY_MILLIS = 60_000;
-
-    /**
-     * Period for the operation is eligible for retry.
-     */
-    public int operationExpiryTimeMillis = DEFAULT_OPERATION_EXPIRY_TIME_MILLIS;
 
     /**
      * Executor that will be used as a thread of

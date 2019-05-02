@@ -5,17 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.tarantool.jdbc.SqlAssertions.assertSqlExceptionHasStatus;
 
-import org.tarantool.TarantoolConnection;
 import org.tarantool.util.SQLStates;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
-import java.lang.reflect.Field;
-import java.net.Socket;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -60,7 +56,6 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
     @Test
     public void testGetSetNetworkTimeout() throws Exception {
         assertEquals(0, conn.getNetworkTimeout());
-
         SQLException e = assertThrows(SQLException.class, new Executable() {
             @Override
             public void execute() throws Throwable {
@@ -68,64 +63,17 @@ public class JdbcConnectionIT extends AbstractJdbcIT {
             }
         });
         assertEquals("Network timeout cannot be negative.", e.getMessage());
-
         conn.setNetworkTimeout(null, 3000);
-
         assertEquals(3000, conn.getNetworkTimeout());
-
-        // Check that timeout gets propagated to the socket.
-        Field tntCon = SQLConnection.class.getDeclaredField("connection");
-        tntCon.setAccessible(true);
-
-        Field sock = TarantoolConnection.class.getDeclaredField("socket");
-        sock.setAccessible(true);
-
-        assertEquals(3000, ((Socket) sock.get(tntCon.get(conn))).getSoTimeout());
-    }
-
-    @Test
-    public void testClosedConnection() throws SQLException {
-        conn.close();
-
-        int i = 0;
-        for (; i < 5; i++) {
-            final int step = i;
-            SQLException e = assertThrows(SQLException.class, new Executable() {
-                @Override
-                public void execute() throws Throwable {
-                    switch (step) {
-                    case 0:
-                        conn.createStatement();
-                        break;
-                    case 1:
-                        conn.prepareStatement("TEST");
-                        break;
-                    case 2:
-                        conn.getMetaData();
-                        break;
-                    case 3:
-                        conn.getNetworkTimeout();
-                        break;
-                    case 4:
-                        conn.setNetworkTimeout(null, 1000);
-                        break;
-                    default:
-                        fail();
-                    }
-                }
-            });
-            assertEquals("Connection is closed.", e.getMessage());
-        }
-        assertEquals(5, i);
     }
 
     @Test
     void testIsValidCheck() throws SQLException {
-        assertTrue(conn.isValid(2000));
-        assertThrows(SQLException.class, () -> conn.isValid(-1000));
+        assertTrue(conn.isValid(2));
+        assertThrows(SQLException.class, () -> conn.isValid(-1));
 
         conn.close();
-        assertFalse(conn.isValid(2000));
+        assertFalse(conn.isValid(2));
     }
 
     @Test

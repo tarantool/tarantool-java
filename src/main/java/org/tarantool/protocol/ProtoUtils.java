@@ -42,17 +42,17 @@ public abstract class ProtoUtils {
      *
      * @throws IOException in case of any io-error
      */
-    public static TarantoolPacket readPacket(InputStream inputStream) throws IOException {
+    public static TarantoolPacket readPacket(InputStream inputStream, MsgPackLite msgPackLite) throws IOException {
         CountInputStreamImpl msgStream = new CountInputStreamImpl(inputStream);
 
-        int size = ((Number) getMsgPackLite().unpack(msgStream)).intValue();
+        int size = ((Number) msgPackLite.unpack(msgStream)).intValue();
         long mark = msgStream.getBytesRead();
 
-        Map<Integer, Object> headers = (Map<Integer, Object>) getMsgPackLite().unpack(msgStream);
+        Map<Integer, Object> headers = (Map<Integer, Object>) msgPackLite.unpack(msgStream);
 
         Map<Integer, Object> body = null;
         if (msgStream.getBytesRead() - mark < size) {
-            body = (Map<Integer, Object>) getMsgPackLite().unpack(msgStream);
+            body = (Map<Integer, Object>) msgPackLite.unpack(msgStream);
         }
 
         return new TarantoolPacket(headers, body);
@@ -70,21 +70,21 @@ public abstract class ProtoUtils {
      * @throws CommunicationException      input stream bytes constitute msg pack message in wrong format
      * @throws NonReadableChannelException If this channel was not opened for reading
      */
-    public static TarantoolPacket readPacket(ReadableByteChannel bufferReader)
+    public static TarantoolPacket readPacket(ReadableByteChannel bufferReader, MsgPackLite msgPackLite)
         throws CommunicationException, IOException {
 
         ByteBuffer buffer = ByteBuffer.allocate(LENGTH_OF_SIZE_MESSAGE);
         bufferReader.read(buffer);
 
         buffer.flip();
-        int size = ((Number) getMsgPackLite().unpack(new ByteBufferBackedInputStream(buffer))).intValue();
+        int size = ((Number) msgPackLite.unpack(new ByteBufferBackedInputStream(buffer))).intValue();
 
         buffer = ByteBuffer.allocate(size);
         bufferReader.read(buffer);
 
         buffer.flip();
         ByteBufferBackedInputStream msgBytesStream = new ByteBufferBackedInputStream(buffer);
-        Object unpackedHeaders = getMsgPackLite().unpack(msgBytesStream);
+        Object unpackedHeaders = msgPackLite.unpack(msgBytesStream);
         if (!(unpackedHeaders instanceof Map)) {
             //noinspection ConstantConditions
             throw new CommunicationException(
@@ -98,7 +98,7 @@ public abstract class ProtoUtils {
 
         Map<Integer, Object> body = null;
         if (msgBytesStream.hasAvailable()) {
-            Object unpackedBody = getMsgPackLite().unpack(msgBytesStream);
+            Object unpackedBody = msgPackLite.unpack(msgBytesStream);
             if (!(unpackedBody instanceof Map)) {
                 //noinspection ConstantConditions
                 throw new CommunicationException(
@@ -129,7 +129,8 @@ public abstract class ProtoUtils {
      */
     public static TarantoolGreeting connect(Socket socket,
                                             String username,
-                                            String password) throws IOException {
+                                            String password,
+                                            MsgPackLite msgPackLite) throws IOException {
         byte[] inputBytes = new byte[64];
 
         InputStream inputStream = socket.getInputStream();
@@ -142,13 +143,13 @@ public abstract class ProtoUtils {
         inputStream.read(inputBytes);
         String salt = new String(inputBytes);
         if (username != null && password != null) {
-            ByteBuffer authPacket = createAuthPacket(username, password, salt);
+            ByteBuffer authPacket = createAuthPacket(username, password, salt, msgPackLite);
 
             OutputStream os = socket.getOutputStream();
             os.write(authPacket.array(), 0, authPacket.remaining());
             os.flush();
 
-            TarantoolPacket responsePacket = readPacket(socket.getInputStream());
+            TarantoolPacket responsePacket = readPacket(socket.getInputStream(), msgPackLite);
             assertNoErrCode(responsePacket);
         }
 
@@ -170,7 +171,8 @@ public abstract class ProtoUtils {
      */
     public static TarantoolGreeting connect(SocketChannel channel,
                                             String username,
-                                            String password) throws IOException {
+                                            String password,
+                                            MsgPackLite msgPackLite) throws IOException {
         ByteBuffer welcomeBytes = ByteBuffer.wrap(new byte[64]);
         channel.read(welcomeBytes);
 
@@ -183,10 +185,10 @@ public abstract class ProtoUtils {
         String salt = new String(welcomeBytes.array());
 
         if (username != null && password != null) {
-            ByteBuffer authPacket = createAuthPacket(username, password, salt);
+            ByteBuffer authPacket = createAuthPacket(username, password, salt, msgPackLite);
             writeFully(channel, authPacket);
 
-            TarantoolPacket authResponse = readPacket(channel);
+            TarantoolPacket authResponse = readPacket(channel, msgPackLite);
             assertNoErrCode(authResponse);
         }
 
@@ -228,7 +230,8 @@ public abstract class ProtoUtils {
 
     public static ByteBuffer createAuthPacket(String username,
                                               final String password,
-                                              String salt) throws IOException {
+                                              String salt,
+                                              MsgPackLite msgPackLite) throws IOException {
         final MessageDigest sha1;
         try {
             sha1 = MessageDigest.getInstance("SHA-1");
@@ -252,20 +255,18 @@ public abstract class ProtoUtils {
         }
         auth.add(p);
 
-        return createPacket(DEFAULT_INITIAL_REQUEST_SIZE, Code.AUTH, 0L, null,
-            Key.USER_NAME, username, Key.TUPLE, auth);
+        return createPacket(
+            DEFAULT_INITIAL_REQUEST_SIZE, msgPackLite,
+            Code.AUTH, 0L, null, Key.USER_NAME, username, Key.TUPLE, auth
+        );
     }
 
-    public static ByteBuffer createPacket(Code code, Long syncId, Long schemaId, Object... args) throws IOException {
-        return createPacket(DEFAULT_INITIAL_REQUEST_SIZE, code, syncId, schemaId, args);
-    }
-
-    public static ByteBuffer createPacket(int initialRequestSize,
+    public static ByteBuffer createPacket(MsgPackLite msgPackLite,
                                           Code code,
                                           Long syncId,
                                           Long schemaId,
                                           Object... args) throws IOException {
-        return createPacket(initialRequestSize, getMsgPackLite(), code, syncId, schemaId, args);
+        return createPacket(DEFAULT_INITIAL_REQUEST_SIZE, msgPackLite, code, syncId, schemaId, args);
     }
 
     public static ByteBuffer createPacket(int initialRequestSize,
@@ -309,7 +310,4 @@ public abstract class ProtoUtils {
         }
     }
 
-    private static MsgPackLite getMsgPackLite() {
-        return MsgPackLite.INSTANCE;
-    }
 }

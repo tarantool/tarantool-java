@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 public class TarantoolConnection extends TarantoolBase<List<?>>
-        implements TarantoolSQLOps<Object,Long,List<Map<String,Object>>> {
+    implements TarantoolSQLOps<Object,Long,List<Map<String,Object>>> {
 
     protected InputStream in;
     protected OutputStream out;
@@ -40,7 +40,7 @@ public class TarantoolConnection extends TarantoolBase<List<?>>
             out.write(packet.array(), 0, packet.remaining());
             out.flush();
 
-            TarantoolPacket responsePacket = ProtoUtils.readPacket(in);
+            TarantoolPacket responsePacket = ProtoUtils.readPacket(in, msgPackLite);
 
             Long c = responsePacket.getCode();
             if (c != 0) {

@@ -126,13 +126,22 @@ Feel free to override any method of `TarantoolClientImpl`. For example, to hook
 all the results, you could override this:
 
 ```java
-protected void complete(long code, CompletableFuture<?> q);
+protected void complete(TarantoolPacket packet, TarantoolOp<?> future);
 ```
 
 ## Spring NamedParameterJdbcTemplate usage example
 
-To configure sockets you should implements SQLSocketProvider and add socketProvider=abc.xyz.MySocketProvider to connect url.
-For example tarantool://localhost:3301?user=test&password=test&socketProvider=abc.xyz.MySocketProvider
+The JDBC driver uses `TarantoolClient` implementation to provide a communication with server.
+To configure socket channel provider you should implements SocketChannelProvider and add
+`socketChannelProvider=abc.xyz.MySocketChannelProvider` to connect url.
+
+For example:
+
+```
+tarantool://localhost:3301?user=test&password=test&socketProvider=abc.xyz.MySocketProvider
+```
+
+Here is an example how you can use the driver covered by Spring `DriverManagerDataSource`:
 
 ```java
 NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(new DriverManagerDataSource("tarantool://localhost:3301?user=test&password=test"));

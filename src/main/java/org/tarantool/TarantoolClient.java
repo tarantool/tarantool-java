@@ -23,6 +23,8 @@ public interface TarantoolClient {
 
     boolean isAlive();
 
+    boolean isClosed();
+
     void waitAlive() throws InterruptedException;
 
     boolean waitAlive(long timeout, TimeUnit unit) throws InterruptedException;

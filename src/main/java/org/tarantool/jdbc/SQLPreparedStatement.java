@@ -1,5 +1,7 @@
 package org.tarantool.jdbc;
 
+import org.tarantool.util.SQLStates;
+
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -50,8 +52,10 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     @Override
     public ResultSet executeQuery() throws SQLException {
         checkNotClosed();
-        discardLastResults();
-        return createResultSet(connection.executeQuery(sql, getParams()));
+        if (!executeInternal(sql, getParams())) {
+            throw new SQLException("No results were returned", SQLStates.NO_DATA.getSqlState());
+        }
+        return resultSet;
     }
 
     @Override
@@ -74,8 +78,13 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
     @Override
     public int executeUpdate() throws SQLException {
         checkNotClosed();
-        discardLastResults();
-        return connection.executeUpdate(sql, getParams());
+        if (executeInternal(sql, getParams())) {
+            throw new SQLException(
+                "Result was returned but nothing was expected",
+                SQLStates.TOO_MANY_RESULTS.getSqlState()
+            );
+        }
+        return updateCount;
     }
 
     @Override

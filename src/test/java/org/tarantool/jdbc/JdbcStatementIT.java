@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import org.tarantool.util.SQLStates;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,10 +45,26 @@ public class JdbcStatementIT extends AbstractJdbcIT {
     }
 
     @Test
+    public void testExecuteWrongQuery() throws SQLException {
+        String wrongResultQuery = "INSERT INTO test(id, val) VALUES (40, 'forty')";
+
+        SQLException exception = assertThrows(SQLException.class, () -> stmt.executeQuery(wrongResultQuery));
+        SqlAssertions.assertSqlExceptionHasStatus(exception, SQLStates.NO_DATA);
+    }
+
+    @Test
     public void testExecuteUpdate() throws Exception {
         assertEquals(2, stmt.executeUpdate("INSERT INTO test(id, val) VALUES (10, 'ten'), (20, 'twenty')"));
         assertEquals("ten", getRow("test", 10).get(1));
         assertEquals("twenty", getRow("test", 20).get(1));
+    }
+
+    @Test
+    public void testExecuteWrongUpdate() throws SQLException {
+        String wrongUpdateQuery = "SELECT val FROM test";
+
+        SQLException exception = assertThrows(SQLException.class, () -> stmt.executeUpdate(wrongUpdateQuery));
+        SqlAssertions.assertSqlExceptionHasStatus(exception, SQLStates.TOO_MANY_RESULTS);
     }
 
     @Test
@@ -67,6 +85,44 @@ public class JdbcStatementIT extends AbstractJdbcIT {
 
         assertEquals("hundred", getRow("test", 100).get(1));
         assertEquals("thousand", getRow("test", 1000).get(1));
+    }
+
+    @Test
+    void testGetMaxRows() throws SQLException {
+        int defaultMaxSize = 0;
+        assertEquals(defaultMaxSize, stmt.getMaxRows());
+    }
+
+    @Test
+    void testSetMaxRows() throws SQLException {
+        int expectedMaxSize = 10;
+        stmt.setMaxRows(expectedMaxSize);
+        assertEquals(expectedMaxSize, stmt.getMaxRows());
+    }
+
+    @Test
+    void testSetNegativeMaxRows() {
+        int negativeMaxSize = -20;
+        assertThrows(SQLException.class, () -> stmt.setMaxRows(negativeMaxSize));
+    }
+
+    @Test
+    void testGetQueryTimeout() throws SQLException {
+        int defaultQueryTimeout = 0;
+        assertEquals(defaultQueryTimeout, stmt.getQueryTimeout());
+    }
+
+    @Test
+    void testSetQueryTimeout() throws SQLException {
+        int expectedSeconds = 10;
+        stmt.setQueryTimeout(expectedSeconds);
+        assertEquals(expectedSeconds, stmt.getQueryTimeout());
+    }
+
+    @Test
+    void testSetNegativeQueryTimeout() throws SQLException {
+        int negativeSeconds = -30;
+        assertThrows(SQLException.class, () -> stmt.setQueryTimeout(negativeSeconds));
     }
 
     @Test
@@ -112,7 +168,7 @@ public class JdbcStatementIT extends AbstractJdbcIT {
     }
 
     @Test
-    public void testSupportedGeneratedKeys() throws SQLException {
+    public void testExecuteUpdateNoGeneratedKeys() throws SQLException {
         int affectedRows = stmt.executeUpdate(
             "INSERT INTO test(id, val) VALUES (50, 'fifty')",
             Statement.NO_GENERATED_KEYS
@@ -125,7 +181,21 @@ public class JdbcStatementIT extends AbstractJdbcIT {
     }
 
     @Test
-    void testUnsupportedGeneratedKeys() {
+    public void testExecuteNoGeneratedKeys() throws SQLException {
+        boolean isResultSet = stmt.execute(
+            "INSERT INTO test(id, val) VALUES (60, 'sixty')",
+            Statement.NO_GENERATED_KEYS
+        );
+        assertFalse(isResultSet);
+        ResultSet generatedKeys = stmt.getGeneratedKeys();
+        assertNotNull(generatedKeys);
+        assertFalse(generatedKeys.next());
+        assertEquals(ResultSet.TYPE_FORWARD_ONLY, generatedKeys.getType());
+        assertEquals(ResultSet.CONCUR_READ_ONLY, generatedKeys.getConcurrency());
+    }
+
+    @Test
+    void testExecuteUpdateGeneratedKeys() {
         assertThrows(
             SQLException.class,
             () -> stmt.executeUpdate(
@@ -133,11 +203,38 @@ public class JdbcStatementIT extends AbstractJdbcIT {
                 Statement.RETURN_GENERATED_KEYS
             )
         );
+    }
 
+    @Test
+    void testExecuteGeneratedKeys() {
+        assertThrows(
+            SQLException.class,
+            () -> stmt.execute(
+                "INSERT INTO test(id, val) VALUES (100, 'hundred'), (1000, 'thousand')",
+                Statement.RETURN_GENERATED_KEYS
+            )
+        );
+    }
+
+    @Test
+    void testExecuteUpdateWrongGeneratedKeys() {
         int[] wrongConstants = { Integer.MAX_VALUE, Integer.MIN_VALUE, -31, 344 };
         for (int wrongConstant : wrongConstants) {
             assertThrows(SQLException.class,
                 () -> stmt.executeUpdate(
+                    "INSERT INTO test(id, val) VALUES (100, 'hundred'), (1000, 'thousand')",
+                    wrongConstant
+                )
+            );
+        }
+    }
+
+    @Test
+    void testExecuteWrongGeneratedKeys() {
+        int[] wrongConstants = { Integer.MAX_VALUE, Integer.MIN_VALUE, -52, 864 };
+        for (int wrongConstant : wrongConstants) {
+            assertThrows(SQLException.class,
+                () -> stmt.execute(
                     "INSERT INTO test(id, val) VALUES (100, 'hundred'), (1000, 'thousand')",
                     wrongConstant
                 )

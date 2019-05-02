@@ -1,9 +1,13 @@
 package org.tarantool;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.net.SocketException;
 import java.util.List;
 
 /**
@@ -16,7 +20,7 @@ public class ConnectionIT extends AbstractTarantoolOpsIT {
 
     @BeforeEach
     public void setup() {
-        conn = openConnection();
+        conn = TestUtils.openConnection(host, port, username, password);
     }
 
     @AfterEach
@@ -32,5 +36,18 @@ public class ConnectionIT extends AbstractTarantoolOpsIT {
     @Test
     public void testClose() {
         conn.close();
+        assertTrue(conn.isClosed());
     }
+
+    @Test
+    void testGetSoTimeout() throws SocketException {
+        assertEquals(0, conn.getSocketTimeout());
+    }
+
+    @Test
+    void testSetSoTimeout() throws SocketException {
+        conn.setSocketTimeout(2000);
+        assertEquals(2000, conn.getSocketTimeout());
+    }
+
 }

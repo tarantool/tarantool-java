@@ -1,6 +1,5 @@
 package org.tarantool.jdbc;
 
-import org.tarantool.JDBCBridge;
 import org.tarantool.jdbc.cursor.CursorIterator;
 import org.tarantool.jdbc.cursor.InMemoryForwardCursorIteratorImpl;
 import org.tarantool.jdbc.cursor.InMemoryScrollableCursorIteratorImpl;
@@ -53,15 +52,15 @@ public class SQLResultSet implements ResultSet {
     private final int concurrencyLevel;
     private final int holdability;
 
-    public SQLResultSet(JDBCBridge bridge, SQLStatement ownerStatement) throws SQLException {
-        metaData = new SQLResultSetMetaData(bridge.getSqlMetadata());
+    public SQLResultSet(SQLResultHolder holder, SQLStatement ownerStatement) throws SQLException {
+        metaData = new SQLResultSetMetaData(holder.getSqlMetadata());
         statement = ownerStatement;
         scrollType = statement.getResultSetType();
         concurrencyLevel = statement.getResultSetConcurrency();
         holdability = statement.getResultSetHoldability();
         this.maxRows = statement.getMaxRows();
 
-        List<List<Object>> fetchedRows = bridge.getRows();
+        List<List<Object>> fetchedRows = holder.getRows();
         List<List<Object>> rows = maxRows == 0 || maxRows >= fetchedRows.size()
             ? fetchedRows
             : fetchedRows.subList(0, maxRows);

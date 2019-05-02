@@ -1,6 +1,5 @@
 package org.tarantool.jdbc;
 
-import org.tarantool.JDBCBridge;
 import org.tarantool.util.JdbcConstants;
 import org.tarantool.util.SQLStates;
 
@@ -9,8 +8,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLNonTransientException;
+import java.sql.SQLTimeoutException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -27,14 +28,19 @@ public class SQLStatement implements Statement {
     /**
      * Current result set / update count associated to this statement.
      */
-    private SQLResultSet resultSet;
-    private int updateCount;
+    protected SQLResultSet resultSet;
+    protected int updateCount;
 
     private final int resultSetType;
     private final int resultSetConcurrency;
     private final int resultSetHoldability;
 
     private int maxRows;
+
+    /**
+     * Query timeout in millis.
+     */
+    private long timeout;
 
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
@@ -136,12 +142,18 @@ public class SQLStatement implements Statement {
 
     @Override
     public int getQueryTimeout() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return (int) TimeUnit.MILLISECONDS.toSeconds(timeout);
     }
 
     @Override
     public void setQueryTimeout(int seconds) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        if (seconds < 0) {
+            throw new SQLNonTransientException(
+                "Query timeout must be positive or zero",
+                SQLStates.INVALID_PARAMETER_VALUE.getSqlState()
+            );
+        }
+        timeout = TimeUnit.SECONDS.toMillis(seconds);
     }
 
     @Override
@@ -167,7 +179,6 @@ public class SQLStatement implements Statement {
     @Override
     public boolean execute(String sql) throws SQLException {
         checkNotClosed();
-        discardLastResults();
         return executeInternal(sql);
     }
 
@@ -275,7 +286,7 @@ public class SQLStatement implements Statement {
     @Override
     public ResultSet getGeneratedKeys() throws SQLException {
         checkNotClosed();
-        return new SQLResultSet(JDBCBridge.EMPTY, this);
+        return new SQLResultSet(SQLResultHolder.ofEmptyQuery(), this);
     }
 
     @Override
@@ -349,26 +360,19 @@ public class SQLStatement implements Statement {
      */
     protected boolean executeInternal(String sql, Object... params) throws SQLException {
         discardLastResults();
-        return handleResult(connection.execute(sql, params));
-    }
-
-    /**
-     * Sets the internals according to the result of last execution.
-     *
-     * @param result The result of SQL statement execution.
-     *
-     * @return {@code true}, if the result is a ResultSet object.
-     */
-    protected boolean handleResult(Object result) throws SQLException {
-        if (result instanceof JDBCBridge) {
-            resultSet = createResultSet((JDBCBridge) result);
-            updateCount = -1;
-            return true;
-        } else {
-            resultSet = null;
-            updateCount = (Integer) result;
-            return false;
+        SQLResultHolder holder;
+        try {
+            holder = connection.execute(timeout, sql, params);
+        } catch (StatementTimeoutException e) {
+            cancel();
+            throw new SQLTimeoutException();
         }
+
+        if (holder.isQueryResult()) {
+            resultSet = new SQLResultSet(holder, this);
+        }
+        updateCount = holder.getUpdateCount();
+        return holder.isQueryResult();
     }
 
     /**
@@ -381,13 +385,13 @@ public class SQLStatement implements Statement {
      * @throws SQLException if a database access error occurs or
      *                      this method is called on a closed <code>Statement</code>
      */
-    public ResultSet executeMetadata(JDBCBridge data) throws SQLException {
+    public ResultSet executeMetadata(SQLResultHolder data) throws SQLException {
         checkNotClosed();
         return createResultSet(data);
     }
 
-    protected SQLResultSet createResultSet(JDBCBridge result) throws SQLException {
-        return new SQLResultSet(result, this);
+    protected SQLResultSet createResultSet(SQLResultHolder holder) throws SQLException {
+        return new SQLResultSet(holder, this);
     }
 
     protected void checkNotClosed() throws SQLException {

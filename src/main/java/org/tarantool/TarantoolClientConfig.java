@@ -2,6 +2,8 @@ package org.tarantool;
 
 public class TarantoolClientConfig {
 
+    public static final int DEFAULT_OPERATION_EXPIRY_TIME_MILLIS = 1000;
+
     /**
      * Auth-related data.
      */
@@ -66,5 +68,10 @@ public class TarantoolClientConfig {
      * {@code 0} means unlimited attempts.
      */
     public int retryCount = 3;
+
+    /**
+     * Operation expiration period.
+     */
+    public int operationExpiryTimeMillis = DEFAULT_OPERATION_EXPIRY_TIME_MILLIS;
 
 }

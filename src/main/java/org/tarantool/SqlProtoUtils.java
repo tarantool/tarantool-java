@@ -9,10 +9,10 @@ import java.util.Map;
 
 public abstract class SqlProtoUtils {
     public static List<Map<String, Object>> readSqlResult(TarantoolPacket pack) {
-        List<List<?>> data = (List<List<?>>) pack.getBody().get(Key.DATA.getId());
+        List<List<Object>> data = getSQLData(pack);
+        List<SQLMetaData> metaData = getSQLMetadata(pack);
 
         List<Map<String, Object>> values = new ArrayList<>(data.size());
-        List<SQLMetaData> metaData = getSQLMetadata(pack);
         for (List row : data) {
             LinkedHashMap<String, Object> value = new LinkedHashMap<>();
             for (int i = 0; i < row.size(); i++) {

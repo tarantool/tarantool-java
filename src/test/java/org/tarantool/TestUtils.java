@@ -1,5 +1,8 @@
 package org.tarantool;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -7,6 +10,25 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class TestUtils {
+
+    public static TarantoolConnection openConnection(String host, int port, String username, String password) {
+        Socket socket = new Socket();
+        try {
+            socket.connect(new InetSocketAddress(host, port));
+        } catch (IOException e) {
+            throw new RuntimeException("Test failed due to invalid environment.", e);
+        }
+        try {
+            return new TarantoolConnection(username, password, socket);
+        } catch (Exception e) {
+            try {
+                socket.close();
+            } catch (IOException ignored) {
+                // No-op.
+            }
+            throw new RuntimeException(e);
+        }
+    }
 
     public static String makeDiscoveryFunction(String functionName, Collection<?> addresses) {
         String functionResult = addresses.stream()

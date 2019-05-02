@@ -5,7 +5,8 @@ import static org.tarantool.TestUtils.makeInstanceEnv;
 import static org.tarantool.jdbc.SqlTestUtils.getCreateTableSQL;
 
 import org.tarantool.ServerVersion;
-import org.tarantool.TarantoolConnection;
+import org.tarantool.TarantoolClientConfig;
+import org.tarantool.TarantoolClientImpl;
 import org.tarantool.TarantoolConsole;
 import org.tarantool.TarantoolControl;
 
@@ -14,9 +15,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -57,14 +55,14 @@ public abstract class AbstractJdbcIT {
     Connection conn;
 
     @BeforeAll
-    public static void setupEnv() throws Exception {
+    public static void setupEnv() {
         control = new TarantoolControl();
         control.createInstance("jdk-testing", LUA_FILE, makeInstanceEnv(LISTEN, ADMIN));
         control.start("jdk-testing");
     }
 
     @AfterAll
-    public static void teardownEnv() throws Exception {
+    public static void teardownEnv() {
         control.stop("jdk-testing");
     }
 
@@ -87,41 +85,38 @@ public abstract class AbstractJdbcIT {
     }
 
     protected static void sqlExec(String... text) {
-        TarantoolConnection con = makeConnection();
+        TarantoolClientImpl client = makeClient();
         try {
             for (String cmd : text) {
-                con.eval("box.execute(\"" + cmd + "\")");
+                client.syncOps().eval("box.execute(\"" + cmd + "\")");
             }
         } finally {
-            con.close();
+            client.close();
         }
     }
 
     static List<?> getRow(String space, Object key) {
-        TarantoolConnection con = makeConnection();
+        TarantoolClientImpl client = makeClient();
         try {
-            List<?> l = con.select(281, 2, Arrays.asList(space.toUpperCase()), 0, 1, 0);
+            List<?> l = client.syncOps().select(281, 2, Arrays.asList(space.toUpperCase()), 0, 1, 0);
             Integer spaceId = (Integer) ((List) l.get(0)).get(0);
-            l = con.select(spaceId, 0, Arrays.asList(key), 0, 1, 0);
+            l = client.syncOps().select(spaceId, 0, Arrays.asList(key), 0, 1, 0);
             return (l == null || l.size() == 0) ? Collections.emptyList() : (List<?>) l.get(0);
         } finally {
-            con.close();
+            client.close();
         }
     }
 
-    static TarantoolConnection makeConnection() {
-        Socket socket = new Socket();
-        try {
-            socket.connect(new InetSocketAddress(host, port));
-            return new TarantoolConnection(user, pass, socket);
-        } catch (IOException e) {
-            try {
-                socket.close();
-            } catch (IOException ignored) {
-                // No-op.
-            }
-            throw new RuntimeException(e);
-        }
+    static TarantoolClientImpl makeClient() {
+        return new TarantoolClientImpl(host + ":" + port, makeClientConfig());
+    }
+
+    private static TarantoolClientConfig makeClientConfig() {
+        TarantoolClientConfig config = new TarantoolClientConfig();
+        config.username = user;
+        config.password = pass;
+        config.initTimeoutMillis = 2000;
+        return config;
     }
 
 }

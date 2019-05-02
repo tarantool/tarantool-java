@@ -9,10 +9,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.opentest4j.AssertionFailedError;
 
-import java.io.IOException;
 import java.math.BigInteger;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -164,25 +161,6 @@ public abstract class AbstractTarantoolConnectorIT {
 
     protected static TarantoolConsole openConsole(String instance) {
         return TarantoolConsole.open(TarantoolControl.tntCtlWorkDir, instance);
-    }
-
-    protected TarantoolConnection openConnection() {
-        Socket socket = new Socket();
-        try {
-            socket.connect(new InetSocketAddress(host, port));
-        } catch (IOException e) {
-            throw new RuntimeException("Test failed due to invalid environment.", e);
-        }
-        try {
-            return new TarantoolConnection(username, password, socket);
-        } catch (Exception e) {
-            try {
-                socket.close();
-            } catch (IOException ignored) {
-                // No-op.
-            }
-            throw new RuntimeException(e);
-        }
     }
 
     private void appendBigInteger(StringBuilder sb, BigInteger value) {

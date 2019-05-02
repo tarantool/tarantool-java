@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import org.tarantool.util.SQLStates;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -54,6 +56,16 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
     }
 
     @Test
+    public void testExecuteWrongQuery() throws SQLException {
+        prep = conn.prepareStatement("INSERT INTO test VALUES (?, ?)");
+        prep.setInt(1, 200);
+        prep.setString(2, "two hundred");
+
+        SQLException exception = assertThrows(SQLException.class, () -> prep.executeQuery());
+        SqlAssertions.assertSqlExceptionHasStatus(exception, SQLStates.NO_DATA);
+    }
+
+    @Test
     public void testExecuteUpdate() throws Exception {
         prep = conn.prepareStatement("INSERT INTO test VALUES(?, ?)");
         assertNotNull(prep);
@@ -72,6 +84,15 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
         assertEquals(1, count);
 
         assertEquals("thousand", getRow("test", 1000).get(1));
+    }
+
+    @Test
+    public void testExecuteWrongUpdate() throws SQLException {
+        prep = conn.prepareStatement("SELECT val FROM test WHERE id=?");
+        prep.setInt(1, 1);
+
+        SQLException exception = assertThrows(SQLException.class, () -> prep.executeUpdate());
+        SqlAssertions.assertSqlExceptionHasStatus(exception, SQLStates.TOO_MANY_RESULTS);
     }
 
     @Test

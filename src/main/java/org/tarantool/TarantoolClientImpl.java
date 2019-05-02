@@ -17,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,6 +32,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         = new CommunicationException("Not connected, initializing connection");
 
     protected TarantoolClientConfig config;
+    protected long operationTimeout;
 
     /**
      * External.
@@ -101,6 +104,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         this.thumbstone = NOT_INIT_EXCEPTION;
         this.config = config;
         this.initialRequestSize = config.defaultRequestSize;
+        this.operationTimeout = config.operationExpiryTimeMillis;
         this.socketProvider = socketProvider;
         this.stats = new TarantoolClientStats();
         this.futures = new ConcurrentHashMap<>(config.predictedFutures);
@@ -169,7 +173,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     protected void connect(final SocketChannel channel) throws Exception {
         try {
-            TarantoolGreeting greeting = ProtoUtils.connect(channel, config.username, config.password);
+            TarantoolGreeting greeting = ProtoUtils.connect(channel, config.username, config.password, msgPackLite);
             this.serverVersion = greeting.getServerVersion();
         } catch (IOException e) {
             closeChannel(channel);
@@ -236,14 +240,39 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         reader.setPriority(config.readerThreadPriority);
     }
 
+    /**
+     * Executes an operation with default timeout.
+     *
+     * @param code operation code
+     * @param args operation arguments
+     *
+     * @return deferred result
+     *
+     * @see #setOperationTimeout(long)
+     */
     protected Future<?> exec(Code code, Object... args) {
-        return doExec(code, args);
+        return doExec(operationTimeout, code, args);
     }
 
-    protected CompletableFuture<?> doExec(Code code, Object[] args) {
+    /**
+     * Executes an operation with the given timeout.
+     * {@code timeoutMillis} will override the default
+     * timeout. 0 means the limitless operation.
+     *
+     * @param code operation code
+     * @param args operation arguments
+     *
+     * @return deferred result
+     */
+    protected Future<?> exec(long timeoutMillis, Code code, Object... args) {
+        return doExec(timeoutMillis, code, args);
+    }
+
+    protected TarantoolOp<?> doExec(long timeoutMillis, Code code, Object[] args) {
         validateArgs(args);
         long sid = syncId.incrementAndGet();
-        TarantoolOp<?> future = new TarantoolOp<>(code);
+
+        TarantoolOp<?> future = makeNewOperation(timeoutMillis, sid, code, args);
 
         if (isDead(future)) {
             return future;
@@ -260,6 +289,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             fail(future, e);
         }
         return future;
+    }
+
+    protected TarantoolOp<?> makeNewOperation(long timeoutMillis, long sid, Code code, Object[] args) {
+        return new TarantoolOp<>(sid, code, args)
+            .orTimeout(timeoutMillis, TimeUnit.MILLISECONDS);
     }
 
     protected synchronized void die(String message, Exception cause) {
@@ -297,7 +331,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     protected void write(Code code, Long syncId, Long schemaId, Object... args)
         throws Exception {
-        ByteBuffer buffer = ProtoUtils.createPacket(code, syncId, schemaId, args);
+        ByteBuffer buffer = ProtoUtils.createPacket(msgPackLite, code, syncId, schemaId, args);
 
         if (directWrite(buffer)) {
             return;
@@ -379,7 +413,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     protected void readThread() {
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                TarantoolPacket packet = ProtoUtils.readPacket(readChannel);
+                TarantoolPacket packet = ProtoUtils.readPacket(readChannel, msgPackLite);
 
                 Map<Integer, Object> headers = packet.getHeaders();
 
@@ -427,8 +461,8 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     }
 
-    protected void fail(CompletableFuture<?> q, Exception e) {
-        q.completeExceptionally(e);
+    protected void fail(TarantoolOp<?> future, Exception e) {
+        future.completeExceptionally(e);
     }
 
     protected void complete(TarantoolPacket packet, TarantoolOp<?> future) {
@@ -438,7 +472,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 if (future.getCode() == Code.EXECUTE) {
                     completeSql(future, packet);
                 } else {
-                    ((CompletableFuture) future).complete(packet.getBody().get(Key.DATA.getId()));
+                    ((TarantoolOp) future).complete(packet.getBody().get(Key.DATA.getId()));
                 }
             } else {
                 Object error = packet.getBody().get(Key.ERROR.getId());
@@ -447,13 +481,13 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
     }
 
-    protected void completeSql(CompletableFuture<?> future, TarantoolPacket pack) {
+    protected void completeSql(TarantoolOp<?> future, TarantoolPacket pack) {
         Long rowCount = SqlProtoUtils.getSqlRowCount(pack);
         if (rowCount != null) {
-            ((CompletableFuture) future).complete(rowCount);
+            ((TarantoolOp) future).complete(rowCount);
         } else {
             List<Map<String, Object>> values = SqlProtoUtils.readSqlResult(pack);
-            ((CompletableFuture) future).complete(values);
+            ((TarantoolOp) future).complete(values);
         }
     }
 
@@ -511,9 +545,32 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         closeChannel(channel);
     }
 
+    /**
+     * Gets the default timeout for client operations.
+     *
+     * @return timeout in millis
+     */
+    public long getOperationTimeout() {
+        return operationTimeout;
+    }
+
+    /**
+     * Sets the default operation timeout.
+     *
+     * @param operationTimeout timeout in millis
+     */
+    public void setOperationTimeout(long operationTimeout) {
+        this.operationTimeout = operationTimeout;
+    }
+
     @Override
     public boolean isAlive() {
         return state.getState() == StateHelper.ALIVE && thumbstone == null;
+    }
+
+    @Override
+    public boolean isClosed() {
+        return state.getState() == StateHelper.CLOSED;
     }
 
     @Override
@@ -546,11 +603,9 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         return fireAndForgetOps;
     }
 
-
     @Override
     public TarantoolSQLOps<Object, Long, List<Map<String, Object>>> sqlSyncOps() {
         return new TarantoolSQLOps<Object, Long, List<Map<String, Object>>>() {
-
             @Override
             public Long update(String sql, Object... bind) {
                 return (Long) syncGet(exec(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, bind));
@@ -616,27 +671,95 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     }
 
-    protected class ComposableAsyncOps
-        extends AbstractTarantoolOps<Integer, List<?>, Object, CompletionStage<List<?>>> {
-
-        @Override
-        public CompletionStage<List<?>> exec(Code code, Object... args) {
-            return (CompletionStage<List<?>>) TarantoolClientImpl.this.doExec(code, args);
-        }
-
-        @Override
-        public void close() {
-            TarantoolClientImpl.this.close();
-        }
-
-    }
-
-    protected boolean isDead(CompletableFuture<?> q) {
+    protected boolean isDead(TarantoolOp<?> future) {
         if (this.thumbstone != null) {
-            fail(q, new CommunicationException("Connection is dead", thumbstone));
+            fail(future, new CommunicationException("Connection is dead", thumbstone));
             return true;
         }
         return false;
+    }
+
+    protected static class TarantoolOp<V> extends CompletableFuture<V> {
+
+        /**
+         * A task identifier used in {@link TarantoolClientImpl#futures}.
+         */
+        private final long id;
+
+        /**
+         * Tarantool binary protocol operation code.
+         */
+        private final Code code;
+
+        /**
+         * Arguments of operation.
+         */
+        private final Object[] args;
+
+        public TarantoolOp(long id, Code code, Object[] args) {
+            this.id = id;
+            this.code = code;
+            this.args = args;
+        }
+
+        public long getId() {
+            return id;
+        }
+
+        public Code getCode() {
+            return code;
+        }
+
+        public Object[] getArgs() {
+            return args;
+        }
+
+        /**
+         * Missed in jdk8 CompletableFuture operator to limit execution
+         * by time.
+         */
+        public TarantoolOp<V> orTimeout(long timeout, TimeUnit unit) {
+            if (timeout < 0) {
+                throw new IllegalArgumentException("Timeout cannot be negative");
+            }
+            if (unit == null) {
+                throw new IllegalArgumentException("Time unit cannot be null");
+            }
+            if (timeout == 0 || isDone()) {
+                return this;
+            }
+            ScheduledFuture<?> abandonByTimeoutAction = TimeoutScheduler.EXECUTOR.schedule(
+                () -> {
+                    if (!this.isDone()) {
+                        this.completeExceptionally(new TimeoutException());
+                    }
+                },
+                timeout, unit
+            );
+            whenComplete(
+                (ignored, error) -> {
+                    if (error == null && !abandonByTimeoutAction.isDone()) {
+                        abandonByTimeoutAction.cancel(false);
+                    }
+                }
+            );
+            return this;
+        }
+
+        /**
+         * Runs timeout operation as a delayed task.
+         */
+        static class TimeoutScheduler {
+
+            static final ScheduledThreadPoolExecutor EXECUTOR;
+
+            static {
+                EXECUTOR =
+                    new ScheduledThreadPoolExecutor(1, new TarantoolThreadDaemonFactory("tarantoolTimeout"));
+                EXECUTOR.setRemoveOnCancelPolicy(true);
+            }
+        }
+
     }
 
     /**
@@ -838,19 +961,17 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     }
 
-    protected static class TarantoolOp<V> extends CompletableFuture<V> {
+    protected class ComposableAsyncOps
+        extends AbstractTarantoolOps<Integer, List<?>, Object, CompletionStage<List<?>>> {
 
-        /**
-         * Tarantool binary protocol operation code.
-         */
-        private final Code code;
-
-        public TarantoolOp(Code code) {
-            this.code = code;
+        @Override
+        public CompletionStage<List<?>> exec(Code code, Object... args) {
+            return (CompletionStage<List<?>>) TarantoolClientImpl.this.exec(code, args);
         }
 
-        public Code getCode() {
-            return code;
+        @Override
+        public void close() {
+            TarantoolClientImpl.this.close();
         }
 
     }

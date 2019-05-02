@@ -11,10 +11,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer, List<?>, Object, Result> {
     protected String serverVersion;
-
-    /**
-     * Connection state.
-     */
     protected MsgPackLite msgPackLite = MsgPackLite.INSTANCE;
     protected AtomicLong syncId = new AtomicLong();
     protected int initialRequestSize = 4096;
@@ -25,7 +21,7 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
     public TarantoolBase(String username, String password, Socket socket) {
         super();
         try {
-            TarantoolGreeting greeting = ProtoUtils.connect(socket, username, password);
+            TarantoolGreeting greeting = ProtoUtils.connect(socket, username, password, msgPackLite);
             this.serverVersion = greeting.getServerVersion();
         } catch (IOException e) {
             throw new CommunicationException("Couldn't connect to tarantool", e);
