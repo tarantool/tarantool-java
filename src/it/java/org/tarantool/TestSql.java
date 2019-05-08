@@ -36,7 +36,7 @@
 //
 //    public static void main(String[] args) throws IOException, SQLException {
 //
-//        NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(new DriverManagerDataSource("tarantool://localhost:3301?username=test&password=test&socketProvider=org.tarantool.TestSql$TestSocketProvider"));
+//        NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(new DriverManagerDataSource("jdbc:tarantool://localhost:3301?username=test&password=test&socketProvider=org.tarantool.TestSql$TestSocketProvider"));
 //        RowMapper<Object> rowMapper = new RowMapper<Object>() {
 //            @Override
 //            public Object mapRow(ResultSet resultSet, int i) throws SQLException {

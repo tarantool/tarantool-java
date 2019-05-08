@@ -138,13 +138,13 @@ To configure socket channel provider you should implements SocketChannelProvider
 For example:
 
 ```
-tarantool://localhost:3301?user=test&password=test&socketProvider=abc.xyz.MySocketProvider
+jdbc:tarantool://localhost:3301?user=test&password=test&socketProvider=abc.xyz.MySocketProvider
 ```
 
 Here is an example how you can use the driver covered by Spring `DriverManagerDataSource`:
 
 ```java
-NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(new DriverManagerDataSource("tarantool://localhost:3301?user=test&password=test"));
+NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(new DriverManagerDataSource("jdbc:tarantool://localhost:3301?user=test&password=test"));
 RowMapper<Object> rowMapper = new RowMapper<Object>() {
     @Override
     public Object mapRow(ResultSet resultSet, int i) throws SQLException {

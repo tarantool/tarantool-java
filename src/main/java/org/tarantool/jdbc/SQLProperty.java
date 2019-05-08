@@ -44,7 +44,7 @@ public enum SQLProperty {
     LOGIN_TIMEOUT(
         "loginTimeout",
         "The number of milliseconds to wait for connection establishment. " +
-            "The default value is 60000 (1 minute).",
+            "The default system value is 60000 (1 minute).",
         "60000",
         null,
         false
@@ -82,6 +82,10 @@ public enum SQLProperty {
 
     public String getDefaultValue() {
         return defaultValue;
+    }
+
+    public int getDefaultIntValue() {
+        return Integer.parseInt(defaultValue);
     }
 
     public boolean isRequired() {

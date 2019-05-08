@@ -58,7 +58,7 @@ public class SQLConnection implements Connection {
     private DatabaseMetaData cachedMetadata;
     private int resultSetHoldability = UNSET_HOLDABILITY;
 
-    SQLConnection(String url, Properties properties) throws SQLException {
+    public SQLConnection(String url, Properties properties) throws SQLException {
         this.url = url;
         this.properties = properties;
 

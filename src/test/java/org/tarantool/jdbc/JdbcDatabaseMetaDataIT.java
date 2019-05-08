@@ -229,7 +229,7 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         String version = meta.getDriverVersion();
 
         // Verify driver name.
-        assertEquals("tarantool-java", name);
+        assertEquals(SQLConstant.DRIVER_NAME, name);
 
         // Verify driver version format.
         // E.g. 1.7.6 or 1.7.6-SNAPSHOT.

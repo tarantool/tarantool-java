@@ -154,7 +154,7 @@ public class JdbcExceptionHandlingTest {
         doThrow(ex).when(sqlOps).execute("TEST");
 
         SQLTarantoolClientImpl client = buildSQLClient(sqlOps, null);
-        final Statement stmt = new SQLStatement(buildTestSQLConnection(client, "tarantool://0:0"));
+        final Statement stmt = new SQLStatement(buildTestSQLConnection(client, "jdbc:tarantool://0:0"));
 
         SQLException e = assertThrows(SQLException.class, new Executable() {
             @Override
@@ -177,7 +177,7 @@ public class JdbcExceptionHandlingTest {
 
         SQLTarantoolClientImpl client = buildSQLClient(sqlOps, null);
         final PreparedStatement prep = new SQLPreparedStatement(
-            buildTestSQLConnection(client, "tarantool://0:0"), "TEST");
+            buildTestSQLConnection(client, "jdbc:tarantool://0:0"), "TEST");
 
 
         SQLException e = assertThrows(SQLException.class, new Executable() {
@@ -201,7 +201,7 @@ public class JdbcExceptionHandlingTest {
         doThrow(ex).when(syncOps).select(_VSPACE, 2, Arrays.asList("TEST"), 0, 1, 0);
 
         SQLTarantoolClientImpl client = buildSQLClient(null, syncOps);
-        SQLConnection conn = buildTestSQLConnection(client, "tarantool://0:0");
+        SQLConnection conn = buildTestSQLConnection(client, "jdbc:tarantool://0:0");
         final DatabaseMetaData meta = conn.getMetaData();
 
         SQLException e = assertThrows(SQLException.class, () -> consumer.accept(meta));

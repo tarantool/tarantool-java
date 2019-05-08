@@ -96,7 +96,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public String getDriverName() throws SQLException {
-        return "tarantool-java";
+        return SQLConstant.DRIVER_NAME;
     }
 
     @Override

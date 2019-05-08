@@ -57,6 +57,9 @@ public class SQLDriver implements Driver {
     protected Properties parseQueryString(URI uri, Properties info) throws SQLException {
         Properties urlProperties = new Properties();
 
+        // get scheme specific part (after the scheme part "jdbc:")
+        // to correct parse remaining URL
+        uri = URI.create(uri.getSchemeSpecificPart());
         String userInfo = uri.getUserInfo();
         if (userInfo != null) {
             // Get user and password from the corresponding part of the URI, i.e. before @ sign.
@@ -140,7 +143,7 @@ public class SQLDriver implements Driver {
 
     @Override
     public boolean acceptsURL(String url) throws SQLException {
-        return url.toLowerCase().startsWith("tarantool:");
+        return url.toLowerCase().startsWith("jdbc:tarantool:");
     }
 
     @Override

@@ -29,7 +29,7 @@ public abstract class AbstractJdbcIT {
     private static final Integer port = Integer.valueOf(System.getProperty("tntPort", "3301"));
     private static final String user = System.getProperty("tntUser", "test_admin");
     private static final String pass = System.getProperty("tntPass", "4pWBZmLEgkmKK5WP");
-    private static String URL = String.format("tarantool://%s:%d?user=%s&password=%s", host, port, user, pass);
+    private static String URL = String.format("jdbc:tarantool://%s:%d?user=%s&password=%s", host, port, user, pass);
 
     protected static final String LUA_FILE = "jdk-testing.lua";
     protected static final int LISTEN = 3301;

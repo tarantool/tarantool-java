@@ -35,7 +35,7 @@ public class JdbcDriverTest {
         SQLProperty.PASSWORD.setString(prop, "secret");
 
         URI uri = new URI(String.format(
-            "tarantool://server.local:3302?%s=%s&%s=%d",
+            "jdbc:tarantool://server.local:3302?%s=%s&%s=%d",
             SQLProperty.SOCKET_CHANNEL_PROVIDER.getName(), "some.class",
             SQLProperty.QUERY_TIMEOUT.getName(), 5000)
         );
@@ -54,7 +54,7 @@ public class JdbcDriverTest {
     @Test
     public void testParseQueryStringUserInfoInURI() throws Exception {
         SQLDriver drv = new SQLDriver();
-        Properties result = drv.parseQueryString(new URI("tarantool://adm:secret@server.local"), null);
+        Properties result = drv.parseQueryString(new URI("jdbc:tarantool://adm:secret@server.local"), null);
         assertNotNull(result);
         assertEquals("server.local", SQLProperty.HOST.getString(result));
         assertEquals("3301", SQLProperty.PORT.getString(result));
@@ -65,7 +65,7 @@ public class JdbcDriverTest {
     @Test
     public void testParseQueryStringValidations() {
         // Check non-number port
-        checkParseQueryStringValidation("tarantool://0",
+        checkParseQueryStringValidation("jdbc:tarantool://0",
             new Properties() {
                 {
                     SQLProperty.PORT.setString(this, "nan");
@@ -74,35 +74,35 @@ public class JdbcDriverTest {
             "Property port must be a valid number.");
 
         // Check zero port
-        checkParseQueryStringValidation("tarantool://0:0", null, "Port is out of range: 0");
+        checkParseQueryStringValidation("jdbc:tarantool://0:0", null, "Port is out of range: 0");
 
         // Check high port
-        checkParseQueryStringValidation("tarantool://0:65536", null, "Port is out of range: 65536");
+        checkParseQueryStringValidation("jdbc:tarantool://0:65536", null, "Port is out of range: 65536");
 
         // Check non-number init timeout
         checkParseQueryStringValidation(
-            String.format("tarantool://0:3301?%s=nan", SQLProperty.LOGIN_TIMEOUT.getName()),
+            String.format("jdbc:tarantool://0:3301?%s=nan", SQLProperty.LOGIN_TIMEOUT.getName()),
             null,
             "Property loginTimeout must be a valid number."
         );
 
         // Check negative init timeout
         checkParseQueryStringValidation(
-            String.format("tarantool://0:3301?%s=-100", SQLProperty.LOGIN_TIMEOUT.getName()),
+            String.format("jdbc:tarantool://0:3301?%s=-100", SQLProperty.LOGIN_TIMEOUT.getName()),
             null,
             "Property loginTimeout must not be negative."
         );
 
         // Check non-number operation timeout
         checkParseQueryStringValidation(
-            String.format("tarantool://0:3301?%s=nan", SQLProperty.QUERY_TIMEOUT.getName()),
+            String.format("jdbc:tarantool://0:3301?%s=nan", SQLProperty.QUERY_TIMEOUT.getName()),
             null,
             "Property queryTimeout must be a valid number."
         );
 
         // Check negative operation timeout
         checkParseQueryStringValidation(
-            String.format("tarantool://0:3301?%s=-100", SQLProperty.QUERY_TIMEOUT.getName()),
+            String.format("jdbc:tarantool://0:3301?%s=-100", SQLProperty.QUERY_TIMEOUT.getName()),
             null,
             "Property queryTimeout must not be negative."
         );
@@ -112,7 +112,7 @@ public class JdbcDriverTest {
     public void testGetPropertyInfo() throws SQLException {
         Driver drv = new SQLDriver();
         Properties props = new Properties();
-        DriverPropertyInfo[] info = drv.getPropertyInfo("tarantool://server.local:3302", props);
+        DriverPropertyInfo[] info = drv.getPropertyInfo("jdbc:tarantool://server.local:3302", props);
         assertNotNull(info);
         assertEquals(7, info.length);
 
@@ -168,7 +168,7 @@ public class JdbcDriverTest {
         ServerSocket socket = new ServerSocket();
         socket.bind(null, 0);
         try {
-            final String url = "tarantool://localhost:" + socket.getLocalPort();
+            final String url = "jdbc:tarantool://localhost:" + socket.getLocalPort();
             final Properties prop = new Properties();
             SQLProperty.LOGIN_TIMEOUT.setInt(prop, 500);
             SQLException e = assertThrows(SQLException.class, new Executable() {
@@ -185,12 +185,12 @@ public class JdbcDriverTest {
     }
 
     private void checkCustomSocketProviderFail(String providerClassName, String errMsg) throws SQLException {
-        final Driver drv = DriverManager.getDriver("tarantool:");
+        final Driver drv = DriverManager.getDriver("jdbc:tarantool:");
         final Properties prop = new Properties();
         SQLProperty.SOCKET_CHANNEL_PROVIDER.setString(prop, providerClassName);
         SQLProperty.LOGIN_TIMEOUT.setInt(prop, 500);
 
-        SQLException e = assertThrows(SQLException.class, () -> drv.connect("tarantool://0:3301", prop));
+        SQLException e = assertThrows(SQLException.class, () -> drv.connect("jdbc:tarantool://0:3301", prop));
         assertTrue(e.getMessage().startsWith(errMsg), e.getMessage());
     }
 
