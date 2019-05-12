@@ -157,12 +157,14 @@ public class JdbcStatementIT extends AbstractJdbcIT {
 
     @Test
     public void testUnwrap() throws SQLException {
+        assertEquals(stmt, stmt.unwrap(TarantoolStatement.class));
         assertEquals(stmt, stmt.unwrap(SQLStatement.class));
         assertThrows(SQLException.class, () -> stmt.unwrap(Integer.class));
     }
 
     @Test
     public void testIsWrapperFor() throws SQLException {
+        assertTrue(stmt.isWrapperFor(TarantoolStatement.class));
         assertTrue(stmt.isWrapperFor(SQLStatement.class));
         assertFalse(stmt.isWrapperFor(Integer.class));
     }
@@ -247,4 +249,103 @@ public class JdbcStatementIT extends AbstractJdbcIT {
         Statement statement = conn.createStatement();
         assertEquals(conn, statement.getConnection());
     }
+
+    @Test
+    void testCloseOnCompletion() throws SQLException {
+        assertFalse(stmt.isCloseOnCompletion());
+        stmt.closeOnCompletion();
+        assertTrue(stmt.isCloseOnCompletion());
+    }
+
+    @Test
+    void testCloseOnCompletionDisabled() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT val FROM test WHERE id=1");
+        assertFalse(stmt.isClosed());
+        assertFalse(resultSet.isClosed());
+
+        resultSet.close();
+        assertTrue(resultSet.isClosed());
+        assertFalse(stmt.isClosed());
+    }
+
+    @Test
+    void testCloseOnCompletionEnabled() throws SQLException {
+        stmt.closeOnCompletion();
+        ResultSet resultSet = stmt.executeQuery("SELECT val FROM test WHERE id=1");
+
+        assertFalse(stmt.isClosed());
+        assertFalse(resultSet.isClosed());
+
+        resultSet.close();
+        assertTrue(resultSet.isClosed());
+        assertTrue(stmt.isClosed());
+    }
+
+    @Test
+    void testCloseOnCompletionAfterResultSet() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT val FROM test WHERE id=1");
+        stmt.closeOnCompletion();
+
+        assertFalse(stmt.isClosed());
+        assertFalse(resultSet.isClosed());
+
+        resultSet.close();
+        assertTrue(resultSet.isClosed());
+        assertTrue(stmt.isClosed());
+    }
+
+    @Test
+    void testCloseOnCompletionMultipleResultSets() throws SQLException {
+        stmt.closeOnCompletion();
+        ResultSet resultSet = stmt.executeQuery("SELECT val FROM test WHERE id=1");
+        ResultSet anotherResultSet = stmt.executeQuery("SELECT val FROM test WHERE id=2");
+
+        assertTrue(resultSet.isClosed());
+        assertFalse(anotherResultSet.isClosed());
+        assertFalse(stmt.isClosed());
+
+        anotherResultSet.close();
+        assertTrue(anotherResultSet.isClosed());
+        assertTrue(stmt.isClosed());
+    }
+
+    @Test
+    void testCloseOnCompletionUpdateQueries() throws SQLException {
+        stmt.closeOnCompletion();
+
+        int updateCount = stmt.executeUpdate("INSERT INTO test(id, val) VALUES (5, 'five')");
+        assertEquals(1, updateCount);
+        assertFalse(stmt.isClosed());
+
+        updateCount = stmt.executeUpdate("INSERT INTO test(id, val) VALUES (6, 'six')");
+        assertEquals(1, updateCount);
+        assertFalse(stmt.isClosed());
+    }
+
+    @Test
+    void testCloseOnCompletionMixedQueries() throws SQLException {
+        stmt.closeOnCompletion();
+
+        int updateCount = stmt.executeUpdate("INSERT INTO test(id, val) VALUES (7, 'seven')");
+        assertEquals(1, updateCount);
+        assertFalse(stmt.isClosed());
+
+        ResultSet resultSet = stmt.executeQuery("SELECT val FROM test WHERE id=7");
+        assertFalse(resultSet.isClosed());
+        assertFalse(stmt.isClosed());
+
+        updateCount = stmt.executeUpdate("INSERT INTO test(id, val) VALUES (8, 'eight')");
+        assertEquals(1, updateCount);
+        assertTrue(resultSet.isClosed());
+        assertFalse(stmt.isClosed());
+
+        resultSet = stmt.executeQuery("SELECT val FROM test WHERE id=8");
+        assertFalse(resultSet.isClosed());
+        assertFalse(stmt.isClosed());
+
+        resultSet.close();
+        assertTrue(resultSet.isClosed());
+        assertTrue(stmt.isClosed());
+    }
+
 }

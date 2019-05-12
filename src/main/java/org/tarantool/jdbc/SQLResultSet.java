@@ -38,13 +38,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SQLResultSet implements ResultSet {
 
-    private final CursorIterator<List<Object>> iterator;
-    private final SQLResultSetMetaData metaData;
+    private CursorIterator<List<Object>> iterator;
+    private SQLResultSetMetaData metaData;
 
     private Map<String, Integer> columnByNameLookups;
     private boolean lastColumnWasNull;
 
-    private final Statement statement;
+    private final TarantoolStatement statement;
     private final int maxRows;
 
     private AtomicBoolean isClosed = new AtomicBoolean(false);
@@ -53,7 +53,7 @@ public class SQLResultSet implements ResultSet {
     private final int concurrencyLevel;
     private final int holdability;
 
-    public SQLResultSet(SQLResultHolder holder, SQLStatement ownerStatement) throws SQLException {
+    public SQLResultSet(SQLResultHolder holder, TarantoolStatement ownerStatement) throws SQLException {
         metaData = new SQLResultSetMetaData(holder.getSqlMetadata());
         statement = ownerStatement;
         scrollType = statement.getResultSetType();
@@ -108,7 +108,13 @@ public class SQLResultSet implements ResultSet {
     @Override
     public void close() throws SQLException {
         if (isClosed.compareAndSet(false, true)) {
-            iterator.close();
+            try {
+                iterator.close();
+                iterator = null;
+                metaData = null;
+            } finally {
+                statement.checkCompletion();
+            }
         }
     }
 
@@ -393,11 +399,13 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public ResultSetMetaData getMetaData() throws SQLException {
+        checkNotClosed();
         return metaData;
     }
 
     @Override
     public int findColumn(String columnLabel) throws SQLException {
+        checkNotClosed();
         return findColumnIndex(columnLabel);
     }
 
@@ -1122,7 +1130,7 @@ public class SQLResultSet implements ResultSet {
         if (isWrapperFor(type)) {
             return type.cast(this);
         }
-        throw new SQLNonTransientException("ResultSet does not wrap " + type.getName());
+        throw new SQLNonTransientException("SQLResultSet does not wrap " + type.getName());
     }
 
     @Override

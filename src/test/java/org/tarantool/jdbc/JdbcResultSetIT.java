@@ -167,8 +167,12 @@ public class JdbcResultSetIT extends JdbcTypesIT {
         assertNotNull(resultSet);
         ResultSetMetaData metaData = resultSet.getMetaData();
         assertNotNull(metaData);
+
+        int expectedColumnSize = 2;
+        assertEquals(expectedColumnSize, metaData.getColumnCount());
+
         resultSet.close();
-        assertEquals(metaData, resultSet.getMetaData());
+        assertEquals(expectedColumnSize, metaData.getColumnCount());
     }
 
     @Test

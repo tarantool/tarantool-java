@@ -1126,8 +1126,8 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
         return new SQLNullResultSet(SQLResultHolder.ofQuery(meta, rows), createMetadataStatement());
     }
 
-    private SQLStatement createMetadataStatement() throws SQLException {
-        return connection.createStatement().unwrap(SQLStatement.class);
+    private TarantoolStatement createMetadataStatement() throws SQLException {
+        return connection.createStatement().unwrap(TarantoolStatement.class);
     }
 
     private static <T> T ensureType(Class<T> cls, Object v) throws Exception {
@@ -1152,7 +1152,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     protected class SQLNullResultSet extends SQLResultSet {
 
-        public SQLNullResultSet(SQLResultHolder holder, SQLStatement ownerStatement) throws SQLException {
+        public SQLNullResultSet(SQLResultHolder holder, TarantoolStatement ownerStatement) throws SQLException {
             super(holder, ownerStatement);
         }
 

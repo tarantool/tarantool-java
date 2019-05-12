@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * types of cursors.
  * Supports only {@link ResultSet#HOLD_CURSORS_OVER_COMMIT} holdability type.
  */
-public class SQLStatement implements Statement {
+public class SQLStatement implements TarantoolStatement {
 
     protected final SQLConnection connection;
 
@@ -30,6 +30,8 @@ public class SQLStatement implements Statement {
      */
     protected SQLResultSet resultSet;
     protected int updateCount;
+
+    private boolean isCloseOnCompletion;
 
     private final int resultSetType;
     private final int resultSetConcurrency;
@@ -310,15 +312,36 @@ public class SQLStatement implements Statement {
         throw new SQLFeatureNotSupportedException();
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * <strong>Impl Note:</strong> this method doesn't affect
+     * execution methods which close the last result set implicitly.
+     * It is applied only when {@link ResultSet#close()} is invoked
+     * explicitly by the app.
+     *
+     * @throws SQLException if this method is called on a closed
+     * {@code Statement}
+     */
     @Override
     public void closeOnCompletion() throws SQLException {
-
+        checkNotClosed();
+        isCloseOnCompletion = true;
     }
 
     @Override
     public boolean isCloseOnCompletion() throws SQLException {
         checkNotClosed();
-        return false;
+        return isCloseOnCompletion;
+    }
+
+    @Override
+    public void checkCompletion() throws SQLException {
+        if (isCloseOnCompletion &&
+            resultSet != null &&
+            resultSet.isClosed()) {
+            close();
+        }
     }
 
     @Override
@@ -326,7 +349,7 @@ public class SQLStatement implements Statement {
         if (isWrapperFor(type)) {
             return type.cast(this);
         }
-        throw new SQLNonTransientException("Statement does not wrap " + type.getName());
+        throw new SQLNonTransientException("SQLStatement does not wrap " + type.getName());
     }
 
     @Override
@@ -338,15 +361,18 @@ public class SQLStatement implements Statement {
      * Clears the results of the most recent execution.
      */
     protected void discardLastResults() throws SQLException {
+        final SQLResultSet lastResultSet = resultSet;
+
         clearWarnings();
         updateCount = -1;
-        if (resultSet != null) {
+        resultSet = null;
+
+        if (lastResultSet != null) {
             try {
-                resultSet.close();
+                lastResultSet.close();
             } catch (Exception ignored) {
                 // No-op.
             }
-            resultSet = null;
         }
     }
 
@@ -375,16 +401,7 @@ public class SQLStatement implements Statement {
         return holder.isQueryResult();
     }
 
-    /**
-     * Returns {@link ResultSet} which will be initialized by <code>data</code>.
-     *
-     * @param data predefined result to be wrapped by {@link ResultSet}
-     *
-     * @return wrapped result
-     *
-     * @throws SQLException if a database access error occurs or
-     *                      this method is called on a closed <code>Statement</code>
-     */
+    @Override
     public ResultSet executeMetadata(SQLResultHolder data) throws SQLException {
         checkNotClosed();
         return createResultSet(data);
