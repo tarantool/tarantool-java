@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.Properties;
 
 public class JdbcExceptionHandlingTest {
+
     /**
      * Simulates meta parsing error: missing "name" field in a space format for the primary key.
      *

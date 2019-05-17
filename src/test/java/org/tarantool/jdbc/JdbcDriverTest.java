@@ -31,6 +31,7 @@ import java.sql.SQLException;
 import java.util.Properties;
 
 public class JdbcDriverTest {
+
     @Test
     public void testParseQueryString() throws Exception {
         SQLDriver drv = new SQLDriver();
