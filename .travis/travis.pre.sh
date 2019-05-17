@@ -2,14 +2,13 @@
 
 set -exuo pipefail # Strict shell
 
-# We need tarantool 2.* for jdbc/sql.
-curl http://download.tarantool.org/tarantool/2x/gpgkey | sudo apt-key add -
-release=`lsb_release -c -s`
+curl http://download.tarantool.org/tarantool/${TNT_VERSION}/gpgkey | sudo apt-key add -
+RELEASE=`lsb_release -c -s`
 
 sudo rm -f /etc/apt/sources.list.d/*tarantool*.list
-sudo tee /etc/apt/sources.list.d/tarantool_2x.list <<- EOF
-deb http://download.tarantool.org/tarantool/2x/ubuntu/ $release main
-deb-src http://download.tarantool.org/tarantool/2x/ubuntu/ $release main
+sudo tee /etc/apt/sources.list.d/tarantool_${TNT_VERSION/./_}.list <<- EOF
+deb http://download.tarantool.org/tarantool/${TNT_VERSION}/ubuntu/ ${RELEASE} main
+deb-src http://download.tarantool.org/tarantool/${TNT_VERSION}/ubuntu/ ${RELEASE} main
 EOF
 
 sudo apt-get update

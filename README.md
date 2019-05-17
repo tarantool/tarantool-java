@@ -281,7 +281,14 @@ base for possible answers and solutions.
 
 ## Building
 
-To run tests
-```
+To run unit tests use:
+ 
+```bash
 ./mvnw clean test
+``` 
+
+To run integration tests use:
+
+```bash
+./mvnw clean verify
 ```

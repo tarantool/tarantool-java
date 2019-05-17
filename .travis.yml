@@ -3,6 +3,17 @@ language: java
 sudo: required
 dist: trusty
 
+jdk:
+  - openjdk8
+  - openjdk11
+  - openjdk12
+
+env:
+  - TNT_VERSION=1.9
+  - TNT_VERSION=1.10
+  - TNT_VERSION=2x
+  - TNT_VERSION=2.2
+
 stages:
   - checkstyle
   - test
@@ -10,16 +21,11 @@ stages:
 jobs:
   include:
     - stage: checkstyle
+      env: []
       jdk: openjdk11
       before_script: skip
       script: mvn checkstyle:check
       after_success: skip
-    - stage: test
-      jdk: openjdk8
-    - stage: test
-      jdk: openjdk11
-    - stage: test
-      jdk: openjdk12
 
 before_script:
   - .travis/travis.pre.sh

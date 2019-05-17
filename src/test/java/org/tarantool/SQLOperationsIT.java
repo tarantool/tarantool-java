@@ -22,7 +22,9 @@ public class SQLOperationsIT extends AbstractTarantoolSQLOpsIT {
 
     @AfterEach
     public void tearDown() {
-        client.close();
+        if (client != null) {
+            client.close();
+        }
     }
 
     @Override

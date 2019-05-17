@@ -26,7 +26,6 @@ public abstract class AbstractTarantoolSQLConnectorIT {
     protected static final String LUA_FILE = "jdk-testing.lua";
     protected static final int LISTEN = 3301;
     protected static final int ADMIN = 3313;
-    protected static final int TIMEOUT = 500;
     protected static final int RESTART_TIMEOUT = 2000;
 
     protected static final SocketChannelProvider socketChannelProvider = new TestSocketChannelProvider(
@@ -36,46 +35,24 @@ public abstract class AbstractTarantoolSQLConnectorIT {
     protected static TarantoolControl control;
     protected static TarantoolConsole console;
 
-    protected static final String TABLE_NAME = "sql_test";
-
-    private static final String[] setupScript = new String[] {
-        "\\set language sql",
-        "\\set delimiter ;",
-
-        "CREATE TABLE sql_test (id INTEGER PRIMARY KEY, val VARCHAR(100));",
-        "CREATE UNIQUE INDEX sql_test_val_index_unique ON sql_test (val);",
-
-        "INSERT INTO sql_test VALUES (1, 'A');",
-        "INSERT INTO sql_test VALUES (2, 'B');",
-        "INSERT INTO sql_test VALUES (3, 'C');",
-    };
-
-    private static final String[] cleanScript = new String[] {
-        "DROP TABLE sql_test;"
-    };
-
     @BeforeAll
     public static void setupEnv() {
         control = new TarantoolControl();
         control.createInstance("jdk-testing", LUA_FILE, makeInstanceEnv(LISTEN, ADMIN));
         startTarantool("jdk-testing");
-
         console = openConsole();
-
-        executeLua(setupScript);
     }
 
     @AfterAll
     public static void cleanupEnv() {
         try {
-            executeLua(cleanScript);
             console.close();
         } finally {
             stopTarantool("jdk-testing");
         }
     }
 
-    private static void executeLua(String[] exprs) {
+    protected static void executeLua(String[] exprs) {
         for (String expr : exprs) {
             console.exec(expr);
         }

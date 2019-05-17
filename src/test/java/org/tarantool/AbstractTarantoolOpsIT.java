@@ -3,6 +3,8 @@ package org.tarantool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.tarantool.TestAssumptions.assumeMaximalServerVersion;
+import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -371,23 +373,38 @@ public abstract class AbstractTarantoolOpsIT extends AbstractTarantoolConnectorI
     }
 
     @Test
-    public void testInsertInvalidData() {
+    void testInsertInvalidData() {
         // Invalid types.
-        TarantoolException ex = assertThrows(TarantoolException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                getOps().insert(SPACE_ID, Arrays.asList("one", 1));
-            }
-        });
+        TarantoolException ex = assertThrows(
+            TarantoolException.class,
+            () -> getOps().insert(SPACE_ID, Arrays.asList("one", 1))
+        );
         assertEquals("Tuple field 1 type does not match one required by operation: expected integer", ex.getMessage());
+    }
+
+    @Test
+    public void testInsertInvalidTupleSize2xVersion() {
+        assumeMinimalServerVersion(console, ServerVersion.V_2_1);
 
         // Invalid tuple size.
-        ex = assertThrows(TarantoolException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                getOps().insert(SPACE_ID, Collections.singletonList(101));
-            }
-        });
+        TarantoolException ex = assertThrows(
+            TarantoolException.class,
+            () -> getOps().insert(SPACE_ID, Collections.singletonList(101))
+        );
         assertEquals("Tuple field 2 required by space format is missing", ex.getMessage());
     }
+
+    @Test
+    public void testInsertInvalidTupleSize1xVersion() {
+        assumeMaximalServerVersion(console, ServerVersion.V_1_10);
+
+        // Invalid tuple size.
+        TarantoolException ex = assertThrows(
+            TarantoolException.class,
+            () -> getOps().insert(SPACE_ID, Collections.singletonList(101))
+        );
+        assertEquals("Tuple field count 1 is less than required by space format or defined indexes " +
+            "(expected at least 2)", ex.getMessage());
+    }
+
 }

@@ -75,6 +75,10 @@ public class TestUtils {
         return env;
     }
 
+    protected static String getTarantoolVersion(TarantoolConsole console) {
+        return console.eval("return box.info.version");
+    }
+
     /**
      * See waitReplication(TarantoolClientImpl client, int timeout).
      */

@@ -1,10 +1,12 @@
 package org.tarantool.jdbc;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 import static org.tarantool.TestUtils.makeInstanceEnv;
 import static org.tarantool.jdbc.SqlTestUtils.getCreateTableSQL;
 
+import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolConnection;
+import org.tarantool.TarantoolConsole;
 import org.tarantool.TarantoolControl;
 
 import org.junit.jupiter.api.AfterAll;
@@ -24,6 +26,7 @@ import java.util.List;
 
 //mvn -DtntHost=localhost -DtntPort=3301 -DtntUser=test -DtntPass=test verify
 public abstract class AbstractJdbcIT {
+
     private static final String host = System.getProperty("tntHost", "localhost");
     private static final Integer port = Integer.valueOf(System.getProperty("tntPort", "3301"));
     private static final String user = System.getProperty("tntUser", "test_admin");
@@ -58,28 +61,26 @@ public abstract class AbstractJdbcIT {
         control = new TarantoolControl();
         control.createInstance("jdk-testing", LUA_FILE, makeInstanceEnv(LISTEN, ADMIN));
         control.start("jdk-testing");
-
-        sqlExec(cleanSql);
-        sqlExec(initSql);
     }
 
     @AfterAll
     public static void teardownEnv() throws Exception {
-        try {
-            sqlExec(cleanSql);
-        } finally {
-            control.stop("jdk-testing");
-        }
+        control.stop("jdk-testing");
     }
 
     @BeforeEach
-    public void setUpConnection() throws SQLException {
+    public void setUpTest() throws SQLException {
+        assumeMinimalServerVersion(TarantoolConsole.open(host, ADMIN), ServerVersion.V_2_1);
+
         conn = DriverManager.getConnection(URL);
-        assertNotNull(conn);
+        sqlExec(cleanSql);
+        sqlExec(initSql);
     }
 
     @AfterEach
-    public void tearDownConnection() throws SQLException {
+    public void tearDownTest() throws SQLException {
+        assumeMinimalServerVersion(TarantoolConsole.open(host, ADMIN), ServerVersion.V_2_1);
+        sqlExec(cleanSql);
         if (conn != null && !conn.isClosed()) {
             conn.close();
         }
@@ -122,4 +123,5 @@ public abstract class AbstractJdbcIT {
             throw new RuntimeException(e);
         }
     }
+
 }
