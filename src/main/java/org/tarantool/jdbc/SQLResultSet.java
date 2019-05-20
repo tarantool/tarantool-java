@@ -42,6 +42,7 @@ public class SQLResultSet implements ResultSet {
     private final SQLResultSetMetaData metaData;
 
     private Map<String, Integer> columnByNameLookups;
+    private boolean lastColumnWasNull;
 
     private final Statement statement;
     private final int maxRows;
@@ -86,6 +87,24 @@ public class SQLResultSet implements ResultSet {
         return iterator.getItem();
     }
 
+    protected Object getRaw(int columnIndex) throws SQLException {
+        checkNotClosed();
+        metaData.checkColumnIndex(columnIndex);
+        List<Object> row = getCurrentRow();
+        Object value = row.get(columnIndex - 1);
+        lastColumnWasNull = (value == null);
+        return value;
+    }
+
+    protected Number getNumber(int columnIndex) throws SQLException {
+        Number raw = (Number) getRaw(columnIndex);
+        return raw == null ? 0 : raw;
+    }
+
+    protected Number getNullableNumber(int columnIndex) throws SQLException {
+        return (Number) getRaw(columnIndex);
+    }
+
     @Override
     public void close() throws SQLException {
         if (isClosed.compareAndSet(false, true)) {
@@ -95,14 +114,8 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public boolean wasNull() throws SQLException {
-        return false;
-    }
-
-    protected Object getRaw(int columnIndex) throws SQLException {
         checkNotClosed();
-        metaData.checkColumnIndex(columnIndex);
-        List<Object> row = getCurrentRow();
-        return row.get(columnIndex - 1);
+        return lastColumnWasNull;
     }
 
     @Override
@@ -156,11 +169,6 @@ public class SQLResultSet implements ResultSet {
         return getInt(findColumn(columnLabel));
     }
 
-    private Number getNumber(int columnIndex) throws SQLException {
-        Number raw = (Number) getRaw(columnIndex);
-        return raw == null ? 0 : raw;
-    }
-
     @Override
     public long getLong(int columnIndex) throws SQLException {
         return (getNumber(columnIndex)).longValue();
@@ -193,13 +201,17 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
-        BigDecimal bigDecimal = new BigDecimal(getString(columnIndex));
+        String raw = getString(columnIndex);
+        if (raw == null) {
+            return null;
+        }
+        BigDecimal bigDecimal = new BigDecimal(raw);
         return scale > -1 ? bigDecimal.setScale(scale) : bigDecimal;
     }
 
     @Override
     public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-        return getBigDecimal(findColumn(columnLabel));
+        return getBigDecimal(findColumn(columnLabel), scale);
     }
 
     @Override
@@ -224,7 +236,8 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Date getDate(int columnIndex) throws SQLException {
-        return new java.sql.Date(getLong(columnIndex));
+        Number time = getNullableNumber(columnIndex);
+        return time == null ? null : new java.sql.Date(time.longValue());
     }
 
     @Override
@@ -244,7 +257,8 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Time getTime(int columnIndex) throws SQLException {
-        return new java.sql.Time(getLong(columnIndex));
+        Number time = getNullableNumber(columnIndex);
+        return time == null ? null : new java.sql.Time(time.longValue());
     }
 
     @Override
@@ -264,7 +278,8 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Timestamp getTimestamp(int columnIndex) throws SQLException {
-        return new java.sql.Timestamp(getLong(columnIndex));
+        Number time = getNullableNumber(columnIndex);
+        return time == null ? null : new java.sql.Timestamp(time.longValue());
     }
 
     @Override
@@ -285,7 +300,8 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public InputStream getAsciiStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(getString(columnIndex).getBytes(Charset.forName("ASCII")));
+        String string = getString(columnIndex);
+        return string == null ? null : new ByteArrayInputStream(string.getBytes(Charset.forName("ASCII")));
     }
 
     @Override
@@ -306,7 +322,8 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public InputStream getBinaryStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(getBytes(columnIndex));
+        byte[] bytes = getBytes(columnIndex);
+        return bytes == null ? null : new ByteArrayInputStream(bytes);
     }
 
     @Override
@@ -316,12 +333,13 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Reader getCharacterStream(int columnIndex) throws SQLException {
-        return new StringReader(getString(columnIndex));
+        String value = getString(columnIndex);
+        return value == null ? null : new StringReader(value);
     }
 
     @Override
     public Reader getCharacterStream(String columnLabel) throws SQLException {
-        return new StringReader(getString(columnLabel));
+        return getCharacterStream(findColumn(columnLabel));
     }
 
     @Override
@@ -331,7 +349,7 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Object getObject(String columnLabel) throws SQLException {
-        return getRaw(findColumn(columnLabel));
+        return getObject(findColumn(columnLabel));
     }
 
     @Override
@@ -346,12 +364,16 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
-        return type.cast(getRaw(columnIndex));
+        try {
+            return type.cast(getRaw(columnIndex));
+        } catch (Exception e) {
+            throw new SQLNonTransientException(e);
+        }
     }
 
     @Override
     public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
-        return type.cast(getRaw(findColumn(columnLabel)));
+        return getObject(findColumn(columnLabel), type);
     }
 
     @Override

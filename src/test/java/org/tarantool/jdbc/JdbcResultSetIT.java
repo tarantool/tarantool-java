@@ -208,7 +208,7 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     public void testNullsSortingDesc() throws SQLException {
-        ResultSet resultSet = stmt.executeQuery("SELECT * FROM test_nulls ORDER BY val DESC");
+        ResultSet resultSet = stmt.executeQuery("SELECT id, dig FROM test_nulls ORDER BY val DESC");
         for (int i = 0; i < 3; i++) {
             assertTrue(resultSet.next());
             assertNotNull(resultSet.getString(2));
@@ -218,6 +218,57 @@ public class JdbcResultSetIT extends JdbcTypesIT {
             assertNull(resultSet.getString(2));
         }
         assertFalse(resultSet.next());
+    }
+
+    @Test
+    void testObjectWasNullColumn() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT id, dig FROM test_nulls WHERE val IS NULL");
+        resultSet.next();
+
+        resultSet.getInt(1);
+        assertFalse(resultSet.wasNull());
+        assertNull(resultSet.getString(2));
+        assertTrue(resultSet.wasNull());
+    }
+
+    @Test
+    void testBinaryWasNullColumn() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT id, bin FROM test_nulls WHERE bin IS NULL");
+        resultSet.next();
+
+        resultSet.getInt(1);
+        assertFalse(resultSet.wasNull());
+        assertNull(resultSet.getString(2));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getAsciiStream(2));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getBinaryStream(2));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getUnicodeStream(2));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getCharacterStream(2));
+        assertTrue(resultSet.wasNull());
+    }
+
+    @Test
+    void testNumberWasNullColumn() throws SQLException {
+        ResultSet resultSet = stmt.executeQuery("SELECT id, dig FROM test_nulls WHERE dig IS NULL");
+        resultSet.next();
+
+        resultSet.getInt(1);
+        assertFalse(resultSet.wasNull());
+        assertEquals(0, resultSet.getInt(2));
+        assertTrue(resultSet.wasNull());
+        assertEquals(0, resultSet.getShort(2));
+        assertTrue(resultSet.wasNull());
+        assertEquals(0, resultSet.getByte(2));
+        assertTrue(resultSet.wasNull());
+        assertEquals(0, resultSet.getLong(2));
+        assertTrue(resultSet.wasNull());
+        assertEquals(0, resultSet.getDouble(2));
+        assertTrue(resultSet.wasNull());
+        assertEquals(0, resultSet.getFloat(2));
+        assertTrue(resultSet.wasNull());
     }
 
     @Test

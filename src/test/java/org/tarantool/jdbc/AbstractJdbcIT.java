@@ -39,8 +39,9 @@ public abstract class AbstractJdbcIT {
         "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100))",
         "INSERT INTO test VALUES (1, 'one'), (2, 'two'), (3, 'three')",
         "CREATE TABLE test_compound(id1 INT, id2 INT, val VARCHAR(100), PRIMARY KEY (id2, id1))",
-        "CREATE TABLE test_nulls(id INT PRIMARY KEY, val VARCHAR(100))",
-        "INSERT INTO test_nulls VALUES (1, 'a'), (2, 'b'), (3, 'c'), (4, NULL), (5, NULL), (6, NULL)",
+        "CREATE TABLE test_nulls(id INT PRIMARY KEY, val VARCHAR(100), dig INTEGER, bin SCALAR)",
+        "INSERT INTO test_nulls VALUES (1, 'a', 10, 'aa'), (2, 'b', 20, 'bb'), (3, 'c', 30, 'cc'), " +
+            "(4, NULL, NULL, NULL), (5, NULL, NULL, NULL), (6, NULL, NULL, NULL)",
         getCreateTableSQL("test_types", TntSqlType.values())
     };
 
