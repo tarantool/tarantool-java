@@ -76,6 +76,14 @@ public class JdbcDatabaseMetaDataIT {
     }
 
     @Test
+    public void testGetSupportedClientInfo() throws SQLException {
+        ResultSet rs = meta.getClientInfoProperties();
+        assertNotNull(rs);
+        assertFalse(rs.next());
+        rs.close();
+    }
+
+    @Test
     public void testGetTableTypes() throws SQLException {
         ResultSet rs = meta.getTableTypes();
         assertNotNull(rs);

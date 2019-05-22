@@ -17,14 +17,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import java.sql.ClientInfoStatus;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
+import java.util.Map;
 
 public class JdbcConnectionIT {
 
@@ -443,4 +446,19 @@ public class JdbcConnectionIT {
         );
     }
 
+    @Test
+    void testSetClientInfoProperties() {
+        String targetProperty = "ApplicationName";
+
+        SQLClientInfoException exception = assertThrows(
+            SQLClientInfoException.class,
+            () -> conn.setClientInfo(targetProperty, "TestApp")
+        );
+
+        Map<String, ClientInfoStatus> failedProperties = exception.getFailedProperties();
+        assertEquals(1, failedProperties.size());
+        assertEquals(ClientInfoStatus.REASON_UNKNOWN_PROPERTY, failedProperties.get(targetProperty));
+    }
+
 }
+

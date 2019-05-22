@@ -479,13 +479,13 @@ public class SQLConnection implements Connection {
     @Override
     public String getClientInfo(String name) throws SQLException {
         checkNotClosed();
-        throw new SQLFeatureNotSupportedException();
+        return null;
     }
 
     @Override
     public Properties getClientInfo() throws SQLException {
         checkNotClosed();
-        throw new SQLFeatureNotSupportedException();
+        return new Properties();
     }
 
     @Override
