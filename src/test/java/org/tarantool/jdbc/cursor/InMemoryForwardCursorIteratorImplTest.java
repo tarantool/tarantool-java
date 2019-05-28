@@ -2,6 +2,8 @@ package org.tarantool.jdbc.cursor;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.tarantool.jdbc.SqlTestUtils;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -9,18 +11,13 @@ import java.sql.SQLException;
 import java.util.List;
 
 @DisplayName("A forward iterator")
-class InMemoryForwardCursorIteratorImplTest extends AbstractCursorIteratorTest {
-
-    @Override
-    protected CursorIterator<List<Object>> getCursorIterator(List<List<Object>> result) {
-        return new InMemoryForwardCursorIteratorImpl(result);
-    }
+class InMemoryForwardCursorIteratorImplTest {
 
     @Test
     @DisplayName("failed trying to use unsupported operations")
     void testUnsupportedOperations() {
-        List<List<Object>> result = makeSingletonListResult("1");
-        CursorIterator<List<Object>> iterator = getCursorIterator(result);
+        List<List<Object>> result = SqlTestUtils.makeSingletonListResult("1");
+        CursorIterator<List<Object>> iterator = new InMemoryForwardCursorIteratorImpl(result);
 
         assertThrows(SQLException.class, iterator::beforeFirst);
         assertThrows(SQLException.class, iterator::afterLast);

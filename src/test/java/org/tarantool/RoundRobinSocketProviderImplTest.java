@@ -3,17 +3,27 @@ package org.tarantool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+import static org.tarantool.TestUtils.asRawHostAndPort;
+import static org.tarantool.TestUtils.extractRawHostAndPortString;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.Socket;
+import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 @DisplayName("A RR socket provider")
-public class RoundRobinSocketProviderImplTest extends AbstractSocketProviderTest {
+public class RoundRobinSocketProviderImplTest {
 
     @Test
     @DisplayName("initialized with a right addresses count")
@@ -150,6 +160,25 @@ public class RoundRobinSocketProviderImplTest extends AbstractSocketProviderTest
         RoundRobinSocketProviderImpl socketProvider
                 = wrapWithMockErroredChannelProvider(new RoundRobinSocketProviderImpl("unreachable-host:3301"));
         assertThrows(SocketProviderTransientException.class, () -> socketProvider.get(0, null));
+    }
+
+    private <T extends BaseSocketChannelProvider> T wrapWithMockChannelProvider(T source) throws IOException {
+        T wrapper = spy(source);
+        doReturn(makeSocketChannel()).when(wrapper).openChannel(anyObject());
+        return wrapper;
+    }
+
+    private <T extends BaseSocketChannelProvider> T wrapWithMockErroredChannelProvider(T source) throws IOException {
+        T wrapper = spy(source);
+        doThrow(IOException.class).when(wrapper).openChannel(anyObject());
+        return wrapper;
+    }
+
+    private SocketChannel makeSocketChannel() {
+        SocketChannel socketChannel = mock(SocketChannel.class);
+        when(socketChannel.socket()).thenReturn(mock(Socket.class));
+
+        return socketChannel;
     }
 
 }

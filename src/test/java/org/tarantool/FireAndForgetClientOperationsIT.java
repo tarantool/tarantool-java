@@ -3,8 +3,14 @@ package org.tarantool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.tarantool.TestAssertions.checkRawTupleResult;
+import static org.tarantool.TestUtils.makeDefaultClientConfig;
+import static org.tarantool.TestUtils.makeTestClient;
+import static org.tarantool.TestUtils.toLuaSelect;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -18,17 +24,52 @@ import java.util.Set;
 /**
  * Test "fire & forget" operations available in {@link TarantoolClientImpl} class.
  */
-public class FireAndForgetClientOperationsIT extends AbstractTarantoolConnectorIT {
+public class FireAndForgetClientOperationsIT {
+
+    private static final int RESTART_TIMEOUT = 2000;
+
+    private static TarantoolTestHelper testHelper;
+
+    private static final String SPACE_NAME = "basic_test";
+    private static final String[] SETUP_SCRIPT = new String[] {
+        "box.schema.space.create('basic_test', { format = " +
+            "{{name = 'id', type = 'integer'}," +
+            " {name = 'val', type = 'string'} } })",
+
+        "box.space.basic_test:create_index('pk', { type = 'TREE', parts = {'id'} } )",
+    };
+
+    private static final String[] CLEAN_SCRIPT = new String[] {
+        "box.space.basic_test and box.space.basic_test:drop()",
+    };
+
     private TarantoolClient client;
+    private int spaceId;
+
+    @BeforeAll
+    static void setupEnv() {
+        testHelper = new TarantoolTestHelper("fire-and-forget-ops-it");
+        testHelper.createInstance();
+        testHelper.startInstance();
+    }
+
+    @AfterAll
+    static void cleanupEnv() {
+        testHelper.stopInstance();
+    }
 
     @BeforeEach
     public void setup() {
-        client = makeClient();
+        testHelper.executeLua(SETUP_SCRIPT);
+
+        spaceId = testHelper.evaluate("box.space.basic_test.id");
+        client = makeTestClient(makeDefaultClientConfig(), RESTART_TIMEOUT);
     }
 
     @AfterEach
     public void tearDown() {
         client.close();
+        testHelper.executeLua(CLEAN_SCRIPT);
     }
 
     @Test
@@ -54,17 +95,17 @@ public class FireAndForgetClientOperationsIT extends AbstractTarantoolConnectorI
 
         Set<Long> syncIds = new HashSet<Long>();
 
-        syncIds.add(ffOps.insert(SPACE_ID, Arrays.asList(10, "10")));
-        syncIds.add(ffOps.delete(SPACE_ID, Collections.singletonList(10)));
+        syncIds.add(ffOps.insert(spaceId, Arrays.asList(10, "10")));
+        syncIds.add(ffOps.delete(spaceId, Collections.singletonList(10)));
 
-        syncIds.add(ffOps.insert(SPACE_ID, Arrays.asList(10, "10")));
-        syncIds.add(ffOps.update(SPACE_ID, Collections.singletonList(10), Arrays.asList("=", 1, "ten")));
+        syncIds.add(ffOps.insert(spaceId, Arrays.asList(10, "10")));
+        syncIds.add(ffOps.update(spaceId, Collections.singletonList(10), Arrays.asList("=", 1, "ten")));
 
-        syncIds.add(ffOps.replace(SPACE_ID, Arrays.asList(20, "20")));
-        syncIds.add(ffOps.upsert(SPACE_ID, Collections.singletonList(20), Arrays.asList(20, "twenty"),
+        syncIds.add(ffOps.replace(spaceId, Arrays.asList(20, "20")));
+        syncIds.add(ffOps.upsert(spaceId, Collections.singletonList(20), Arrays.asList(20, "twenty"),
             Arrays.asList("=", 1, "twenty")));
 
-        syncIds.add(ffOps.insert(SPACE_ID, Arrays.asList(30, "30")));
+        syncIds.add(ffOps.insert(spaceId, Arrays.asList(30, "30")));
         syncIds.add(ffOps.call("box.space.basic_test:delete", Collections.singletonList(30)));
 
         // Check the syncs.
@@ -76,8 +117,13 @@ public class FireAndForgetClientOperationsIT extends AbstractTarantoolConnectorI
         client.syncOps().ping();
 
         // Check the effects
-        checkTupleResult(consoleSelect(SPACE_NAME, 10), Arrays.asList(10, "ten"));
-        checkTupleResult(consoleSelect(SPACE_NAME, 20), Arrays.asList(20, "twenty"));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 10), Arrays.asList(10, "ten"));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 20), Arrays.asList(20, "twenty"));
         assertEquals(consoleSelect(SPACE_NAME, 30), Collections.emptyList());
     }
+
+    private List<?> consoleSelect(String spaceName, Object key) {
+        return testHelper.evaluate(toLuaSelect(spaceName, key));
+    }
+
 }

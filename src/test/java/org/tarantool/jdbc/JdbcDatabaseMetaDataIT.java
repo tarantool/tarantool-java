@@ -6,26 +6,73 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
+import org.tarantool.ServerVersion;
+import org.tarantool.TarantoolTestHelper;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
+public class JdbcDatabaseMetaDataIT {
+
+    private static final String[] INIT_SQL = new String[] {
+        "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100))",
+        "CREATE TABLE test_compound(id1 INT, id2 INT, val VARCHAR(100), PRIMARY KEY (id2, id1))"
+    };
+
+    private static final String[] CLEAN_SQL = new String[] {
+        "DROP TABLE IF EXISTS test",
+        "DROP TABLE IF EXISTS test_compound",
+    };
+
+    private static TarantoolTestHelper testHelper;
+    private static Connection connection;
 
     private DatabaseMetaData meta;
 
+    @BeforeAll
+    public static void setUpEnv() throws SQLException {
+        testHelper = new TarantoolTestHelper("jdbc-db-metadata-it");
+        testHelper.createInstance();
+        testHelper.startInstance();
+
+        connection = DriverManager.getConnection(SqlTestUtils.makeDefaultJdbcUrl());
+    }
+
+    @AfterAll
+    public static void tearDownEnv() throws SQLException {
+        if (connection != null) {
+            connection.close();
+        }
+
+        testHelper.stopInstance();
+    }
+
     @BeforeEach
     public void setUp() throws SQLException {
-        meta = conn.getMetaData();
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
+        testHelper.executeSql(INIT_SQL);
+
+        meta = connection.getMetaData();
+    }
+
+    @AfterEach
+    public void tearDownTest() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
+        testHelper.executeSql(CLEAN_SQL);
     }
 
     @Test
@@ -45,20 +92,14 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         ResultSet rs = meta.getTables(null, null, null, new String[] { "TABLE" });
         assertNotNull(rs);
 
-        assertTrue(rs.next());
-        assertEquals("TEST", rs.getString("TABLE_NAME"));
+        String[] expectedTables = { "TEST", "TEST_COMPOUND" };
 
-        assertTrue(rs.next());
-        assertEquals("TEST_COMPOUND", rs.getString("TABLE_NAME"));
-
-        assertTrue(rs.next());
-        assertEquals("TEST_NULLS", rs.getString("TABLE_NAME"));
-
-        assertTrue(rs.next());
-        assertEquals("TEST_TYPES", rs.getString("TABLE_NAME"));
+        for (String expectedTable : expectedTables) {
+            assertTrue(rs.next());
+            assertEquals(expectedTable, rs.getString("TABLE_NAME"));
+        }
 
         assertFalse(rs.next());
-
         rs.close();
     }
 
@@ -191,36 +232,6 @@ public class JdbcDatabaseMetaDataIT extends AbstractJdbcIT {
         assertEquals(colName, rs.getString(4));
         assertEquals(seq, rs.getInt(5));
         assertEquals(pkName, rs.getString(6));
-    }
-
-    @Test
-    public void testClosedConnection() throws SQLException {
-        conn.close();
-
-        int i = 0;
-        for (; i < 3; i++) {
-            final int step = i;
-            SQLException e = assertThrows(SQLException.class, new Executable() {
-                @Override
-                public void execute() throws Throwable {
-                    switch (step) {
-                    case 0:
-                        meta.getTables(null, null, null, new String[] { "TABLE" });
-                        break;
-                    case 1:
-                        meta.getColumns(null, null, "TEST", null);
-                        break;
-                    case 2:
-                        meta.getPrimaryKeys(null, null, "TEST");
-                        break;
-                    default:
-                        fail();
-                    }
-                }
-            });
-            assertEquals("Connection is closed.", e.getCause().getMessage());
-        }
-        assertEquals(3, i);
     }
 
     @Test

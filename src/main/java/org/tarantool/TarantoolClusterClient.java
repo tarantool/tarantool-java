@@ -278,6 +278,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
                         onInstancesRefreshed(lastInstances);
                     }
                 } catch (Exception ignored) {
+                    ignored.getCause();
                     // no-op
                 }
             }

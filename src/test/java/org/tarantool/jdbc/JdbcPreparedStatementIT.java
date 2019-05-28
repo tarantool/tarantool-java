@@ -7,34 +7,82 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
+import org.tarantool.ServerVersion;
+import org.tarantool.TarantoolTestHelper;
+import org.tarantool.TestUtils;
 import org.tarantool.util.SQLStates;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
-import java.math.BigDecimal;
-import java.sql.Date;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
+import java.util.List;
 
-public class JdbcPreparedStatementIT extends JdbcTypesIT {
+public class JdbcPreparedStatementIT {
+
+    private static final String[] INIT_SQL = new String[] {
+        "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100))",
+    };
+
+    private static final String[] CLEAN_SQL = new String[] {
+        "DROP TABLE IF EXISTS test"
+    };
+
+    private static TarantoolTestHelper testHelper;
+    private static Connection conn;
 
     private PreparedStatement prep;
 
+    @BeforeAll
+    public static void setupEnv() throws SQLException {
+        testHelper = new TarantoolTestHelper("jdbc-prepared-it");
+        testHelper.createInstance();
+        testHelper.startInstance();
+
+        conn = DriverManager.getConnection(SqlTestUtils.makeDefaultJdbcUrl());
+    }
+
+    @AfterAll
+    public static void teardownEnv() throws SQLException {
+        if (conn != null) {
+            conn.close();
+        }
+        testHelper.stopInstance();
+    }
+
+    @BeforeEach
+    public void setUpTest() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
+        testHelper.executeSql(INIT_SQL);
+    }
+
     @AfterEach
-    public void tearDown() throws SQLException {
-        if (prep != null && !prep.isClosed()) {
+    public void tearDownTest() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
+        testHelper.executeSql(CLEAN_SQL);
+
+        if (prep != null) {
             prep.close();
         }
     }
 
     @Test
     public void testExecuteQuery() throws SQLException {
-        prep = conn.prepareStatement("SELECT val FROM test WHERE id=?");
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, 'one'), (2, 'two')");
+
+        prep = conn.prepareStatement("SELECT val FROM test WHERE id = ?");
         assertNotNull(prep);
 
         prep.setInt(1, 1);
@@ -75,7 +123,7 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
         int count = prep.executeUpdate();
         assertEquals(1, count);
 
-        assertEquals("hundred", getRow("test", 100).get(1));
+        assertEquals("hundred", consoleSelect(100).get(1));
 
         // Reuse the prepared statement.
         prep.setInt(1, 1000);
@@ -83,7 +131,7 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
         count = prep.executeUpdate();
         assertEquals(1, count);
 
-        assertEquals("thousand", getRow("test", 1000).get(1));
+        assertEquals("thousand", consoleSelect(1000).get(1));
     }
 
     @Test
@@ -97,19 +145,20 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
 
     @Test
     public void testExecuteReturnsResultSet() throws SQLException {
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, 'one')");
+
         prep = conn.prepareStatement("SELECT val FROM test WHERE id=?");
-        assertNotNull(prep);
         prep.setInt(1, 1);
 
         assertTrue(prep.execute());
         assertEquals(-1, prep.getUpdateCount());
 
-        ResultSet rs = prep.getResultSet();
-        assertNotNull(rs);
-        assertTrue(rs.next());
-        assertEquals("one", rs.getString(1));
-        assertFalse(rs.next());
-        rs.close();
+        try (ResultSet resultSet = prep.getResultSet()) {
+            assertNotNull(resultSet);
+            assertTrue(resultSet.next());
+            assertEquals("one", resultSet.getString(1));
+            assertFalse(resultSet.next());
+        }
     }
 
     @Test
@@ -126,10 +175,8 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
         assertNull(prep.getResultSet());
         assertEquals(2, prep.getUpdateCount());
 
-        assertEquals("ten", getRow("test", 10).get(1));
-        assertEquals("twenty", getRow("test", 20).get(1));
-
-        conn.createStatement().execute("DELETE FROM test WHERE id IN (10, 20)");
+        assertEquals("ten", consoleSelect(10).get(1));
+        assertEquals("twenty", consoleSelect(20).get(1));
     }
 
     @Test
@@ -158,38 +205,6 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
                 }
             });
             assertEquals("The method cannot be called on a PreparedStatement.", e.getMessage());
-        }
-        assertEquals(3, i);
-    }
-
-    @Test
-    public void testClosedConnection() throws SQLException {
-        prep = conn.prepareStatement("TEST");
-
-        conn.close();
-
-        int i = 0;
-        for (; i < 3; i++) {
-            final int step = i;
-            SQLException e = assertThrows(SQLException.class, new Executable() {
-                @Override
-                public void execute() throws Throwable {
-                    switch (step) {
-                    case 0:
-                        prep.executeQuery();
-                        break;
-                    case 1:
-                        prep.executeUpdate();
-                        break;
-                    case 2:
-                        prep.execute();
-                        break;
-                    default:
-                        fail();
-                    }
-                }
-            });
-            assertEquals("Statement is closed.", e.getMessage());
         }
         assertEquals(3, i);
     }
@@ -228,76 +243,9 @@ public class JdbcPreparedStatementIT extends JdbcTypesIT {
         assertEquals(conn, statement.getConnection());
     }
 
-    @Test
-    public void testSetByte() throws SQLException {
-        makeHelper(Byte.class)
-            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-            .setValues(BYTE_VALS)
-            .testSetParameter();
-    }
-
-    @Test
-    public void testSetInt() throws SQLException {
-        makeHelper(Integer.class)
-            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-            .setValues(INT_VALS)
-            .testSetParameter();
-    }
-
-    @Test
-    public void testSetLong() throws SQLException {
-        makeHelper(Long.class)
-            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-            .setValues(LONG_VALS)
-            .testSetParameter();
-    }
-
-    @Test
-    public void testSetString() throws SQLException {
-        makeHelper(String.class)
-            .setColumns(TntSqlType.VARCHAR, TntSqlType.TEXT)
-            .setValues(STRING_VALS)
-            .testSetParameter();
-    }
-
-    @Test
-    public void testSetFloat() throws SQLException {
-        makeHelper(Float.class)
-            .setColumns(TntSqlType.REAL)
-            .setValues(FLOAT_VALS)
-            .testSetParameter();
-    }
-
-    @Test
-    public void testSetDouble() throws SQLException {
-        makeHelper(Double.class)
-            .setColumns(TntSqlType.FLOAT, TntSqlType.DOUBLE)
-            .setValues(DOUBLE_VALS)
-            .testSetParameter();
-    }
-
-    @Test
-    public void testSetBigDecimal() throws SQLException {
-        makeHelper(BigDecimal.class)
-            .setColumns(TntSqlType.REAL, TntSqlType.FLOAT, TntSqlType.DOUBLE)
-            .setValues(BIGDEC_VALS)
-            .testSetParameter();
-    }
-
-    @Test
-    public void testSetByteArray() throws SQLException {
-        makeHelper(byte[].class)
-            .setColumns(TntSqlType.SCALAR)
-            .setValues(BINARY_VALS)
-            .testSetParameter();
-    }
-
-    @Test
-    public void testSetDate() throws SQLException {
-        makeHelper(Date.class)
-            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-            .setValues(DATE_VALS)
-            .testSetParameter();
+    private List<?> consoleSelect(Object key) {
+        List<?> list = testHelper.evaluate(TestUtils.toLuaSelect("TEST", key));
+        return list == null ? Collections.emptyList() : (List<?>) list.get(0);
     }
 
 }

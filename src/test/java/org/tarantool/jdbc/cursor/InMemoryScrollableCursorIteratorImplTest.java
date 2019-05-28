@@ -3,22 +3,23 @@ package org.tarantool.jdbc.cursor;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import org.tarantool.TestUtils;
+import static org.tarantool.jdbc.SqlAssertions.assertAfterLast;
+import static org.tarantool.jdbc.SqlAssertions.assertBeforeFirst;
+import static org.tarantool.jdbc.SqlAssertions.assertEmpty;
+import static org.tarantool.jdbc.SqlAssertions.assertFirst;
+import static org.tarantool.jdbc.SqlAssertions.assertLast;
+import static org.tarantool.jdbc.SqlAssertions.assertNthPosition;
+import static org.tarantool.jdbc.SqlTestUtils.makeSingletonListResult;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import java.sql.SQLException;
 import java.util.List;
 
 @DisplayName("A scrollable iterator")
-class InMemoryScrollableCursorIteratorImplTest extends AbstractCursorIteratorTest {
-
-    @Override
-    protected CursorIterator<List<Object>> getCursorIterator(List<List<Object>> result) {
-        return new InMemoryScrollableCursorIteratorImpl(result);
-    }
+class InMemoryScrollableCursorIteratorImplTest {
 
     @Test
     @DisplayName("failed with a null result object")
@@ -239,23 +240,23 @@ class InMemoryScrollableCursorIteratorImplTest extends AbstractCursorIteratorTes
 
     @Test
     @DisplayName("moved to edges over an empty result")
-    void testIterationOverEmptyResult() throws SQLException {
+    void testMovementOverEmptyResult() throws Throwable {
         List<List<Object>> result = makeSingletonListResult();
         CursorIterator<List<Object>> iterator = getCursorIterator(result);
 
-        Runnable[] actions = new Runnable[] {
-                TestUtils.throwingWrapper(iterator::beforeFirst),
-                TestUtils.throwingWrapper(iterator::afterLast),
-                TestUtils.throwingWrapper(iterator::first),
-                TestUtils.throwingWrapper(iterator::last),
-                TestUtils.throwingWrapper(iterator::previous),
-                TestUtils.throwingWrapper(() -> iterator.relative(1)),
-                TestUtils.throwingWrapper(() -> iterator.absolute(1)),
+        Executable[] actions = new Executable[] {
+            iterator::beforeFirst,
+            iterator::afterLast,
+            iterator::first,
+            iterator::last,
+            iterator::previous,
+            () -> iterator.relative(1),
+            () -> iterator.absolute(1),
         };
 
-        for (Runnable action : actions) {
+        for (Executable action : actions) {
             assertEmpty(iterator);
-            action.run();
+            action.execute();
         }
     }
 
@@ -281,8 +282,8 @@ class InMemoryScrollableCursorIteratorImplTest extends AbstractCursorIteratorTes
      * @param iterator scrollable iterator to be tested
      * @param result   result is backed by <code>iterator</code>
      */
-    protected void backwardIteratorUseCase(CursorIterator<List<Object>> iterator, List<List<Object>> result)
-            throws SQLException {
+    private void backwardIteratorUseCase(CursorIterator<List<Object>> iterator, List<List<Object>> result)
+        throws SQLException {
         assertFalse(result.isEmpty());
 
         assertBeforeFirst(iterator);
@@ -301,6 +302,10 @@ class InMemoryScrollableCursorIteratorImplTest extends AbstractCursorIteratorTes
             assertFalse(iterator.previous());
             assertBeforeFirst(iterator);
         }
+    }
+
+    private CursorIterator<List<Object>> getCursorIterator(List<List<Object>> result) {
+        return new InMemoryScrollableCursorIteratorImpl(result);
     }
 
 }

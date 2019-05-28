@@ -4,15 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.tarantool.TestUtils.makeDefaultClientConfig;
+import static org.tarantool.TestUtils.makeTestClient;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 import java.nio.channels.SocketChannel;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -25,44 +30,69 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.LockSupport;
 
-public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
+public class ClientReconnectIT {
 
-    private static final String INSTANCE_NAME = "jdk-testing";
+    private static final int RESTART_TIMEOUT = 2000;
+    private static final int TIMEOUT = 500;
+
+    private static final SocketChannelProvider socketChannelProvider =
+        new TestSocketChannelProvider(TarantoolTestHelper.HOST, TarantoolTestHelper.PORT, RESTART_TIMEOUT);
+    private static TarantoolTestHelper testHelper;
+
+    private static final String[] SETUP_SCRIPT = new String[] {
+        "box.schema.space.create('basic_test', { format = " +
+            "{{name = 'id', type = 'integer'}," +
+            " {name = 'val', type = 'string'} } })",
+
+        "box.space.basic_test:create_index('pk', { type = 'TREE', parts = {'id'} } )",
+    };
+
+    private static final String[] CLEAN_SCRIPT = new String[] {
+        "box.space.basic_test and box.space.basic_test:drop()",
+    };
+
     private TarantoolClient client;
+
+    private int spaceId;
+    private int pkIndexId;
+
+    @BeforeAll
+    static void setupEnv() {
+        testHelper = new TarantoolTestHelper("client-reconnect-it");
+        testHelper.createInstance();
+    }
+
+    @BeforeEach
+    void setUpTest() {
+        testHelper.startInstance();
+        testHelper.executeLua(SETUP_SCRIPT);
+
+        spaceId = testHelper.evaluate("box.space.basic_test.id");
+        pkIndexId = testHelper.evaluate("box.space.basic_test.index.pk.id");
+    }
 
     @AfterEach
     public void tearDown() {
         if (client != null) {
-            assertTimeoutPreemptively(RESTART_TIMEOUT, "Close is stuck.", new Runnable() {
-                @Override
-                public void run() {
-                    client.close();
-                }
-            });
+            assertTimeoutPreemptively(
+                Duration.ofMillis(RESTART_TIMEOUT),
+                () -> client.close(),
+                "Close is stuck."
+            );
         }
-    }
-
-    @AfterAll
-    public static void tearDownEnv() {
-        // Re-open console for cleanupEnv() to work.
-        console.close();
-        console = openConsole();
+        testHelper.executeLua(CLEAN_SCRIPT);
+        testHelper.stopInstance();
     }
 
     @Test
     public void testReconnect() throws Exception {
-        client = makeClient();
+        client = makeTestClient(makeDefaultClientConfig(), RESTART_TIMEOUT);
 
         client.syncOps().ping();
 
-        stopTarantool(INSTANCE_NAME);
+        testHelper.stopInstance();
 
-        Exception e = assertThrows(Exception.class, new Executable() {
-            @Override
-            public void execute() {
-                client.syncOps().ping();
-            }
-        });
+        Exception e = assertThrows(Exception.class, () -> client.syncOps().ping());
 
         assertTrue(CommunicationException.class.isAssignableFrom(e.getClass()) ||
             IllegalStateException.class.isAssignableFrom(e.getClass()));
@@ -71,7 +101,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
 
         assertFalse(client.isAlive());
 
-        startTarantool(INSTANCE_NAME);
+        testHelper.startInstance();
 
         assertTrue(client.waitAlive(TIMEOUT, TimeUnit.MILLISECONDS));
 
@@ -86,17 +116,14 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     @Test
     public void testSpuriousReturnFromPark() {
         final CountDownLatch latch = new CountDownLatch(2);
-        SocketChannelProvider provider = new SocketChannelProvider() {
-            @Override
-            public SocketChannel get(int retryNumber, Throwable lastError) {
-                if (lastError == null) {
-                    latch.countDown();
-                }
-                return socketChannelProvider.get(retryNumber, lastError);
+        SocketChannelProvider provider = (retryNumber, lastError) -> {
+            if (lastError == null) {
+                latch.countDown();
             }
+            return socketChannelProvider.get(retryNumber, lastError);
         };
 
-        client = new TarantoolClientImpl(provider, makeClientConfig());
+        client = new TarantoolClientImpl(provider, makeDefaultClientConfig());
         client.syncOps().ping();
 
         // The park() will return inside connector thread.
@@ -117,15 +144,15 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
      */
     @Test
     public void testCloseWhileOperationsAreInProgress() {
-        client = new TarantoolClientImpl(socketChannelProvider, makeClientConfig()) {
+        client = new TarantoolClientImpl(socketChannelProvider, makeDefaultClientConfig()) {
             @Override
             protected void write(Code code, Long syncId, Long schemaId, Object... args) {
                 // Skip write.
             }
         };
 
-        final Future<List<?>> res = client.asyncOps().select(SPACE_ID, PK_INDEX_ID, Collections.singletonList(1),
-            0, 1, Iterator.EQ);
+        final Future<List<?>> res = client.asyncOps()
+            .select(spaceId, pkIndexId, Collections.singletonList(1), 0, 1, Iterator.EQ);
 
         client.close();
 
@@ -145,7 +172,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     @Test
     public void testReconnectWhileOperationsAreInProgress() {
         final AtomicBoolean writeEnabled = new AtomicBoolean(false);
-        client = new TarantoolClientImpl(socketChannelProvider, makeClientConfig()) {
+        client = new TarantoolClientImpl(socketChannelProvider, makeDefaultClientConfig()) {
             @Override
             protected void write(Code code, Long syncId, Long schemaId, Object... args) throws Exception {
                 if (writeEnabled.get()) {
@@ -154,10 +181,10 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
             }
         };
 
-        final Future<List<?>> mustFail = client.asyncOps().select(SPACE_ID, PK_INDEX_ID, Collections.singletonList(1),
-            0, 1, Iterator.EQ);
+        final Future<List<?>> mustFail = client.asyncOps()
+            .select(spaceId, pkIndexId, Collections.singletonList(1), 0, 1, Iterator.EQ);
 
-        stopTarantool(INSTANCE_NAME);
+        testHelper.stopInstance();
 
         assertThrows(ExecutionException.class, new Executable() {
             @Override
@@ -166,7 +193,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
             }
         });
 
-        startTarantool(INSTANCE_NAME);
+        testHelper.startInstance();
 
         writeEnabled.set(true);
 
@@ -176,8 +203,8 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
             fail();
         }
 
-        Future<List<?>> res = client.asyncOps().select(SPACE_ID, PK_INDEX_ID, Collections.singletonList(1),
-            0, 1, Iterator.EQ);
+        Future<List<?>> res = client.asyncOps()
+            .select(spaceId, pkIndexId, Collections.singletonList(1), 0, 1, Iterator.EQ);
 
         try {
             res.get(TIMEOUT, TimeUnit.MILLISECONDS);
@@ -189,7 +216,7 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
     @Test
     public void testConcurrentCloseAndReconnect() {
         final CountDownLatch latch = new CountDownLatch(2);
-        client = new TarantoolClientImpl(socketChannelProvider, makeClientConfig()) {
+        client = new TarantoolClientImpl(socketChannelProvider, makeDefaultClientConfig()) {
             @Override
             protected void connect(final SocketChannel channel) throws Exception {
                 latch.countDown();
@@ -197,21 +224,14 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
             }
         };
 
-        stopTarantool(INSTANCE_NAME);
-        startTarantool(INSTANCE_NAME);
+        testHelper.stopInstance();
+        testHelper.startInstance();
 
         try {
             assertTrue(latch.await(RESTART_TIMEOUT, TimeUnit.MILLISECONDS));
         } catch (InterruptedException e) {
             fail(e);
         }
-
-        assertTimeoutPreemptively(RESTART_TIMEOUT, "Close is stuck.", new Runnable() {
-            @Override
-            public void run() {
-                client.close();
-            }
-        });
     }
 
     // DO NOT REMOVE THIS TEST
@@ -272,11 +292,9 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
         int numClients = 4;
         int timeBudget = 30 * 1000;
 
-        SocketChannelProvider provider = new TestSocketChannelProvider(host,
-            port, RESTART_TIMEOUT).setSoLinger(0);
-
+        SocketChannelProvider provider = makeZeroLingerProvider();
         final AtomicReferenceArray<TarantoolClient> clients =
-                new AtomicReferenceArray<>(numClients);
+            new AtomicReferenceArray<>(numClients);
 
         for (int idx = 0; idx < clients.length(); idx++) {
             clients.set(idx, makeClient(provider));
@@ -325,8 +343,8 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
 
         // Restart tarantool several times in the foreground.
         while (deadline > System.currentTimeMillis()) {
-            stopTarantool(INSTANCE_NAME);
-            startTarantool(INSTANCE_NAME);
+            testHelper.stopInstance();
+            testHelper.startInstance();
             try {
                 Thread.sleep(RESTART_TIMEOUT * 2);
             } catch (InterruptedException e) {
@@ -367,22 +385,17 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
      */
     @Test
     public void testReconnectWrongAuth() throws Exception {
-        SocketChannelProvider provider = new TestSocketChannelProvider(host,
-            port, RESTART_TIMEOUT).setSoLinger(0);
-        TarantoolClientConfig config = makeClientConfig();
+        SocketChannelProvider provider = makeZeroLingerProvider();
+        TarantoolClientConfig config = makeDefaultClientConfig();
         config.initTimeoutMillis = 100;
         config.password = config.password + 'x';
         for (int i = 0; i < 100; ++i) {
             if (i % 10 == 0) {
                 System.out.println("testReconnectWrongAuth: " + (100 - i) + " iterations remain");
             }
-            CommunicationException e = assertThrows(CommunicationException.class,
-                new Executable() {
-                    @Override
-                    public void execute() throws Throwable {
-                        client = new TarantoolClientImpl(provider, config);
-                    }
-                }
+            CommunicationException e = assertThrows(
+                CommunicationException.class,
+                () -> client = new TarantoolClientImpl(provider, config)
             );
             assertEquals(e.getMessage(), "100ms is exceeded when waiting " +
                 "for client initialization. You could configure init " +
@@ -394,9 +407,19 @@ public class ClientReconnectIT extends AbstractTarantoolConnectorIT {
          * Verify we don't exceed a file descriptor limit. If we exceed it, a
          * client will not able to connect to tarantool.
          */
-        TarantoolClient client = makeClient();
+        TarantoolClient client = makeTestClient(makeDefaultClientConfig(), RESTART_TIMEOUT);
         client.syncOps().ping();
         client.close();
+    }
+
+    private TestSocketChannelProvider makeZeroLingerProvider() {
+        return new TestSocketChannelProvider(
+            TarantoolTestHelper.HOST, TarantoolTestHelper.PORT, RESTART_TIMEOUT
+        ).setSoLinger(0);
+    }
+
+    TarantoolClient makeClient(SocketChannelProvider provider) {
+        return new TarantoolClientImpl(provider, makeDefaultClientConfig());
     }
 
 }

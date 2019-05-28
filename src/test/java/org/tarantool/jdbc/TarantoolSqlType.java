@@ -3,7 +3,7 @@ package org.tarantool.jdbc;
 /**
  * Enumeration of SQL types recognizable by tarantool.
  */
-public enum TntSqlType {
+public enum TarantoolSqlType {
 
     FLOAT("FLOAT"),
     DOUBLE("DOUBLE"),
@@ -21,7 +21,7 @@ public enum TntSqlType {
 
     public String sqlType;
 
-    TntSqlType(String sqlType) {
+    TarantoolSqlType(String sqlType) {
         this.sqlType = sqlType;
     }
 }

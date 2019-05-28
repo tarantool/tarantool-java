@@ -40,7 +40,7 @@ public class TarantoolControl {
 
     }
 
-    protected static final String tntCtlWorkDir = System.getProperty("tntCtlWorkDir",
+    public static final String tntCtlWorkDir = System.getProperty("tntCtlWorkDir",
         new File("testroot").getAbsolutePath());
     protected static final String instanceDir = new File("src/test/resources").getAbsolutePath();
     protected static final String tarantoolCtlConfig = new File("src/test/resources/.tarantoolctl").getAbsolutePath();

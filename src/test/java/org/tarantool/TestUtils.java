@@ -1,8 +1,10 @@
 package org.tarantool;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -10,6 +12,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class TestUtils {
+
+    public static TarantoolClient makeTestClient(TarantoolClientConfig config, int restartTimeout) {
+        return new TarantoolClientImpl(
+            new TestSocketChannelProvider(TarantoolTestHelper.HOST, TarantoolTestHelper.PORT, restartTimeout),
+            config
+        );
+    }
 
     public static TarantoolConnection openConnection(String host, int port, String username, String password) {
         Socket socket = new Socket();
@@ -50,23 +59,6 @@ public class TestUtils {
         "box.info.lsn, " +
         "box.info.replication";
 
-    @FunctionalInterface
-    public interface ThrowingAction<X extends Throwable> {
-
-        void run() throws X;
-
-    }
-
-    public static <X extends Throwable> Runnable throwingWrapper(ThrowingAction<X> action) {
-        return () -> {
-            try {
-                action.run();
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        };
-    }
-
     public static String makeReplicationString(String user, String pass, String... addrs) {
         StringBuilder sb = new StringBuilder();
         for (int idx = 0; idx < addrs.length; idx++) {
@@ -89,16 +81,14 @@ public class TestUtils {
         return env;
     }
 
-    public static Map<String, String> makeInstanceEnv(int port, int consolePort, String replicationConfig,
+    public static Map<String, String> makeInstanceEnv(int port,
+                                                      int consolePort,
+                                                      String replicationConfig,
                                                       double replicationTimeout) {
         Map<String, String> env = makeInstanceEnv(port, consolePort);
         env.put("MASTER", replicationConfig);
         env.put("REPLICATION_TIMEOUT", Double.toString(replicationTimeout));
         return env;
-    }
-
-    protected static String getTarantoolVersion(TarantoolConsole console) {
-        return console.eval("return box.info.version");
     }
 
     /**
@@ -209,6 +199,54 @@ public class TestUtils {
         return true;
     }
 
+    public static String toLuaSelect(String spaceName, Object key) {
+        StringBuilder sb = new StringBuilder("box.space.");
+        sb.append(spaceName);
+        sb.append(":select{");
+        appendKey(sb, key);
+        sb.append("}");
+        return sb.toString();
+    }
+
+    public static String toLuaDelete(String spaceName, Object key) {
+        StringBuilder sb = new StringBuilder("box.space.");
+        sb.append(spaceName);
+        sb.append(":delete{");
+        appendKey(sb, key);
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private static void appendKey(StringBuilder sb, Object key) {
+        if (List.class.isAssignableFrom(key.getClass())) {
+            List parts = (List) key;
+            for (int i = 0; i < parts.size(); i++) {
+                if (i != 0) {
+                    sb.append(", ");
+                }
+                Object k = parts.get(i);
+                if (k instanceof BigInteger) {
+                    appendBigInteger(sb, (BigInteger) k);
+                } else if (k instanceof String) {
+                    sb.append('\'');
+                    sb.append(k);
+                    sb.append('\'');
+                } else {
+                    sb.append(k);
+                }
+            }
+        } else if (key instanceof BigInteger) {
+            appendBigInteger(sb, (BigInteger) key);
+        } else {
+            sb.append(key);
+        }
+    }
+
+    private static void appendBigInteger(StringBuilder sb, BigInteger value) {
+        sb.append(value);
+        sb.append(value.signum() >= 0 ? "ULL" : "LL");
+    }
+
     private static <T> T ensureTypeOrNull(Class<T> cls, Object v) {
         return v == null ? null : ensureType(cls, v);
     }
@@ -219,6 +257,37 @@ public class TestUtils {
                 v == null ? "null" : v.getClass().getName(), cls.getName()));
         }
         return cls.cast(v);
+    }
+
+    public static String extractRawHostAndPortString(SocketAddress socketAddress) {
+        InetSocketAddress inetSocketAddress = (InetSocketAddress) socketAddress;
+        return inetSocketAddress.getAddress().getHostName() + ":" + inetSocketAddress.getPort();
+    }
+
+    public static Iterable<String> asRawHostAndPort(Collection<SocketAddress> addresses) {
+        return addresses.stream()
+            .map(TestUtils::extractRawHostAndPortString)
+            .collect(Collectors.toList());
+    }
+
+    public static TarantoolClusterClientConfig makeDefaultClusterClientConfig() {
+        TarantoolClusterClientConfig config = new TarantoolClusterClientConfig();
+        config.username = TarantoolTestHelper.USERNAME;
+        config.password = TarantoolTestHelper.PASSWORD;
+        config.initTimeoutMillis = 2000;
+        config.operationExpiryTimeMillis = 1000;
+        config.sharedBufferSize = 128;
+        config.executor = null;
+        return config;
+    }
+
+    public static TarantoolClientConfig makeDefaultClientConfig() {
+        TarantoolClientConfig config = new TarantoolClientConfig();
+        config.username = TarantoolTestHelper.USERNAME;
+        config.password = TarantoolTestHelper.PASSWORD;
+        config.initTimeoutMillis = 2000;
+        config.sharedBufferSize = 128;
+        return config;
     }
 
 }

@@ -6,32 +6,72 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
+import org.tarantool.ServerVersion;
+import org.tarantool.TarantoolTestHelper;
+
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
-import java.sql.DatabaseMetaData;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-public class JdbcResultSetIT extends JdbcTypesIT {
+public class JdbcResultSetIT {
+
+    private static final String[] INIT_SQL = new String[] {
+        "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100))",
+        "CREATE TABLE test_nulls(id INT PRIMARY KEY, val VARCHAR(100), dig INTEGER, bin SCALAR)",
+    };
+
+    private static final String[] CLEAN_SQL = new String[] {
+        "DROP TABLE IF EXISTS test",
+        "DROP TABLE IF EXISTS test_nulls",
+    };
+
+    private static TarantoolTestHelper testHelper;
+    private static Connection connection;
 
     private Statement stmt;
-    private DatabaseMetaData metaData;
+
+    @BeforeAll
+    public static void setupEnv() throws SQLException {
+        testHelper = new TarantoolTestHelper("jdbc-resultset-it");
+        testHelper.createInstance();
+        testHelper.startInstance();
+
+        connection = DriverManager.getConnection(SqlTestUtils.makeDefaultJdbcUrl());
+    }
+
+    @AfterAll
+    public static void teardownEnv() throws SQLException {
+        if (connection != null) {
+            connection.close();
+        }
+        testHelper.stopInstance();
+    }
 
     @BeforeEach
-    public void setUp() throws Exception {
-        stmt = conn.createStatement();
-        metaData = conn.getMetaData();
+    public void setUpTest() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
+        testHelper.executeSql(INIT_SQL);
+
+        stmt = connection.createStatement();
     }
 
     @AfterEach
-    public void tearDown() throws Exception {
-        if (stmt != null && !stmt.isClosed()) {
+    public void tearDownTest() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
+
+        testHelper.executeSql(CLEAN_SQL);
+        if (stmt != null) {
             stmt.close();
         }
     }
@@ -46,88 +86,18 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     public void testIteration() throws SQLException {
-        ResultSet rs = stmt.executeQuery("SELECT * FROM test WHERE id IN (1,2,3) ORDER BY id");
-        assertNotNull(rs);
-        assertTrue(rs.next());
-        assertEquals(1, rs.getInt(1));
-        assertTrue(rs.next());
-        assertEquals(2, rs.getInt(1));
-        assertTrue(rs.next());
-        assertEquals(3, rs.getInt(1));
-        assertFalse(rs.next());
-        rs.close();
-    }
+        testHelper.executeSql("INSERT INTO test VALUES (1, 'one'), (2, 'two'), (3, 'three')");
 
-    @Test
-    public void testGetByteColumn() throws SQLException {
-        makeHelper(Byte.class)
-            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-            .setValues(BYTE_VALS)
-            .testGetColumn();
-    }
-
-    @Test
-    public void testGetShortColumn() throws SQLException {
-        makeHelper(Short.class)
-            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-            .setValues(SHORT_VALS)
-            .testGetColumn();
-    }
-
-    @Test
-    public void testGetIntColumn() throws SQLException {
-        makeHelper(Integer.class)
-            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-            .setValues(INT_VALS)
-            .testGetColumn();
-    }
-
-    @Test
-    public void testGetLongColumn() throws SQLException {
-        makeHelper(Long.class)
-            .setColumns(TntSqlType.INT, TntSqlType.INTEGER)
-            .setValues(LONG_VALS)
-            .testGetColumn();
-    }
-
-    @Test
-    public void testGetBigDecimalColumn() throws SQLException {
-        makeHelper(BigDecimal.class)
-            .setColumns(TntSqlType.REAL, TntSqlType.FLOAT, TntSqlType.DOUBLE)
-            .setValues(BIGDEC_VALS)
-            .testGetColumn();
-    }
-
-    @Test
-    public void testGetFloatColumn() throws SQLException {
-        makeHelper(Float.class)
-            .setColumns(TntSqlType.REAL)
-            .setValues(FLOAT_VALS)
-            .testGetColumn();
-    }
-
-    @Test
-    public void testGetDoubleColumn() throws SQLException {
-        makeHelper(Double.class)
-            .setColumns(TntSqlType.FLOAT, TntSqlType.DOUBLE)
-            .setValues(DOUBLE_VALS)
-            .testGetColumn();
-    }
-
-    @Test
-    public void testGetStringColumn() throws SQLException {
-        makeHelper(String.class)
-            .setColumns(TntSqlType.VARCHAR, TntSqlType.TEXT)
-            .setValues(STRING_VALS)
-            .testGetColumn();
-    }
-
-    @Test
-    public void testGetByteArrayColumn() throws SQLException {
-        makeHelper(byte[].class)
-            .setColumns(TntSqlType.SCALAR)
-            .setValues(BINARY_VALS)
-            .testGetColumn();
+        try (ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id IN (1,2,3) ORDER BY id")) {
+            assertNotNull(resultSet);
+            assertTrue(resultSet.next());
+            assertEquals(1, resultSet.getInt(1));
+            assertTrue(resultSet.next());
+            assertEquals(2, resultSet.getInt(1));
+            assertTrue(resultSet.next());
+            assertEquals(3, resultSet.getInt(1));
+            assertFalse(resultSet.next());
+        }
     }
 
     @Test
@@ -142,7 +112,7 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     public void testSelectedScrollType() throws SQLException {
-        Statement statement = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
         ResultSet resultSet = statement.executeQuery("SELECT * FROM test WHERE id < 0");
         assertNotNull(resultSet);
         assertEquals(statement.getResultSetType(), resultSet.getType());
@@ -179,7 +149,7 @@ public class JdbcResultSetIT extends JdbcTypesIT {
     public void testHoldability() throws SQLException {
         ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id < 0");
         assertNotNull(resultSet);
-        assertEquals(metaData.getResultSetHoldability(), resultSet.getHoldability());
+        assertEquals(connection.getMetaData().getResultSetHoldability(), resultSet.getHoldability());
     }
 
     @Test
@@ -198,6 +168,10 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     public void testNullsSortingAsc() throws SQLException {
+        testHelper.executeSql("INSERT INTO test_nulls(id, val) VALUES (1, 'a'), (2, 'b');");
+        testHelper.executeSql("INSERT INTO test_nulls(id, val) VALUES (3, 'c'), (4, NULL)");
+        testHelper.executeSql("INSERT INTO test_nulls(id, val) VALUES (5, NULL), (6, NULL)");
+
         ResultSet resultSet = stmt.executeQuery("SELECT * FROM test_nulls ORDER BY val ASC");
         for (int i = 0; i < 3; i++) {
             assertTrue(resultSet.next());
@@ -212,6 +186,10 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     public void testNullsSortingDesc() throws SQLException {
+        testHelper.executeSql("INSERT INTO test_nulls(id, dig) VALUES (1, 1), (2, 2);");
+        testHelper.executeSql("INSERT INTO test_nulls(id, dig) VALUES (3, 3), (4, NULL)");
+        testHelper.executeSql("INSERT INTO test_nulls(id, dig) VALUES (5, NULL), (6, NULL)");
+
         ResultSet resultSet = stmt.executeQuery("SELECT id, dig FROM test_nulls ORDER BY val DESC");
         for (int i = 0; i < 3; i++) {
             assertTrue(resultSet.next());
@@ -226,6 +204,9 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     void testObjectWasNullColumn() throws SQLException {
+        testHelper.executeSql("INSERT INTO test_nulls(id, val) VALUES (1, 'z'), (2, 'y');");
+        testHelper.executeSql("INSERT INTO test_nulls(id, val) VALUES (3, 'x'), (4, NULL)");
+
         ResultSet resultSet = stmt.executeQuery("SELECT id, dig FROM test_nulls WHERE val IS NULL");
         resultSet.next();
 
@@ -237,6 +218,9 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     void testBinaryWasNullColumn() throws SQLException {
+        testHelper.executeSql("INSERT INTO test_nulls(id, bin) VALUES (1, 'zz'), (2, 'yy');");
+        testHelper.executeSql("INSERT INTO test_nulls(id, bin) VALUES (3, 'xx'), (4, NULL)");
+
         ResultSet resultSet = stmt.executeQuery("SELECT id, bin FROM test_nulls WHERE bin IS NULL");
         resultSet.next();
 
@@ -256,6 +240,9 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     void testNumberWasNullColumn() throws SQLException {
+        testHelper.executeSql("INSERT INTO test_nulls(id, dig) VALUES (1, 1), (2, 2);");
+        testHelper.executeSql("INSERT INTO test_nulls(id, dig) VALUES (3, 3), (4, NULL)");
+
         ResultSet resultSet = stmt.executeQuery("SELECT id, dig FROM test_nulls WHERE dig IS NULL");
         resultSet.next();
 
@@ -292,6 +279,8 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     public void testMaxRows() throws SQLException {
+        testHelper.executeSql("INSERT INTO test VALUES (1, 'one'), (2, 'two'), (3, 'three')");
+
         stmt.setMaxRows(1);
         ResultSet resultSet = stmt.executeQuery("SELECT id as f1, val as f2 FROM test");
         assertNotNull(resultSet);
@@ -302,6 +291,8 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     public void testForwardTraversal() throws SQLException {
+        testHelper.executeSql("INSERT INTO test VALUES (1, 'one'), (2, 'two'), (3, 'three')");
+
         ResultSet resultSet = stmt.executeQuery("SELECT id as f1, val as f2 FROM test");
         assertNotNull(resultSet);
         assertTrue(resultSet.isBeforeFirst());
@@ -328,7 +319,9 @@ public class JdbcResultSetIT extends JdbcTypesIT {
 
     @Test
     public void testTraversal() throws SQLException {
-        Statement statement = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        testHelper.executeSql("INSERT INTO test VALUES (1, 'one'), (2, 'two'), (3, 'three')");
+
+        Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
         ResultSet resultSet = statement.executeQuery("SELECT id as f1, val as f2 FROM test");
         assertNotNull(resultSet);
         assertTrue(resultSet.isBeforeFirst());

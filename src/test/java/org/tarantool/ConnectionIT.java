@@ -3,34 +3,51 @@ package org.tarantool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.SocketException;
-import java.util.List;
 
 /**
- * Test operations of {@link TarantoolConnection} class.
+ * {@link TarantoolConnection} specific test cases.
  *
- * Actual tests reside in base class.
+ * @see TarantoolSQLOpsIT
+ * @see TarantoolClientOpsIT
  */
-public class ConnectionIT extends AbstractTarantoolOpsIT {
+public class ConnectionIT {
+
+    private static TarantoolTestHelper testHelper;
+
     private TarantoolConnection conn;
+
+    @BeforeAll
+    static void setupEnv() {
+        testHelper = new TarantoolTestHelper("tnt-connection-it");
+        testHelper.createInstance();
+        testHelper.startInstance();
+    }
+
+    @AfterAll
+    static void cleanupEnv() {
+        testHelper.stopInstance();
+    }
 
     @BeforeEach
     public void setup() {
-        conn = TestUtils.openConnection(host, port, username, password);
+        conn = TestUtils.openConnection(
+            TarantoolTestHelper.HOST,
+            TarantoolTestHelper.PORT,
+            TarantoolTestHelper.USERNAME,
+            TarantoolTestHelper.PASSWORD
+        );
     }
 
     @AfterEach
     public void tearDown() {
         conn.close();
-    }
-
-    @Override
-    protected TarantoolClientOps<Integer, List<?>, Object, List<?>> getOps() {
-        return conn;
     }
 
     @Test

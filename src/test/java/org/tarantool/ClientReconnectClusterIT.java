@@ -2,22 +2,23 @@ package org.tarantool;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.tarantool.AbstractTarantoolConnectorIT.makeClusterClientConfig;
+import static org.tarantool.TestUtils.makeDefaultClusterClientConfig;
 import static org.tarantool.TestUtils.makeDiscoveryFunction;
-import static org.tarantool.TestUtils.makeInstanceEnv;
 
 import org.tarantool.cluster.ClusterServiceStoredFunctionDiscovererIT;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
@@ -32,48 +33,41 @@ public class ClientReconnectClusterIT {
         "return box.schema.space.create('%1$s').id, box.space.%1$s:create_index('primary').id";
 
     private static final int TIMEOUT = 500;
-    private static final String LUA_FILE = "jdk-testing.lua";
-    private static final String SRV1 = "replica1";
-    private static final String SRV2 = "replica2";
-    private static final String SRV3 = "replica3";
+
+    private static final String SRV1 = "cluster-replica1-it";
+    private static final String SRV2 = "cluster-replica2-it";
+    private static final String SRV3 = "cluster-replica3-it";
     private static final int[] PORTS = { 3401, 3402, 3403 };
     private static final int[] CONSOLE_PORTS = { 3501, 3502, 3503 };
-    private static TarantoolControl control;
+
+    // Resume replication faster in case of temporary failure to fit TIMEOUT.
+    private static double REPLICATION_TIMEOUT = 0.1;
 
     private static String REPLICATION_CONFIG = TestUtils.makeReplicationString(
-        AbstractTarantoolConnectorIT.username,
-        AbstractTarantoolConnectorIT.password,
+        TarantoolTestHelper.USERNAME,
+        TarantoolTestHelper.PASSWORD,
         "localhost:" + PORTS[0],
         "localhost:" + PORTS[1],
         "localhost:" + PORTS[2]
     );
 
-    // Resume replication faster in case of temporary failure to fit TIMEOUT.
-    private static double REPLICATION_TIMEOUT = 0.1;
+    private static Map<String, TarantoolTestHelper> instances = new HashMap<>();
 
     @BeforeAll
     public static void setupEnv() {
-        control = new TarantoolControl();
-        int idx = 0;
+        int index = 0;
         for (String name : Arrays.asList(SRV1, SRV2, SRV3)) {
-            control.createInstance(name, LUA_FILE,
-                makeInstanceEnv(
-                    PORTS[idx], CONSOLE_PORTS[idx],
-                    REPLICATION_CONFIG, REPLICATION_TIMEOUT
-                )
+            TarantoolTestHelper testHelper = new TarantoolTestHelper(name);
+            testHelper.createInstance(
+                TarantoolTestHelper.LUA_FILE,
+                PORTS[index],
+                CONSOLE_PORTS[index],
+                REPLICATION_CONFIG,
+                REPLICATION_TIMEOUT
             );
-            idx++;
-        }
-    }
+            instances.put(name, testHelper);
 
-    @AfterAll
-    public static void tearDownEnv() {
-        for (String name : Arrays.asList(SRV1, SRV2, SRV3)) {
-            control.stop(name);
-            /*
-             * Don't cleanup instance directory to allow further investigation
-             * of xlog / snap files in case of the test failure.
-             */
+            index++;
         }
     }
 
@@ -125,7 +119,6 @@ public class ClientReconnectClusterIT {
     void testUpdateExtendedNodeList() {
         String service1Address = "localhost:" + PORTS[0];
         String service2Address = "127.0.0.1:" + PORTS[1];
-        String service3Address = "localhost:" + PORTS[2];
 
         CyclicBarrier barrier = new CyclicBarrier(2);
 
@@ -133,7 +126,7 @@ public class ClientReconnectClusterIT {
         String infoFunctionScript =
             makeDiscoveryFunction(infoFunctionName, Arrays.asList(service1Address, service2Address));
 
-        control.openConsole(SRV1).exec(infoFunctionScript);
+        instances.get(SRV1).executeLua(infoFunctionScript);
 
         final TarantoolClusterClient client = makeClientWithDiscoveryFeature(
             infoFunctionName,
@@ -177,7 +170,7 @@ public class ClientReconnectClusterIT {
         String infoFunctionName = "getAddresses";
         String infoFunctionScript = makeDiscoveryFunction(infoFunctionName, Collections.singletonList(service1Address));
 
-        control.openConsole(SRV1).exec(infoFunctionScript);
+        instances.get(SRV1).executeLua(infoFunctionScript);
 
         final TarantoolClusterClient client = makeClientWithDiscoveryFeature(
             infoFunctionName,
@@ -221,7 +214,7 @@ public class ClientReconnectClusterIT {
         String infoFunctionName = "getAddresses";
         String infoFunctionScript = makeDiscoveryFunction(infoFunctionName, Collections.emptyList());
 
-        control.openConsole(SRV1).exec(infoFunctionScript);
+        instances.get(SRV1).executeLua(infoFunctionScript);
 
         final TarantoolClusterClient client = makeClientWithDiscoveryFeature(
             infoFunctionName,
@@ -267,7 +260,7 @@ public class ClientReconnectClusterIT {
         String infoFunctionName = "getAddresses";
         String infoFunctionScript = makeDiscoveryFunction(infoFunctionName, Collections.emptyList());
 
-        control.openConsole(SRV1).exec(infoFunctionScript);
+        instances.get(SRV1).executeLua(infoFunctionScript);
 
         final TarantoolClusterClient client = makeClientWithDiscoveryFeature(
             infoFunctionName + "wrongSuffix",
@@ -311,7 +304,7 @@ public class ClientReconnectClusterIT {
         String infoFunctionName = "getWhateverExceptAddressesListFunction";
         String infoFunctionScript = makeDiscoveryFunction(infoFunctionName, 42);
 
-        control.openConsole(SRV1).exec(infoFunctionScript);
+        instances.get(SRV1).executeLua(infoFunctionScript);
 
         final TarantoolClusterClient client = makeClientWithDiscoveryFeature(
             infoFunctionName,
@@ -363,13 +356,13 @@ public class ClientReconnectClusterIT {
             .map(address -> "coroutine.yield('" + address + "');")
             .collect(Collectors.joining(" "));
 
-        control.openConsole(SRV1)
-            .exec("co = coroutine.create(function() " + functionBody + " end)");
-        control.openConsole(SRV1)
-            .exec("function getAddressesFunction() local c, r = coroutine.resume(co); return r end");
+        instances.get(SRV1)
+            .executeLua("co = coroutine.create(function() " + functionBody + " end)");
+        instances.get(SRV1)
+            .executeLua("function getAddressesFunction() local c, r = coroutine.resume(co); return r end");
 
         String infoFunctionScript = makeDiscoveryFunction(infoFunctionName, Collections.singletonList(service3Address));
-        control.openConsole(SRV2).exec(infoFunctionScript);
+        instances.get(SRV2).executeLua(infoFunctionScript);
 
         final TarantoolClusterClient client = makeClientWithDiscoveryFeature(
             infoFunctionName,
@@ -408,18 +401,18 @@ public class ClientReconnectClusterIT {
         }
     }
 
-    private void startInstancesAndAwait(String... instances) {
-        for (String instance : instances) {
-            control.start(instance, false);
+    private void startInstancesAndAwait(String... instanceNames) {
+        for (String instanceName : instanceNames) {
+            instances.get(instanceName).startInstanceAsync();
         }
-        for (String instance : instances) {
-            control.waitStarted(instance);
+        for (String instanceName : instanceNames) {
+            instances.get(instanceName).awaitStart();
         }
     }
 
-    private void stopInstancesAndAwait(String... instances) {
-        for (String instance : instances) {
-            control.stop(instance);
+    private void stopInstancesAndAwait(String... instanceNames) {
+        for (String instanceName : instanceNames) {
+            instances.get(instanceName).stopInstance();
         }
     }
 
@@ -447,7 +440,7 @@ public class ClientReconnectClusterIT {
         final int pkId = ((Number) ids.get(1)).intValue();
 
         client.syncOps().insert(spaceId, Arrays.asList(1, 1));
-        control.waitReplication(SRV1, TIMEOUT);
+        instances.get(SRV1).awaitReplication(Duration.ofMillis(TIMEOUT));
 
         return new int[] { spaceId, pkId };
     }
@@ -465,7 +458,7 @@ public class ClientReconnectClusterIT {
                                                                   int entryDelayMillis,
                                                                   Consumer<Set<String>> consumer,
                                                                   String... addresses) {
-        TarantoolClusterClientConfig config = makeClusterClientConfig();
+        TarantoolClusterClientConfig config = makeDefaultClusterClientConfig();
         config.clusterDiscoveryEntryFunction = entryFunction;
         config.clusterDiscoveryDelayMillis = entryDelayMillis;
 

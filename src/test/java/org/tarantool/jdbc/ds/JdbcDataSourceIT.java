@@ -8,16 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
-import static org.tarantool.TestUtils.makeInstanceEnv;
 
 import org.tarantool.ServerVersion;
-import org.tarantool.TarantoolConsole;
-import org.tarantool.TarantoolControl;
+import org.tarantool.TarantoolTestHelper;
 import org.tarantool.jdbc.SQLProperty;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.ThrowingSupplier;
 
@@ -28,36 +27,33 @@ import java.sql.SQLException;
 import java.time.Duration;
 import javax.sql.DataSource;
 
+@DisplayName("A data source")
 class JdbcDataSourceIT {
 
-    private static final String LUA_FILE = "jdk-testing.lua";
-    private static final String HOST = "localhost";
-    private static final int LISTEN = 3301;
-    private static final int ADMIN = 3313;
-    private static final String INSTANCE_NAME = "data-source-testing";
+    private static TarantoolTestHelper testHelper;
 
     private SQLDataSource dataSource;
 
     @BeforeAll
     static void setUpEnv() {
-        TarantoolControl control = new TarantoolControl();
-        control.createInstance(INSTANCE_NAME, LUA_FILE, makeInstanceEnv(LISTEN, ADMIN));
-        control.start(INSTANCE_NAME);
+        testHelper = new TarantoolTestHelper("data-source-it");
+        testHelper.createInstance();
+        testHelper.startInstance();
     }
 
     @BeforeEach
     void setUp() {
-        assumeMinimalServerVersion(TarantoolConsole.open(HOST, ADMIN), ServerVersion.V_2_1);
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
         dataSource = new SQLDataSource();
     }
 
     @AfterAll
     static void tearDownEnv() {
-        TarantoolControl control = new TarantoolControl();
-        control.stop(INSTANCE_NAME);
+        testHelper.stopInstance();
     }
 
     @Test
+    @DisplayName("returned an active connection with guest credentials")
     void testGetDefaultConnection() throws SQLException {
         Connection connection = dataSource.getConnection();
         assertTrue(connection.isValid(2));
@@ -65,6 +61,7 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("returned an active connection with user credentials")
     void testGetUserConnection() throws SQLException {
         Connection connection = dataSource.getConnection("test_admin", "4pWBZmLEgkmKK5WP");
         assertTrue(connection.isValid(2));
@@ -72,6 +69,7 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("gave a connection exceptionally with wrong user credentials")
     void testGetWrongUserConnection() throws SQLException {
         dataSource.setLoginTimeout(1);
         assertThrows(
@@ -81,14 +79,16 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("received a custom logger writer")
     void testLogWriter() throws Exception {
         assertNull(dataSource.getLogWriter());
-        PrintWriter logWriter = new PrintWriter("jdk-testing.lua");
+        PrintWriter logWriter = new PrintWriter("testroot/ds-out.log");
         dataSource.setLogWriter(logWriter);
         assertEquals(logWriter, dataSource.getLogWriter());
     }
 
     @Test
+    @DisplayName("timed out during connection establishment")
     void testLoginTimeout() throws SQLException {
         assertEquals(dataSource.getLoginTimeout(), 60);
         dataSource.setLoginTimeout(2);
@@ -103,30 +103,35 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("is compatible with proper interfaces")
     void testRightIsWrapperFor() {
         assertTrue(dataSource.isWrapperFor(DataSource.class));
         assertTrue(dataSource.isWrapperFor(TarantoolDataSource.class));
     }
 
     @Test
+    @DisplayName("is not compatible with proper interfaces")
     void testWrongIsWrapperFor() {
         assertFalse(dataSource.isWrapperFor(Integer.class));
         assertFalse(dataSource.isWrapperFor(Driver.class));
     }
 
     @Test
+    @DisplayName("unwrapped to proper interfaces")
     void testRightUnwrap() throws SQLException {
         assertNotNull(dataSource.unwrap(DataSource.class));
         assertNotNull(dataSource.unwrap(TarantoolDataSource.class));
     }
 
     @Test
+    @DisplayName("unwrapped to proper interfaces")
     void testWrongUnwrap() {
         assertThrows(SQLException.class, () -> dataSource.unwrap(Integer.class));
         assertThrows(SQLException.class, () -> dataSource.unwrap(Driver.class));
     }
 
     @Test
+    @DisplayName("was configured with a custom server name")
     void testServerNameProperty() {
         assertEquals(SQLProperty.HOST.getDefaultValue(), dataSource.getServerName());
         String expectedNewServerName = "my-server-name";
@@ -135,6 +140,7 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("was configured with a custom port number")
     void testPortNumberProperty() throws SQLException {
         assertEquals(SQLProperty.PORT.getDefaultIntValue(), dataSource.getPortNumber());
         int expectedNewPort = 4001;
@@ -143,6 +149,7 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("was configured with a custom user name")
     void testUserProperty() {
         assertEquals(SQLProperty.USER.getDefaultValue(), dataSource.getUser());
         String expectedNewUser = "myUserName";
@@ -151,6 +158,7 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("was configured with a custom user password")
     void testPasswordProperty() {
         assertEquals(SQLProperty.PASSWORD.getDefaultValue(), dataSource.getPassword());
         String expectedNewPassword = "newPassword";
@@ -159,6 +167,7 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("was configured with a custom channel socket provider")
     void testSocketChannelProviderProperty() {
         assertEquals(SQLProperty.SOCKET_CHANNEL_PROVIDER.getDefaultValue(), dataSource.getSocketChannelProvider());
         String expectedProviderClassName = "z.x.z.MyClass";
@@ -167,6 +176,7 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("was configured with a custom query timeout")
     void testRequestTimeoutProperty() throws SQLException {
         assertEquals(SQLProperty.QUERY_TIMEOUT.getDefaultIntValue(), dataSource.getQueryTimeout());
         int expectedNewTimeout = 45;
@@ -175,6 +185,7 @@ class JdbcDataSourceIT {
     }
 
     @Test
+    @DisplayName("was configured with a custom data source name")
     void testDataSourceNameProperty() {
         String expectedDataSourceName = "dataSourceName";
         dataSource.setDataSourceName(expectedDataSourceName);
