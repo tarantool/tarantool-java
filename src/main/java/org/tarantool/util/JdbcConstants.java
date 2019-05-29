@@ -27,6 +27,14 @@ public class JdbcConstants {
         }
     }
 
+    public static void checkCurrentResultConstant(int currentResult) throws SQLException {
+        if (currentResult != Statement.CLOSE_CURRENT_RESULT &&
+            currentResult != Statement.CLOSE_ALL_RESULTS &&
+            currentResult != Statement.KEEP_CURRENT_RESULT) {
+            throw new SQLNonTransientException("", SQLStates.INVALID_PARAMETER_VALUE.getSqlState());
+        }
+    }
+
     public static class DatabaseMetadataTable {
 
         private DatabaseMetadataTable() {

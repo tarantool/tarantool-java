@@ -218,13 +218,21 @@ public class SQLStatement implements TarantoolStatement {
 
     @Override
     public boolean getMoreResults() throws SQLException {
-        checkNotClosed();
-        return false;
+        return getMoreResults(Statement.CLOSE_CURRENT_RESULT);
     }
 
     @Override
     public boolean getMoreResults(int current) throws SQLException {
         checkNotClosed();
+        JdbcConstants.checkCurrentResultConstant(current);
+        if (resultSet != null &&
+            (current == KEEP_CURRENT_RESULT || current == CLOSE_ALL_RESULTS)) {
+            throw new SQLFeatureNotSupportedException();
+        }
+
+        // the driver doesn't support multiple results
+        // close current result and return no-more-results flag
+        discardLastResults();
         return false;
     }
 

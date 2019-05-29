@@ -26,6 +26,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.List;
@@ -241,6 +242,84 @@ public class JdbcPreparedStatementIT {
     void testStatementConnection() throws SQLException {
         Statement statement = conn.prepareStatement("SELECT * FROM TEST");
         assertEquals(conn, statement.getConnection());
+    }
+
+    @Test
+    public void testMoreResultsWithResultSet() throws SQLException {
+        prep = conn.prepareStatement("SELECT val FROM test WHERE id = ?");
+        prep.setInt(1, 1);
+
+        prep.execute();
+        ResultSet resultSet = prep.getResultSet();
+
+        assertFalse(resultSet.isClosed());
+        assertFalse(prep.getMoreResults());
+        assertEquals(-1, prep.getUpdateCount());
+        assertTrue(resultSet.isClosed());
+    }
+
+    @Test
+    public void testMoreResultsWithUpdateCount() throws SQLException {
+        prep = conn.prepareStatement("INSERT INTO test VALUES (?, ?)");
+        prep.setInt(1, 9);
+        prep.setString(2, "nine");
+
+        prep.execute();
+        int updateCount = prep.getUpdateCount();
+
+        assertEquals(1, prep.getUpdateCount());
+        assertFalse(prep.getMoreResults());
+        assertEquals(-1, prep.getUpdateCount());
+    }
+
+    @Test
+    public void testMoreResultsButCloseCurrent() throws SQLException {
+        prep = conn.prepareStatement("SELECT val FROM test WHERE id = ?");
+        prep.setInt(1, 2);
+
+        prep.execute();
+        ResultSet resultSet = prep.getResultSet();
+
+        assertFalse(resultSet.isClosed());
+        assertFalse(prep.getMoreResults(Statement.CLOSE_CURRENT_RESULT));
+        assertEquals(-1, prep.getUpdateCount());
+        assertTrue(resultSet.isClosed());
+    }
+
+    @Test
+    public void testMoreResultsButCloseAll() throws SQLException {
+        prep = conn.prepareStatement("SELECT val FROM test WHERE id = ?");
+        prep.setInt(1, 2);
+        prep.execute();
+
+        assertThrows(SQLFeatureNotSupportedException.class, () -> prep.getMoreResults(Statement.CLOSE_ALL_RESULTS));
+
+        prep = conn.prepareStatement("INSERT INTO test VALUES (?, ?)");
+        prep.setInt(1, 21);
+        prep.setString(2, "twenty one");
+        prep.execute();
+
+        assertEquals(1, prep.getUpdateCount());
+        assertFalse(prep.getMoreResults(Statement.CLOSE_ALL_RESULTS));
+        assertEquals(-1, prep.getUpdateCount());
+    }
+
+    @Test
+    public void testMoreResultsButKeepCurrent() throws SQLException {
+        prep = conn.prepareStatement("SELECT val FROM test WHERE id = ?");
+        prep.setInt(1, 3);
+        prep.execute();
+
+        assertThrows(SQLFeatureNotSupportedException.class, () -> prep.getMoreResults(Statement.KEEP_CURRENT_RESULT));
+
+        prep = conn.prepareStatement("INSERT INTO test VALUES (?, ?)");
+        prep.setInt(1, 22);
+        prep.setString(2, "twenty two");
+        prep.execute();
+
+        assertEquals(1, prep.getUpdateCount());
+        assertFalse(prep.getMoreResults(Statement.KEEP_CURRENT_RESULT));
+        assertEquals(-1, prep.getUpdateCount());
     }
 
     private List<?> consoleSelect(Object key) {

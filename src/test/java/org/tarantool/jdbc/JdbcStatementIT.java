@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
+import static org.tarantool.jdbc.SqlAssertions.assertSqlExceptionHasStatus;
 
 import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
@@ -22,6 +23,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.List;
@@ -93,7 +95,7 @@ public class JdbcStatementIT {
         String wrongResultQuery = "INSERT INTO test(id, val) VALUES (40, 'forty')";
 
         SQLException exception = assertThrows(SQLException.class, () -> stmt.executeQuery(wrongResultQuery));
-        SqlAssertions.assertSqlExceptionHasStatus(exception, SQLStates.NO_DATA);
+        assertSqlExceptionHasStatus(exception, SQLStates.NO_DATA);
     }
 
     @Test
@@ -108,7 +110,7 @@ public class JdbcStatementIT {
         String wrongUpdateQuery = "SELECT val FROM test";
 
         SQLException exception = assertThrows(SQLException.class, () -> stmt.executeUpdate(wrongUpdateQuery));
-        SqlAssertions.assertSqlExceptionHasStatus(exception, SQLStates.TOO_MANY_RESULTS);
+        assertSqlExceptionHasStatus(exception, SQLStates.TOO_MANY_RESULTS);
     }
 
     @Test
@@ -362,6 +364,61 @@ public class JdbcStatementIT {
         resultSet.close();
         assertTrue(resultSet.isClosed());
         assertTrue(stmt.isClosed());
+    }
+
+    @Test
+    public void testMoreResultsWithResultSet() throws SQLException {
+        stmt.execute("SELECT val FROM test WHERE id = 1");
+
+        ResultSet rs = stmt.getResultSet();
+
+        assertFalse(rs.isClosed());
+        assertFalse(stmt.getMoreResults());
+        assertEquals(-1, stmt.getUpdateCount());
+        assertTrue(rs.isClosed());
+    }
+
+    @Test
+    public void testMoreResultsWithUpdateCount() throws SQLException {
+        stmt.execute("INSERT INTO test(id, val) VALUES (9, 'nine')");
+
+        assertEquals(1, stmt.getUpdateCount());
+        assertFalse(stmt.getMoreResults());
+        assertEquals(-1, stmt.getUpdateCount());
+    }
+
+    @Test
+    public void testMoreResultsButCloseCurrent() throws SQLException {
+        stmt.execute("SELECT val FROM test WHERE id = 1");
+
+        ResultSet resultSet = stmt.getResultSet();
+
+        assertFalse(resultSet.isClosed());
+        assertFalse(stmt.getMoreResults(Statement.CLOSE_CURRENT_RESULT));
+        assertEquals(-1, stmt.getUpdateCount());
+        assertTrue(resultSet.isClosed());
+    }
+
+    @Test
+    public void testMoreResultsButCloseAll() throws SQLException {
+        stmt.execute("SELECT val FROM test WHERE id = 3");
+        assertThrows(SQLFeatureNotSupportedException.class, () -> stmt.getMoreResults(Statement.CLOSE_ALL_RESULTS));
+
+        stmt.execute("INSERT INTO test(id, val) VALUES (21, 'twenty one')");
+        assertEquals(1, stmt.getUpdateCount());
+        assertFalse(stmt.getMoreResults(Statement.CLOSE_ALL_RESULTS));
+        assertEquals(-1, stmt.getUpdateCount());
+    }
+
+    @Test
+    public void testMoreResultsButKeepCurrent() throws SQLException {
+        stmt.execute("SELECT val FROM test WHERE id = 2");
+        assertThrows(SQLFeatureNotSupportedException.class, () -> stmt.getMoreResults(Statement.KEEP_CURRENT_RESULT));
+
+        stmt.execute("INSERT INTO test(id, val) VALUES (22, 'twenty two')");
+        assertEquals(1, stmt.getUpdateCount());
+        assertFalse(stmt.getMoreResults(Statement.KEEP_CURRENT_RESULT));
+        assertEquals(-1, stmt.getUpdateCount());
     }
 
     private List<?> consoleSelect(Object key) {
