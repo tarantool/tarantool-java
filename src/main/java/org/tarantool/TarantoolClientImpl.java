@@ -115,11 +115,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         this.syncOps = new SyncOps();
         this.composableAsyncOps = new ComposableAsyncOps();
         this.fireAndForgetOps = new FireAndForgetOps();
-        if (config.useNewCall) {
-            setCallCode(Code.CALL);
-            this.syncOps.setCallCode(Code.CALL);
-            this.fireAndForgetOps.setCallCode(Code.CALL);
-            this.composableAsyncOps.setCallCode(Code.CALL);
+        if (!config.useNewCall) {
+            setCallCode(Code.OLD_CALL);
+            this.syncOps.setCallCode(Code.OLD_CALL);
+            this.fireAndForgetOps.setCallCode(Code.OLD_CALL);
+            this.composableAsyncOps.setCallCode(Code.OLD_CALL);
         }
     }
 

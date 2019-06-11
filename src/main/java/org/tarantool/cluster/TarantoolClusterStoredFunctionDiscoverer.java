@@ -55,7 +55,7 @@ public class TarantoolClusterStoredFunctionDiscoverer implements TarantoolCluste
         if (result == null || result.isEmpty()) {
             throw new IllegalDiscoveryFunctionResult("Discovery function returned no data");
         }
-        if (!((List<Object>)result.get(0)).stream().allMatch(item -> item instanceof String)) {
+        if (!(result.get(0) instanceof List)) {
             throw new IllegalDiscoveryFunctionResult("The first value must be an array of strings");
         }
     }

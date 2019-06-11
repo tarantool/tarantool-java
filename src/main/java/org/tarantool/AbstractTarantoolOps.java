@@ -4,7 +4,7 @@ package org.tarantool;
 public abstract class AbstractTarantoolOps<Space, Tuple, Operation, Result>
     implements TarantoolClientOps<Space, Tuple, Operation, Result> {
 
-    private Code callCode = Code.OLD_CALL;
+    private Code callCode = Code.CALL;
 
     protected abstract Result exec(Code code, Object... args);
 

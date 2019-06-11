@@ -237,8 +237,7 @@ tarantool> function get_cluster_nodes() return { 'host1:3301', 'host2:3302', 'ho
 
 You need to pay attention to a function contract we are currently supporting:
 * The client never passes any arguments to a discovery function.
-* A discovery function _should_ return a single result of strings (i.e. single 
-  string `return 'host:3301'` or array of strings `return {'host1:3301', 'host2:3301'}`).
+* A discovery function _must_ return an array of strings (i.e `return {'host1:3301', 'host2:3301'}`).
 * A discovery function _may_ return multi-results but the client takes
   into account only first of them (i.e. `return {'host:3301'}, discovery_delay`, where 
   the second result is unused). Even more, any extra results __are reserved__ by the client

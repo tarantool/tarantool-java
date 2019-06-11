@@ -359,7 +359,7 @@ public class ClientReconnectClusterIT {
         instances.get(SRV1)
             .executeLua("co = coroutine.create(function() " + functionBody + " end)");
         instances.get(SRV1)
-            .executeLua("function getAddressesFunction() local c, r = coroutine.resume(co); return r end");
+            .executeLua("function getAddressesFunction() local c, r = coroutine.resume(co); return {r} end");
 
         String infoFunctionScript = makeDiscoveryFunction(infoFunctionName, Collections.singletonList(service3Address));
         instances.get(SRV2).executeLua(infoFunctionScript);

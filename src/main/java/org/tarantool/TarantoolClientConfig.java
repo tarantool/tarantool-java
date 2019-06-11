@@ -44,10 +44,12 @@ public class TarantoolClientConfig {
     public long writeTimeoutMillis = 60 * 1000L;
 
     /**
-     * Use old call command https://github.com/tarantool/doc/issues/54,
-     * please ensure that you server supports new call command.
+     * Use new call method instead of obsolete
+     * {@code call_16} which used to work in Tarantool v1.6.
+     *
+     * Since 1.9.3, this flag has become enabled by default
      */
-    public boolean useNewCall = false;
+    public boolean useNewCall = true;
 
     /**
      *  Max time to establish connection to the server

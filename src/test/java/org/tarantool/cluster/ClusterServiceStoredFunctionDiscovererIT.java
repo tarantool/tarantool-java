@@ -154,6 +154,18 @@ public class ClusterServiceStoredFunctionDiscovererIT {
     }
 
     @Test
+    @DisplayName("fetched with an exception when a single string returned")
+    public void testSingleStringResultData() {
+        String functionCode = makeDiscoveryFunction(ENTRY_FUNCTION_NAME, "'host1:3301'");
+        control.openConsole(INSTANCE_NAME).exec(functionCode);
+
+        TarantoolClusterStoredFunctionDiscoverer discoverer =
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+
+        assertThrows(IllegalDiscoveryFunctionResult.class, discoverer::getInstances);
+    }
+
+    @Test
     @DisplayName("fetched with an exception using no return function")
     public void testFunctionWithNoReturn() {
         String functionCode = makeDiscoveryFunction(ENTRY_FUNCTION_NAME, "");
