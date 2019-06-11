@@ -238,6 +238,10 @@ tarantool> function get_cluster_nodes() return { 'host1:3301', 'host2:3302', 'ho
 You need to pay attention to a function contract we are currently supporting:
 * The client never passes any arguments to a discovery function.
 * A discovery function _must_ return an array of strings (i.e `return {'host1:3301', 'host2:3301'}`).
+* Each string _should_ satisfy the following pattern `host[:port]`
+  (or more strictly `/^[^:]+(:\d+)?$/` - a mandatory host containing any string
+  and an optional colon followed by digits of the port). Also, the port must be
+  in a range between 1 and 65535 if one is presented.
 * A discovery function _may_ return multi-results but the client takes
   into account only first of them (i.e. `return {'host:3301'}, discovery_delay`, where 
   the second result is unused). Even more, any extra results __are reserved__ by the client
@@ -270,6 +274,8 @@ client.syncOps().insert(45, Arrays.asList(1, 1));
 * A discovery task always uses an active client connection to get the nodes list.
   It's in your responsibility to provide a function availability as well as a consistent
   nodes list on all instances you initially set or obtain from the task.
+* Every address which is unmatched with `host[:port]` pattern will be filtered out from
+  the target addresses list.
 * If some error occurs while a discovery task is running then this task
   will be aborted without any after-effects for next task executions. These cases, for instance, are 
   a wrong function result (see discovery function contract) or a broken connection. 

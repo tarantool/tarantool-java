@@ -1,6 +1,7 @@
 package org.tarantool.cluster;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -72,7 +74,7 @@ public class ClusterServiceStoredFunctionDiscovererIT {
         testHelper.executeLua(functionCode);
 
         TarantoolClusterStoredFunctionDiscoverer discoverer =
-                new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
 
         Set<String> instances = discoverer.getInstances();
 
@@ -91,7 +93,7 @@ public class ClusterServiceStoredFunctionDiscovererIT {
         testHelper.executeLua(functionCode);
 
         TarantoolClusterStoredFunctionDiscoverer discoverer =
-                new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
 
         Set<String> instances = discoverer.getInstances();
 
@@ -110,7 +112,7 @@ public class ClusterServiceStoredFunctionDiscovererIT {
         testHelper.executeLua(functionCode);
 
         TarantoolClusterStoredFunctionDiscoverer discoverer =
-                new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
 
         Set<String> instances = discoverer.getInstances();
 
@@ -124,7 +126,7 @@ public class ClusterServiceStoredFunctionDiscovererIT {
         clusterConfig.clusterDiscoveryEntryFunction = "wrongFunction";
 
         TarantoolClusterStoredFunctionDiscoverer discoverer =
-                new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
 
         assertThrows(TarantoolException.class, discoverer::getInstances);
     }
@@ -136,7 +138,7 @@ public class ClusterServiceStoredFunctionDiscovererIT {
 
         client.close();
         TarantoolClusterStoredFunctionDiscoverer discoverer =
-                new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
 
         assertThrows(CommunicationException.class, discoverer::getInstances);
     }
@@ -148,7 +150,7 @@ public class ClusterServiceStoredFunctionDiscovererIT {
         testHelper.executeLua(functionCode);
 
         TarantoolClusterStoredFunctionDiscoverer discoverer =
-                new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
 
         assertThrows(IllegalDiscoveryFunctionResult.class, discoverer::getInstances);
     }
@@ -157,7 +159,7 @@ public class ClusterServiceStoredFunctionDiscovererIT {
     @DisplayName("fetched with an exception when a single string returned")
     public void testSingleStringResultData() {
         String functionCode = makeDiscoveryFunction(ENTRY_FUNCTION_NAME, "'host1:3301'");
-        control.openConsole(INSTANCE_NAME).exec(functionCode);
+        testHelper.executeLua(functionCode);
 
         TarantoolClusterStoredFunctionDiscoverer discoverer =
             new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
@@ -184,7 +186,7 @@ public class ClusterServiceStoredFunctionDiscovererIT {
         testHelper.executeLua(functionCode);
 
         TarantoolClusterStoredFunctionDiscoverer discoverer =
-                new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
 
         Set<String> instances = discoverer.getInstances();
 
@@ -200,9 +202,68 @@ public class ClusterServiceStoredFunctionDiscovererIT {
         testHelper.executeLua(functionCode);
 
         TarantoolClusterStoredFunctionDiscoverer discoverer =
-                new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
 
         assertThrows(TarantoolException.class, discoverer::getInstances);
+    }
+
+    @Test
+    @DisplayName("fetched a subset of valid addresses")
+    public void testFilterBadAddressesData() {
+        final List<String> allHosts = Arrays.asList(
+            "host1:3313",
+            "host:abc",
+            "192.168.33.90",
+            "myHost",
+            "10.30.10.4:7814",
+            "host:311:sub-host",
+            "instance-2:",
+            "host:0",
+            "host:321981"
+        );
+
+        final Set<String> expectedFiltered = new HashSet<>(
+            Arrays.asList(
+                "host1:3313",
+                "192.168.33.90",
+                "myHost",
+                "10.30.10.4:7814"
+            )
+        );
+
+        String functionCode = makeDiscoveryFunction(ENTRY_FUNCTION_NAME, allHosts);
+        testHelper.executeLua(functionCode);
+
+        TarantoolClusterStoredFunctionDiscoverer discoverer =
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+
+        Set<String> instances = discoverer.getInstances();
+
+        assertNotNull(instances);
+        assertFalse(instances.isEmpty());
+        assertEquals(expectedFiltered, instances);
+    }
+
+    @Test
+    @DisplayName("fetched an empty set after filtration")
+    public void testFullBrokenAddressesList() {
+        List<String> allHosts = Arrays.asList(
+            "abc:edf",
+            "192.168.33.90:",
+            "host:-123",
+            "host:0"
+        );
+
+        String functionCode = makeDiscoveryFunction(ENTRY_FUNCTION_NAME, allHosts);
+        testHelper.executeLua(functionCode);
+
+        TarantoolClusterStoredFunctionDiscoverer discoverer =
+            new TarantoolClusterStoredFunctionDiscoverer(clusterConfig, client);
+
+        Set<String> instances = discoverer.getInstances();
+
+        assertNotNull(instances);
+        assertTrue(instances.isEmpty());
     }
 
 }

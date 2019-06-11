@@ -489,7 +489,7 @@ public class TarantoolClientOpsIT {
     @MethodSource("getClientOps")
     public void testCall(SyncOpsProvider provider) {
         assertEquals(
-            Collections.singletonList(Collections.singletonList("true")),
+            Collections.singletonList("true"),
             provider.getClientOps().call("echo", "true")
         );
 

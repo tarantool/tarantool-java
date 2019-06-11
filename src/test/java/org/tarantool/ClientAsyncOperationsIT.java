@@ -180,8 +180,7 @@ class ClientAsyncOperationsIT {
         testHelper.executeLua("function echo(...) return ... end");
 
         Future<List<?>> fut = provider.getAsyncOps().call("echo", "hello");
-        assertEquals(Collections.singletonList(Collections.singletonList("hello")),
-            fut.get(TIMEOUT, TimeUnit.MILLISECONDS));
+        assertEquals(Collections.singletonList("hello"), fut.get(TIMEOUT, TimeUnit.MILLISECONDS));
 
         provider.close();
     }
