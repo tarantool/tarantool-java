@@ -9,6 +9,8 @@ import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
 import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
+import org.tarantool.jdbc.type.JdbcType;
+import org.tarantool.jdbc.type.TarantoolSqlType;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
