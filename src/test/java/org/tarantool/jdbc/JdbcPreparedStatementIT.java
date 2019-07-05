@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -320,6 +321,160 @@ public class JdbcPreparedStatementIT {
         assertEquals(1, prep.getUpdateCount());
         assertFalse(prep.getMoreResults(Statement.KEEP_CURRENT_RESULT));
         assertEquals(-1, prep.getUpdateCount());
+    }
+
+    @Test
+    public void testExecuteOneBatchQuery() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+
+        prep.setInt(1, 1);
+        prep.setString(2, "one");
+        prep.addBatch();
+
+        int[] updateCounts = prep.executeBatch();
+        assertEquals(1, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+
+        assertEquals("one", consoleSelect(1).get(1));
+    }
+
+    @Test
+    public void testExecuteZeroBatchQuery() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (1, 'one')");
+        int[] updateCounts = prep.executeBatch();
+        assertEquals(0, updateCounts.length);
+    }
+
+    @Test
+    public void testExecuteBatchQuery() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+
+        prep.setInt(1, 1);
+        prep.setString(2, "one");
+        prep.addBatch();
+
+        prep.setInt(1, 2);
+        prep.setString(2, "two");
+        prep.addBatch();
+
+        prep.setInt(1, 3);
+        prep.setString(2, "three");
+        prep.addBatch();
+
+        int[] updateCounts = prep.executeBatch();
+        assertEquals(3, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+        assertEquals(1, updateCounts[1]);
+        assertEquals(1, updateCounts[2]);
+
+        assertEquals("one", consoleSelect(1).get(1));
+        assertEquals("two", consoleSelect(2).get(1));
+        assertEquals("three", consoleSelect(3).get(1));
+    }
+
+    @Test
+    public void testExecuteMultiBatchQuery() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?), (?, ?)");
+
+        prep.setInt(1, 1);
+        prep.setString(2, "one");
+        prep.setInt(3, 2);
+        prep.setString(4, "two");
+        prep.addBatch();
+
+        prep.setInt(1, 3);
+        prep.setString(2, "three");
+        prep.setInt(3, 4);
+        prep.setString(4, "four");
+        prep.addBatch();
+
+        int[] updateCounts = prep.executeBatch();
+        assertEquals(2, updateCounts.length);
+        assertEquals(2, updateCounts[0]);
+        assertEquals(2, updateCounts[1]);
+
+        assertEquals("one", consoleSelect(1).get(1));
+        assertEquals("two", consoleSelect(2).get(1));
+        assertEquals("three", consoleSelect(3).get(1));
+        assertEquals("four", consoleSelect(4).get(1));
+    }
+
+    @Test
+    public void testClearBatch() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+
+        prep.setInt(1, 1);
+        prep.setString(2, "one");
+        prep.addBatch();
+
+        prep.setInt(1, 2);
+        prep.setString(2, "two");
+        prep.addBatch();
+
+        prep.clearBatch();
+
+        int[] updateCounts = prep.executeBatch();
+        assertEquals(0, updateCounts.length);
+    }
+
+    @Test
+    public void testExecuteZeroCountsBatchQuery() throws Exception {
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, 'one')");
+
+        prep = conn.prepareStatement("DELETE FROM test WHERE id = ?");
+
+        prep.setInt(1, 1);
+        prep.addBatch();
+
+        prep.setInt(1, 2);
+        prep.addBatch();
+
+        int[] updateCounts = prep.executeBatch();
+        assertEquals(2, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+        assertEquals(0, updateCounts[1]);
+    }
+
+    @Test
+    public void testExecuteFailedBatchQuery() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+
+        prep.setInt(1, 6);
+        prep.setString(2, "six");
+        prep.addBatch();
+
+        prep.setInt(1, 6);
+        prep.setString(2, "six");
+        prep.addBatch();
+
+        prep.setInt(1, 9);
+        prep.setString(2, "nine");
+        prep.addBatch();
+
+        BatchUpdateException exception = assertThrows(BatchUpdateException.class, () -> prep.executeBatch());
+        int[] updateCounts = exception.getUpdateCounts();
+        assertEquals(3, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+        assertEquals(Statement.EXECUTE_FAILED, updateCounts[1]);
+        assertEquals(1, updateCounts[2]);
+
+        assertEquals("six", consoleSelect(6).get(1));
+        assertEquals("nine", consoleSelect(9).get(1));
+    }
+
+    @Test
+    public void testExecuteResultSetBatchQuery() throws Exception {
+        prep = conn.prepareStatement("SELECT * FROM test WHERE id > ?");
+        prep.setInt(1, 0);
+        prep.addBatch();
+
+        assertThrows(SQLException.class, () -> prep.executeBatch());
+    }
+
+    @Test
+    public void testExecuteStringBatchQuery() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        assertThrows(SQLException.class, () -> prep.addBatch("INSERT INTO test(id, val) VALUES (1, 'one')"));
     }
 
     private List<?> consoleSelect(Object key) {

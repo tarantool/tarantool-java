@@ -32,7 +32,7 @@ import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,7 +40,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 /**
  * Tarantool {@link Connection} implementation.
@@ -525,20 +527,34 @@ public class SQLConnection implements Connection {
         return (int) client.getOperationTimeout();
     }
 
-    protected SQLResultHolder execute(long timeout, String sql, Object... args) throws SQLException {
+    protected SQLResultHolder execute(long timeout, SQLQueryHolder query) throws SQLException {
         checkNotClosed();
-        int networkTimeout = getNetworkTimeout();
-        return (timeout == 0 || (networkTimeout > 0 && networkTimeout < timeout))
-            ? executeWithNetworkTimeout(sql, args)
-            : executeWithStatementTimeout(timeout, sql, args);
+        return (useNetworkTimeout(timeout))
+            ? executeWithNetworkTimeout(query)
+            : executeWithQueryTimeout(timeout, query);
     }
 
-    private SQLResultHolder executeWithNetworkTimeout(String sql, Object... args) throws SQLException {
+    protected SQLBatchResultHolder executeBatch(long timeout, List<SQLQueryHolder> queries) throws SQLException {
+        checkNotClosed();
+        SQLTarantoolClientImpl.SQLRawOps sqlOps = client.sqlRawOps();
+        SQLBatchResultHolder batchResult = useNetworkTimeout(timeout)
+             ? sqlOps.executeBatch(queries)
+             : sqlOps.executeBatch(timeout, queries);
+
+        return batchResult;
+    }
+
+    private boolean useNetworkTimeout(long timeout) throws SQLException {
+        int networkTimeout = getNetworkTimeout();
+        return timeout == 0 || (networkTimeout > 0 && networkTimeout < timeout);
+    }
+
+    private SQLResultHolder executeWithNetworkTimeout(SQLQueryHolder query) throws SQLException {
         try {
-            return client.sqlRawOps().execute(sql, args);
+            return client.sqlRawOps().execute(query);
         } catch (Exception e) {
             handleException(e);
-            throw new SQLException(formatError(sql, args), e);
+            throw new SQLException(formatError(query), e);
         }
     }
 
@@ -546,25 +562,24 @@ public class SQLConnection implements Connection {
      * Executes a query using a custom timeout.
      *
      * @param timeout query timeout
-     * @param sql     query
-     * @param args    query bindings
+     * @param query   query
      *
      * @return SQL result holder
      *
      * @throws StatementTimeoutException if query execution took more than query timeout
      * @throws SQLException              if any other errors occurred
      */
-    private SQLResultHolder executeWithStatementTimeout(long timeout, String sql, Object... args) throws SQLException {
+    private SQLResultHolder executeWithQueryTimeout(long timeout, SQLQueryHolder query) throws SQLException {
         try {
-            return client.sqlRawOps().execute(timeout, sql, args);
+            return client.sqlRawOps().execute(timeout, query);
         } catch (Exception e) {
             // statement timeout should not affect the current connection
             // but can be handled by the caller side
             if (e.getCause() instanceof TimeoutException) {
-                throw new StatementTimeoutException(formatError(sql, args), e.getCause());
+                throw new StatementTimeoutException(formatError(query), e.getCause());
             }
             handleException(e);
-            throw new SQLException(formatError(sql, args), e);
+            throw new SQLException(formatError(query), e);
         }
     }
 
@@ -708,28 +723,74 @@ public class SQLConnection implements Connection {
     /**
      * Provides error message that contains parameters of failed SQL statement.
      *
-     * @param sql    SQL Text.
-     * @param params Parameters of the SQL statement.
+     * @param query SQL query
      *
      * @return Formatted error message.
      */
-    private static String formatError(String sql, Object... params) {
-        return "Failed to execute SQL: " + sql + ", params: " + Arrays.deepToString(params);
+    private static String formatError(SQLQueryHolder query) {
+        return "Failed to execute SQL: " + query.getQuery() + ", params: " + query.getParams();
     }
 
     static class SQLTarantoolClientImpl extends TarantoolClientImpl {
 
+        private Future<?> executeQuery(SQLQueryHolder queryHolder) {
+            return exec(Code.EXECUTE, Key.SQL_TEXT, queryHolder.getQuery(), Key.SQL_BIND, queryHolder.getParams());
+        }
+
+        private Future<?> executeQuery(SQLQueryHolder queryHolder, long timeoutMillis) {
+            return exec(
+                timeoutMillis, Code.EXECUTE, Key.SQL_TEXT, queryHolder.getQuery(), Key.SQL_BIND, queryHolder.getParams()
+            );
+        }
+
         final SQLRawOps sqlRawOps = new SQLRawOps() {
             @Override
-            public SQLResultHolder execute(String sql, Object... binds) {
-                return (SQLResultHolder) syncGet(exec(Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, binds));
+            public SQLResultHolder execute(SQLQueryHolder query) {
+                return (SQLResultHolder) syncGet(executeQuery(query));
             }
 
             @Override
-            public SQLResultHolder execute(long timeoutMillis, String sql, Object... binds) {
-                return (SQLResultHolder) syncGet(
-                    exec(timeoutMillis, Code.EXECUTE, Key.SQL_TEXT, sql, Key.SQL_BIND, binds)
-                );
+            public SQLResultHolder execute(long timeoutMillis, SQLQueryHolder query) {
+                return (SQLResultHolder) syncGet(executeQuery(query, timeoutMillis));
+            }
+
+            @Override
+            public SQLBatchResultHolder executeBatch(List<SQLQueryHolder> queries) {
+                return executeInternal(queries, (query) -> executeQuery(query));
+            }
+
+            @Override
+            public SQLBatchResultHolder executeBatch(long timeoutMillis, List<SQLQueryHolder> queries) {
+                return executeInternal(queries, (query) -> executeQuery(query, timeoutMillis));
+            }
+
+            private SQLBatchResultHolder executeInternal(List<SQLQueryHolder> queries,
+                                                         Function<SQLQueryHolder, Future<?>> fetcher) {
+                List<Future<?>> sqlFutures = new ArrayList<>();
+                // using queries pipelining to emulate a batch request
+                for (SQLQueryHolder query : queries) {
+                    sqlFutures.add(fetcher.apply(query));
+                }
+                // wait for all the results
+                Exception lastError = null;
+                List<SQLResultHolder> items = new ArrayList<>(queries.size());
+                for (Future<?> future : sqlFutures) {
+                    try {
+                        SQLResultHolder result = (SQLResultHolder) syncGet(future);
+                        if (result.isQueryResult()) {
+                            lastError = new SQLException(
+                                "Result set is not allowed in the batch response",
+                                SQLStates.TOO_MANY_RESULTS.getSqlState()
+                            );
+                        }
+                        items.add(result);
+                    } catch (RuntimeException e) {
+                        // empty result set will be treated as a wrong result
+                        items.add(SQLResultHolder.ofEmptyQuery());
+                        lastError = e;
+                    }
+                }
+                return new SQLBatchResultHolder(items, lastError);
             }
         };
 
@@ -758,9 +819,13 @@ public class SQLConnection implements Connection {
 
         interface SQLRawOps {
 
-            SQLResultHolder execute(String sql, Object... binds);
+            SQLResultHolder execute(SQLQueryHolder query);
 
-            SQLResultHolder execute(long timeoutMillis, String sql, Object... binds);
+            SQLResultHolder execute(long timeoutMillis, SQLQueryHolder query);
+
+            SQLBatchResultHolder executeBatch(List<SQLQueryHolder> queries);
+
+            SQLBatchResultHolder executeBatch(long timeoutMillis, List<SQLQueryHolder> queries);
 
         }
 

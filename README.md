@@ -15,6 +15,7 @@ To get the Java connector for Tarantool 1.6.9, visit
 
 ## Table of contents
 * [Getting started](#getting-started)
+* [JDBC](#JDBC)
 * [Cluster support](#cluster-support)
 * [Where to get help](#where-to-get-help)
 
@@ -169,6 +170,67 @@ System.out.println(template.query("select * from hello_world where hello=:id", C
 ```
 
 For more implementation details, see [API documentation](http://tarantool.github.io/tarantool-java/apidocs/index.html).
+
+## JDBC
+
+### Batch updates
+
+`Statement` and `PreparedStatement` objects can be used to submit batch
+updates.
+
+For instance, using `Statement` object:
+
+```java
+Statement statement = connection.createStatement();
+statement.addBatch("INSERT INTO student VALUES (30, 'Joe Jones')");
+statement.addBatch("INSERT INTO faculty VALUES (2, 'Faculty of Chemistry')");
+statement.addBatch("INSERT INTO student_faculty VALUES (30, 2)");
+
+int[] updateCounts = stmt.executeBatch();
+```
+
+or using `PreparedStatement`:
+
+```java
+PreparedStatement stmt = con.prepareStatement("INSERT INTO student VALUES (?, ?)");
+stmt.setInt(1, 30);
+stmt.setString(2, "Michael Korj");
+stmt.addBatch();
+stmt.setInt(1, 40);
+stmt.setString(2, "Linda Simpson");
+stmt.addBatch();
+
+int[] updateCounts = stmt.executeBatch();
+```
+
+The connector uses a pipeliing when it performs a batch request. It means
+each query is asynchronously sent one-by-one in order they were specified
+in the batch.
+
+There are a couple of caveats:
+
+- JDBC spec recommends that *auto-commit* mode should be turned off
+to prevent the driver from committing a transaction when a batch request
+is called. The connector is not support transactions and *auto-commit* is
+always enabled, so each statement from the batch is executed in its own
+transaction.
+
+- DDL operations aren't transactional in Tarantool. In this way, a batch
+like this can produce an undefined behaviour (i.e. second statement can fail
+with an error that `student` table does not exist).
+
+```java
+statement.addBatch("CREATE TABLE student (id INT PRIMARY KEY, name VARCHAR(100))");
+statement.addBatch("INSERT INTO student VALUES (1, 'Alex Smith')");
+```
+
+- If `vinyl` storage engine is used an execution order of batch statements is
+not specified. __NOTE:__ This behaviour is incompatible with JDBC spec in the
+sentence "Batch commands are executed serially (at least logically) in the
+order in which they were added to the batch"
+
+- The driver continues processing the remaining commands in a batch once execution
+of a command fails.
 
 ## Cluster support
 

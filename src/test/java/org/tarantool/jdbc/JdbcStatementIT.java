@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -419,6 +420,111 @@ public class JdbcStatementIT {
         assertEquals(1, stmt.getUpdateCount());
         assertFalse(stmt.getMoreResults(Statement.KEEP_CURRENT_RESULT));
         assertEquals(-1, stmt.getUpdateCount());
+    }
+
+    @Test
+    public void testExecuteOneBatchQuery() throws Exception {
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (1, 'one')");
+        int[] updateCounts = stmt.executeBatch();
+        assertEquals(1, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+
+        assertEquals("one", consoleSelect(1).get(1));
+    }
+
+    @Test
+    public void testExecuteZeroBatchQuery() throws Exception {
+        int[] updateCounts = stmt.executeBatch();
+        assertEquals(0, updateCounts.length);
+    }
+
+    @Test
+    public void testExecuteBatchQuery() throws Exception {
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (1, 'one')");
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (2, 'two')");
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (3, 'three'), (4, 'four')");
+        stmt.addBatch("DELETE FROM test WHERE id > 1");
+
+        int[] updateCounts = stmt.executeBatch();
+        assertEquals(4, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+        assertEquals(1, updateCounts[1]);
+        assertEquals(2, updateCounts[2]);
+        assertEquals(3, updateCounts[3]);
+
+        assertEquals("one", consoleSelect(1).get(1));
+    }
+
+    @Test
+    public void testClearBatch() throws Exception {
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (1, 'one')");
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (2, 'two')");
+        stmt.clearBatch();
+        int[] updateCounts = stmt.executeBatch();
+        assertEquals(0, updateCounts.length);
+    }
+
+    @Test
+    public void testExecuteZeroCountsBatchQuery() throws Exception {
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (50, 'fifty')");
+        stmt.addBatch("DELETE FROM test WHERE id > 100");
+        int[] updateCounts = stmt.executeBatch();
+        assertEquals(2, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+        assertEquals(0, updateCounts[1]);
+
+        assertEquals("fifty", consoleSelect(50).get(1));
+    }
+
+    @Test
+    public void testExecuteMixedBatchQuery() throws Exception {
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (5, 'five')");
+        stmt.addBatch("DELETE FROM test WHERE id = 5");
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (5, 'five')");
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (6, 'six')");
+
+        int[] updateCounts = stmt.executeBatch();
+        assertEquals(4, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+        assertEquals(1, updateCounts[1]);
+        assertEquals(1, updateCounts[2]);
+        assertEquals(1, updateCounts[3]);
+    }
+
+    @Test
+    public void testExecuteFailedBatchQuery() throws Exception {
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (5, 'five')");
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (5, 'five')");
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (6, 'six')");
+
+        BatchUpdateException exception = assertThrows(BatchUpdateException.class, () -> stmt.executeBatch());
+        int[] updateCounts = exception.getUpdateCounts();
+        assertEquals(3, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+        assertEquals(Statement.EXECUTE_FAILED, updateCounts[1]);
+        assertEquals(1, updateCounts[2]);
+
+        assertEquals("five", consoleSelect(5).get(1));
+        assertEquals("six", consoleSelect(6).get(1));
+    }
+
+    @Test
+    public void testExecuteResultSetBatchQuery() throws Exception {
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (5, 'five')");
+        stmt.addBatch("SELECT * FROM test WHERE id = 5");
+        stmt.addBatch("INSERT INTO test(id, val) VALUES (6, 'six')");
+        stmt.addBatch("SELECT id FROM test WHERE id = 8");
+
+        BatchUpdateException exception = assertThrows(BatchUpdateException.class, () -> stmt.executeBatch());
+        int[] updateCounts = exception.getUpdateCounts();
+        assertEquals(4, updateCounts.length);
+        assertEquals(1, updateCounts[0]);
+        assertEquals(Statement.EXECUTE_FAILED, updateCounts[1]);
+        assertEquals(1, updateCounts[2]);
+        assertEquals(Statement.EXECUTE_FAILED, updateCounts[3]);
+
+        assertEquals("five", consoleSelect(5).get(1));
+        assertEquals("six", consoleSelect(6).get(1));
     }
 
     private List<?> consoleSelect(Object key) {

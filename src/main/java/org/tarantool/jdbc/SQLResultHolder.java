@@ -11,9 +11,11 @@ import java.util.List;
  */
 public class SQLResultHolder {
 
-    final List<SqlProtoUtils.SQLMetaData> sqlMetadata;
-    final List<List<Object>> rows;
-    final int updateCount;
+    public static final int NO_UPDATE_COUNT = -1;
+
+    private final List<SqlProtoUtils.SQLMetaData> sqlMetadata;
+    private final List<List<Object>> rows;
+    private final int updateCount;
 
     public SQLResultHolder(List<SqlProtoUtils.SQLMetaData> sqlMetadata, List<List<Object>> rows, int updateCount) {
         this.sqlMetadata = sqlMetadata;
@@ -23,7 +25,7 @@ public class SQLResultHolder {
 
     public static SQLResultHolder ofQuery(final List<SqlProtoUtils.SQLMetaData> sqlMetadata,
                                           final List<List<Object>> rows) {
-        return new SQLResultHolder(sqlMetadata, rows, -1);
+        return new SQLResultHolder(sqlMetadata, rows, NO_UPDATE_COUNT);
     }
 
     public static SQLResultHolder ofEmptyQuery() {

@@ -3,6 +3,7 @@ package org.tarantool.jdbc;
 import org.tarantool.util.JdbcConstants;
 import org.tarantool.util.SQLStates;
 
+import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -11,8 +12,11 @@ import java.sql.SQLNonTransientException;
 import java.sql.SQLTimeoutException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
  * Tarantool {@link Statement} implementation.
@@ -30,6 +34,8 @@ public class SQLStatement implements TarantoolStatement {
      */
     protected SQLResultSet resultSet;
     protected int updateCount;
+
+    private List<String> batchQueries = new ArrayList<>();
 
     private boolean isCloseOnCompletion;
 
@@ -275,17 +281,28 @@ public class SQLStatement implements TarantoolStatement {
 
     @Override
     public void addBatch(String sql) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        batchQueries.add(sql);
     }
 
     @Override
     public void clearBatch() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        batchQueries.clear();
     }
 
     @Override
     public int[] executeBatch() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        discardLastResults();
+        try {
+            List<SQLQueryHolder> queries = batchQueries.stream()
+                .map(q -> SQLQueryHolder.of(q))
+                .collect(Collectors.toList());
+            return executeBatchInternal(queries);
+        } finally {
+            batchQueries.clear();
+        }
     }
 
     @Override
@@ -329,7 +346,7 @@ public class SQLStatement implements TarantoolStatement {
      * explicitly by the app.
      *
      * @throws SQLException if this method is called on a closed
-     * {@code Statement}
+     *                      {@code Statement}
      */
     @Override
     public void closeOnCompletion() throws SQLException {
@@ -396,7 +413,7 @@ public class SQLStatement implements TarantoolStatement {
         discardLastResults();
         SQLResultHolder holder;
         try {
-            holder = connection.execute(timeout, sql, params);
+            holder = connection.execute(timeout, SQLQueryHolder.of(sql, params));
         } catch (StatementTimeoutException e) {
             cancel();
             throw new SQLTimeoutException();
@@ -407,6 +424,28 @@ public class SQLStatement implements TarantoolStatement {
         }
         updateCount = holder.getUpdateCount();
         return holder.isQueryResult();
+    }
+
+    /**
+     * Performs batch query execution.
+     *
+     * @param queries batch queries
+     *
+     * @return update count result per query
+     */
+    protected int[] executeBatchInternal(List<SQLQueryHolder> queries) throws SQLException {
+        SQLBatchResultHolder batchResult = connection.executeBatch(timeout, queries);
+        int[] resultCounts = batchResult.getResults().stream()
+            .mapToInt(result -> result.isQueryResult()
+                ? Statement.EXECUTE_FAILED : result.getUpdateCount() == SQLResultHolder.NO_UPDATE_COUNT
+                ? Statement.SUCCESS_NO_INFO : result.getUpdateCount()
+            ).toArray();
+
+        if (batchResult.getError() != null) {
+            throw new BatchUpdateException(resultCounts, batchResult.getError());
+        }
+
+        return resultCounts;
     }
 
     @Override

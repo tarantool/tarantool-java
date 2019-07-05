@@ -22,21 +22,25 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class SQLPreparedStatement extends SQLStatement implements PreparedStatement {
 
-    static final String INVALID_CALL_MSG = "The method cannot be called on a PreparedStatement.";
-    final String sql;
-    final Map<Integer, Object> params;
+    private static final String INVALID_CALL_MESSAGE = "The method cannot be called on a PreparedStatement.";
 
+    private final String sql;
+    private final Map<Integer, Object> parameters;
+
+    private List<Map<Integer, Object>> batchParameters = new ArrayList<>();
 
     public SQLPreparedStatement(SQLConnection connection, String sql) throws SQLException {
         super(connection);
         this.sql = sql;
-        this.params = new HashMap<>();
+        this.parameters = new HashMap<>();
     }
 
     public SQLPreparedStatement(SQLConnection connection,
@@ -46,13 +50,13 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
                                 int resultSetHoldability) throws SQLException {
         super(connection, resultSetType, resultSetConcurrency, resultSetHoldability);
         this.sql = sql;
-        this.params = new HashMap<>();
+        this.parameters = new HashMap<>();
     }
 
     @Override
     public ResultSet executeQuery() throws SQLException {
         checkNotClosed();
-        if (!executeInternal(sql, getParams())) {
+        if (!executeInternal(sql, toParametersList(parameters))) {
             throw new SQLException("No results were returned", SQLStates.NO_DATA.getSqlState());
         }
         return resultSet;
@@ -60,25 +64,14 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public ResultSet executeQuery(String sql) throws SQLException {
-        throw new SQLException(INVALID_CALL_MSG);
-    }
-
-    protected Object[] getParams() throws SQLException {
-        Object[] objects = new Object[params.size()];
-        for (int i = 1; i <= params.size(); i++) {
-            if (params.containsKey(i)) {
-                objects[i - 1] = params.get(i);
-            } else {
-                throw new SQLException("Parameter " + i + " is missing");
-            }
-        }
-        return objects;
+        checkNotClosed();
+        throw new SQLException(INVALID_CALL_MESSAGE);
     }
 
     @Override
     public int executeUpdate() throws SQLException {
         checkNotClosed();
-        if (executeInternal(sql, getParams())) {
+        if (executeInternal(sql, toParametersList(parameters))) {
             throw new SQLException(
                 "Result was returned but nothing was expected",
                 SQLStates.TOO_MANY_RESULTS.getSqlState()
@@ -89,7 +82,8 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public int executeUpdate(String sql) throws SQLException {
-        throw new SQLException(INVALID_CALL_MSG);
+        checkNotClosed();
+        throw new SQLException(INVALID_CALL_MESSAGE);
     }
 
     @Override
@@ -219,7 +213,7 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public void clearParameters() throws SQLException {
-        params.clear();
+        parameters.clear();
     }
 
     @Override
@@ -242,18 +236,19 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     private void setParameter(int parameterIndex, Object value) throws SQLException {
         checkNotClosed();
-        params.put(parameterIndex, value);
+        parameters.put(parameterIndex, value);
     }
 
     @Override
     public boolean execute() throws SQLException {
         checkNotClosed();
-        return executeInternal(sql, getParams());
+        return executeInternal(sql, toParametersList(parameters));
     }
 
     @Override
     public boolean execute(String sql) throws SQLException {
-        throw new SQLException(INVALID_CALL_MSG);
+        checkNotClosed();
+        throw new SQLException(INVALID_CALL_MESSAGE);
     }
 
     @Override
@@ -374,22 +369,48 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public void addBatch(String sql) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        throw new SQLException(INVALID_CALL_MESSAGE);
     }
 
     @Override
     public void addBatch() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        // shadow copy of the current parameters
+        batchParameters.add(new HashMap<>(parameters));
     }
 
     @Override
     public int[] executeBatch() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        try {
+            List<SQLQueryHolder> queries = new ArrayList<>();
+            for (Map<Integer, Object> p : batchParameters) {
+                SQLQueryHolder of = SQLQueryHolder.of(sql, toParametersList(p));
+                queries.add(of);
+            }
+            return executeBatchInternal(queries);
+        } finally {
+            batchParameters.clear();
+        }
     }
 
     @Override
     public void clearBatch() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        batchParameters.clear();
+    }
+
+    private Object[] toParametersList(Map<Integer, Object> parameters) throws SQLException {
+        Object[] objects = new Object[parameters.size()];
+        for (int i = 1; i <= parameters.size(); i++) {
+            if (parameters.containsKey(i)) {
+                objects[i - 1] = parameters.get(i);
+            } else {
+                throw new SQLException("Parameter " + i + " is missing");
+            }
+        }
+        return objects;
     }
 
 }

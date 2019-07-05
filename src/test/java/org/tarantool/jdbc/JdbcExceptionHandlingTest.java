@@ -3,6 +3,7 @@ package org.tarantool.jdbc;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -151,17 +152,12 @@ public class JdbcExceptionHandlingTest {
         throws SQLException {
         Exception ex = new CommunicationException("TEST");
         SQLTarantoolClientImpl.SQLRawOps sqlOps = mock(SQLTarantoolClientImpl.SQLRawOps.class);
-        doThrow(ex).when(sqlOps).execute("TEST");
+        doThrow(ex).when(sqlOps).execute(anyObject());
 
         SQLTarantoolClientImpl client = buildSQLClient(sqlOps, null);
         final Statement stmt = new SQLStatement(buildTestSQLConnection(client, "jdbc:tarantool://0:0"));
 
-        SQLException e = assertThrows(SQLException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                consumer.accept(stmt);
-            }
-        });
+        SQLException e = assertThrows(SQLException.class, () -> consumer.accept(stmt));
         assertTrue(e.getMessage().startsWith("Failed to execute"), e.getMessage());
 
         assertEquals(ex, e.getCause());
@@ -173,7 +169,7 @@ public class JdbcExceptionHandlingTest {
         throws SQLException {
         Exception ex = new CommunicationException("TEST");
         SQLTarantoolClientImpl.SQLRawOps sqlOps = mock(SQLTarantoolClientImpl.SQLRawOps.class);
-        doThrow(ex).when(sqlOps).execute("TEST");
+        doThrow(ex).when(sqlOps).execute(anyObject());
 
         SQLTarantoolClientImpl client = buildSQLClient(sqlOps, null);
         final PreparedStatement prep = new SQLPreparedStatement(
