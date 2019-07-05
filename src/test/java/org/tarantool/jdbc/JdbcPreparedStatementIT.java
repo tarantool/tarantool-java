@@ -477,6 +477,14 @@ public class JdbcPreparedStatementIT {
         assertThrows(SQLException.class, () -> prep.addBatch("INSERT INTO test(id, val) VALUES (1, 'one')"));
     }
 
+    @Test
+    void testPoolableStatus() throws SQLException {
+        prep = conn.prepareStatement("SELECT val FROM test WHERE id = ?");
+        assertTrue(prep.isPoolable());
+        prep.setPoolable(false);
+        assertFalse(prep.isPoolable());
+    }
+
     private List<?> consoleSelect(Object key) {
         List<?> list = testHelper.evaluate(TestUtils.toLuaSelect("TEST", key));
         return list == null ? Collections.emptyList() : (List<?>) list.get(0);

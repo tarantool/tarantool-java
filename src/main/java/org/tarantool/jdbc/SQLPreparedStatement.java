@@ -41,6 +41,7 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
         super(connection);
         this.sql = sql;
         this.parameters = new HashMap<>();
+        setPoolable(true);
     }
 
     public SQLPreparedStatement(SQLConnection connection,
@@ -51,6 +52,7 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
         super(connection, resultSetType, resultSetConcurrency, resultSetHoldability);
         this.sql = sql;
         this.parameters = new HashMap<>();
+        setPoolable(true);
     }
 
     @Override

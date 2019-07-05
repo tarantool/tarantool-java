@@ -50,6 +50,14 @@ public class SQLStatement implements TarantoolStatement {
      */
     private long timeout;
 
+    /**
+     * Hint to the statement pool implementation indicating
+     * whether the application wants the statement to be pooled.
+     *
+     * Ignored.
+     */
+    private boolean poolable;
+
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
     protected SQLStatement(SQLConnection sqlConnection) throws SQLException {
@@ -329,12 +337,14 @@ public class SQLStatement implements TarantoolStatement {
 
     @Override
     public void setPoolable(boolean poolable) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        this.poolable = poolable;
     }
 
     @Override
     public boolean isPoolable() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkNotClosed();
+        return poolable;
     }
 
     /**

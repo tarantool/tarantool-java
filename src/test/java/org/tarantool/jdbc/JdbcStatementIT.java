@@ -527,6 +527,13 @@ public class JdbcStatementIT {
         assertEquals("six", consoleSelect(6).get(1));
     }
 
+    @Test
+    void testPoolableStatus() throws SQLException {
+        assertFalse(stmt.isPoolable());
+        stmt.setPoolable(true);
+        assertTrue(stmt.isPoolable());
+    }
+
     private List<?> consoleSelect(Object key) {
         List<?> list = testHelper.evaluate(TestUtils.toLuaSelect("TEST", key));
         return list == null ? Collections.emptyList() : (List<?>) list.get(0);
