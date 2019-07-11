@@ -10,6 +10,8 @@
         <junit.jupiter.version>5.4.2</junit.jupiter.version>
         <snakeyml.version>1.23</snakeyml.version>
         <mockito.version>1.10.19</mockito.version>
+        <!-- logger dependency versions -->
+        <sfl4j.version>1.7.26</sfl4j.version>
     </properties>
     <name>Tarantool Connector for Java</name>
     <url>https://github.com/tarantool/tarantool-java</url>
@@ -188,6 +190,12 @@
             <artifactId>snakeyaml</artifactId>
             <version>${snakeyml.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${sfl4j.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
