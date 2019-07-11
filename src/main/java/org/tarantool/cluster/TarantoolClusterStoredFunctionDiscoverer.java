@@ -3,12 +3,13 @@ package org.tarantool.cluster;
 import org.tarantool.TarantoolClient;
 import org.tarantool.TarantoolClientOps;
 import org.tarantool.TarantoolClusterClientConfig;
+import org.tarantool.logging.Logger;
+import org.tarantool.logging.LoggerFactory;
 import org.tarantool.util.StringUtils;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * A cluster nodes discoverer based on calling a predefined function
@@ -18,6 +19,8 @@ import java.util.stream.Collectors;
  * the strings which follow <code>host[:port]</code> format
  */
 public class TarantoolClusterStoredFunctionDiscoverer implements TarantoolClusterDiscoverer {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(TarantoolClusterStoredFunctionDiscoverer.class);
 
     private TarantoolClient client;
     private String entryFunction;
@@ -57,12 +60,24 @@ public class TarantoolClusterStoredFunctionDiscoverer implements TarantoolCluste
             throw new IllegalDiscoveryFunctionResult("The first value must be an array of strings");
         }
 
-        return ((List<Object>) result.get(0)).stream()
-            .filter(item -> item instanceof String)
-            .map(Object::toString)
-            .filter(s -> !StringUtils.isBlank(s))
-            .filter(this::isAddress)
-            .collect(Collectors.toCollection(LinkedHashSet::new));
+        LinkedHashSet<String> passed = new LinkedHashSet<>();
+        LinkedHashSet<String> skipped = new LinkedHashSet<>();
+        for (Object item : ((List<Object>) result.get(0))) {
+            if (!(item instanceof String)) {
+                skipped.add(item.toString());
+                continue;
+            }
+            String s = item.toString();
+            if (!StringUtils.isBlank(s) && isAddress(s)) {
+                passed.add(s);
+            } else {
+                skipped.add(s);
+            }
+        }
+        if (!skipped.isEmpty()) {
+            LOGGER.warn("Some of the addresses were skipped because of unsupported format: {0}", skipped);
+        }
+        return passed;
     }
 
     /**
