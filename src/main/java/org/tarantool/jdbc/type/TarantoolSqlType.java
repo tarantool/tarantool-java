@@ -98,6 +98,10 @@ public enum TarantoolSqlType {
         return tarantoolType.isCaseSensitive();
     }
 
+    public boolean isTrimmable() {
+        return jdbcType.isTrimmable();
+    }
+
     public int getPrecision() {
         return tarantoolType.getPrecision();
     }

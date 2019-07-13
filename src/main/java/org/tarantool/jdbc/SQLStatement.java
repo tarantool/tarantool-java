@@ -51,6 +51,7 @@ public class SQLStatement implements TarantoolStatement {
     private final int resultSetHoldability;
 
     private int maxRows;
+    private int maxFieldSize;
 
     /**
      * Query timeout in millis.
@@ -134,12 +135,18 @@ public class SQLStatement implements TarantoolStatement {
 
     @Override
     public int getMaxFieldSize() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return maxFieldSize;
     }
 
     @Override
-    public void setMaxFieldSize(int max) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public void setMaxFieldSize(int size) throws SQLException {
+        if (size < 0) {
+            throw new SQLException(
+                "The max field size must be positive or zero",
+                SQLStates.INVALID_PARAMETER_VALUE.getSqlState()
+            );
+        }
+        maxFieldSize = size;
     }
 
     @Override

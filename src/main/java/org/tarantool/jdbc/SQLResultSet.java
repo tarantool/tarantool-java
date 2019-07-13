@@ -39,13 +39,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SQLResultSet implements ResultSet {
 
     private CursorIterator<List<Object>> iterator;
-    private SQLResultSetMetaData metaData;
+    private TarantoolResultSetMetaData metaData;
 
     private Map<String, Integer> columnByNameLookups;
     private boolean lastColumnWasNull;
 
     private final TarantoolStatement statement;
     private final int maxRows;
+    private final int maxFieldSize;
 
     private AtomicBoolean isClosed = new AtomicBoolean(false);
 
@@ -59,7 +60,8 @@ public class SQLResultSet implements ResultSet {
         scrollType = statement.getResultSetType();
         concurrencyLevel = statement.getResultSetConcurrency();
         holdability = statement.getResultSetHoldability();
-        this.maxRows = statement.getMaxRows();
+        maxRows = statement.getMaxRows();
+        maxFieldSize = statement.getMaxFieldSize();
 
         List<List<Object>> fetchedRows = holder.getRows();
         List<List<Object>> rows = maxRows == 0 || maxRows >= fetchedRows.size()
@@ -127,7 +129,13 @@ public class SQLResultSet implements ResultSet {
     @Override
     public String getString(int columnIndex) throws SQLException {
         Object raw = getRaw(columnIndex);
-        return raw == null ? null : String.valueOf(raw);
+        if (raw == null) {
+            return null;
+        }
+        String value = String.valueOf(raw);
+        return (maxFieldSize > 0 && value.length() > maxFieldSize && metaData.isTrimmable(columnIndex))
+            ? value.substring(0, maxFieldSize)
+            : value;
     }
 
     @Override
@@ -232,7 +240,17 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public byte[] getBytes(int columnIndex) throws SQLException {
-        return (byte[]) getRaw(columnIndex);
+        Object raw = getRaw(columnIndex);
+        if (raw == null) {
+            return null;
+        }
+        byte[] bytes = (byte[]) raw;
+        if (maxFieldSize > 0 && bytes.length > maxFieldSize && metaData.isTrimmable(columnIndex)) {
+            byte[] trimmedBytes = new byte[maxFieldSize];
+            System.arraycopy(bytes, 0, trimmedBytes, 0, maxFieldSize);
+            return trimmedBytes;
+        }
+        return bytes;
     }
 
     @Override

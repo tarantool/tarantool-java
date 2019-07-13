@@ -16,42 +16,44 @@ import java.sql.NClob;
  */
 public enum JdbcType {
 
-    UNKNOWN(Object.class, JDBCType.OTHER),
+    UNKNOWN(Object.class, JDBCType.OTHER, false),
 
-    CHAR(String.class, JDBCType.CHAR),
-    VARCHAR(String.class, JDBCType.VARCHAR),
-    LONGVARCHAR(String.class, JDBCType.LONGNVARCHAR),
+    CHAR(String.class, JDBCType.CHAR, true),
+    VARCHAR(String.class, JDBCType.VARCHAR, true),
+    LONGVARCHAR(String.class, JDBCType.LONGNVARCHAR, true),
 
-    NCHAR(String.class, JDBCType.NCHAR),
-    NVARCHAR(String.class, JDBCType.NVARCHAR),
-    LONGNVARCHAR(String.class, JDBCType.LONGNVARCHAR),
+    NCHAR(String.class, JDBCType.NCHAR, true),
+    NVARCHAR(String.class, JDBCType.NVARCHAR, true),
+    LONGNVARCHAR(String.class, JDBCType.LONGNVARCHAR, true),
 
-    BINARY(byte[].class, JDBCType.BINARY),
-    VARBINARY(byte[].class, JDBCType.VARBINARY),
-    LONGVARBINARY(byte[].class, JDBCType.LONGVARBINARY),
+    BINARY(byte[].class, JDBCType.BINARY, true),
+    VARBINARY(byte[].class, JDBCType.VARBINARY, true),
+    LONGVARBINARY(byte[].class, JDBCType.LONGVARBINARY, true),
 
-    BIT(Boolean.class, JDBCType.BIT),
-    BOOLEAN(Boolean.class, JDBCType.BOOLEAN),
+    BIT(Boolean.class, JDBCType.BIT, false),
+    BOOLEAN(Boolean.class, JDBCType.BOOLEAN, false),
 
-    REAL(Float.class, JDBCType.REAL),
-    FLOAT(Double.class, JDBCType.FLOAT),
-    DOUBLE(Double.class, JDBCType.DOUBLE),
+    REAL(Float.class, JDBCType.REAL, false),
+    FLOAT(Double.class, JDBCType.FLOAT, false),
+    DOUBLE(Double.class, JDBCType.DOUBLE, false),
 
-    TINYINT(Byte.class, JDBCType.TINYINT),
-    SMALLINT(Short.class, JDBCType.SMALLINT),
-    INTEGER(Integer.class, JDBCType.INTEGER),
-    BIGINT(Long.class, JDBCType.BIGINT),
+    TINYINT(Byte.class, JDBCType.TINYINT, false),
+    SMALLINT(Short.class, JDBCType.SMALLINT, false),
+    INTEGER(Integer.class, JDBCType.INTEGER, false),
+    BIGINT(Long.class, JDBCType.BIGINT, false),
 
-    CLOB(Clob.class, JDBCType.CLOB),
-    NCLOB(NClob.class, JDBCType.NCLOB),
-    BLOB(Blob.class, JDBCType.BLOB);
+    CLOB(Clob.class, JDBCType.CLOB, false),
+    NCLOB(NClob.class, JDBCType.NCLOB, false),
+    BLOB(Blob.class, JDBCType.BLOB, false);
 
     private final Class<?> javaType;
     private final JDBCType targetJdbcType;
+    private final boolean trimmable;
 
-    JdbcType(Class<?> javaType, JDBCType targetJdbcType) {
+    JdbcType(Class<?> javaType, JDBCType targetJdbcType, boolean trimmable) {
         this.javaType = javaType;
         this.targetJdbcType = targetJdbcType;
+        this.trimmable = trimmable;
     }
 
     public Class<?> getJavaType() {
@@ -60,6 +62,10 @@ public enum JdbcType {
 
     public JDBCType getTargetJdbcType() {
         return targetJdbcType;
+    }
+
+    public boolean isTrimmable() {
+        return trimmable;
     }
 
     public int getTypeNumber() {

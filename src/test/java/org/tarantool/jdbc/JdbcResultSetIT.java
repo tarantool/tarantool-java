@@ -10,6 +10,7 @@ import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
 import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
+import org.tarantool.util.SQLStates;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -368,6 +369,72 @@ public class JdbcResultSetIT {
 
         assertFalse(resultSet.previous());
         assertEquals(0, resultSet.getRow());
+    }
+
+    @Test
+    public void testMaxFieldSize() throws SQLException {
+        assertEquals(0, stmt.getMaxFieldSize());
+
+        int expectedMaxSize = 256;
+        stmt.setMaxFieldSize(expectedMaxSize);
+        assertEquals(expectedMaxSize, stmt.getMaxFieldSize());
+    }
+
+    @Test
+    public void testNegativeMaxFieldSize() throws SQLException {
+        SQLException error = assertThrows(SQLException.class, () -> stmt.setMaxFieldSize(-12));
+        assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
+    }
+
+    @Test
+    public void testPositiveMaxFieldSize() throws SQLException {
+        testHelper.executeSql("INSERT INTO test VALUES (1, 'greater-than-ten-characters-value')");
+
+        stmt.setMaxFieldSize(10);
+        try (ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id = 1")) {
+            resultSet.next();
+            assertEquals("greater-th", resultSet.getString(2));
+        }
+    }
+
+    @Test
+    public void testMaxFieldSizeBiggerThanValue() throws SQLException {
+        testHelper.executeSql("INSERT INTO test VALUES (1, 'less-than-one-hundred-characters-value')");
+
+        stmt.setMaxFieldSize(100);
+        try (ResultSet resultSet = stmt.executeQuery("SELECT * FROM test WHERE id = 1")) {
+            resultSet.next();
+            assertEquals("less-than-one-hundred-characters-value", resultSet.getString(2));
+        }
+    }
+
+    @Test
+    public void testMaxFieldSizeBinaryType() throws SQLException {
+        testHelper.executeSql("CREATE TABLE test_bin(id INT PRIMARY KEY, val SCALAR)");
+        testHelper.executeSql("INSERT INTO test_bin VALUES (1, X'6c6f6e672d62696e6172792d737472696e67')");
+
+        stmt.setMaxFieldSize(12);
+        try (ResultSet resultSet = stmt.executeQuery("SELECT * FROM test_bin WHERE id = 1")) {
+            resultSet.next();
+            assertEquals(12, resultSet.getBytes(2).length);
+        }
+
+        testHelper.executeSql("DROP TABLE test_bin");
+    }
+
+    @Test
+    public void testMaxFieldSizeNotTrimmableType() throws SQLException {
+        testHelper.executeSql("CREATE TABLE test_num(id INT PRIMARY KEY, val INT)");
+        testHelper.executeSql("INSERT INTO test_num VALUES (1, 1234567890)");
+
+        String expectedUntrimmedValue = "1234567890";
+        stmt.setMaxFieldSize(5);
+        try (ResultSet resultSet = stmt.executeQuery("SELECT * FROM test_num WHERE id = 1")) {
+            resultSet.next();
+            assertEquals(expectedUntrimmedValue, resultSet.getString(2));
+        }
+
+        testHelper.executeSql("DROP TABLE test_num");
     }
 
 }

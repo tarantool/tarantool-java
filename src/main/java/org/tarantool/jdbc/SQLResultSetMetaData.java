@@ -8,7 +8,7 @@ import java.sql.SQLException;
 import java.sql.SQLNonTransientException;
 import java.util.List;
 
-public class SQLResultSetMetaData implements ResultSetMetaData {
+public class SQLResultSetMetaData implements TarantoolResultSetMetaData {
 
     private final List<SqlProtoUtils.SQLMetaData> sqlMetadata;
     private final boolean readOnly;
@@ -181,13 +181,20 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
         return type.isAssignableFrom(this.getClass());
     }
 
-    void checkColumnIndex(int columnIndex) throws SQLException {
+    @Override
+    public void checkColumnIndex(int columnIndex) throws SQLException {
         if (columnIndex < 1 || columnIndex > getColumnCount()) {
             throw new SQLNonTransientException(
                     String.format("Column index %d is out of range. Max index is %d", columnIndex, getColumnCount()),
                     SQLStates.INVALID_PARAMETER_VALUE.getSqlState()
             );
         }
+    }
+
+    @Override
+    public boolean isTrimmable(int columnIndex) throws SQLException {
+        checkColumnIndex(columnIndex);
+        return sqlMetadata.get(columnIndex - 1).getType().isTrimmable();
     }
 
     @Override
