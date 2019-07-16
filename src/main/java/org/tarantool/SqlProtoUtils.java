@@ -5,6 +5,7 @@ import org.tarantool.jdbc.type.TarantoolType;
 import org.tarantool.protocol.TarantoolPacket;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,13 +42,22 @@ public abstract class SqlProtoUtils {
         return values;
     }
 
-    public static Long getSqlRowCount(TarantoolPacket pack) {
+    public static Long getSQLRowCount(TarantoolPacket pack) {
         Map<Key, Object> info = (Map<Key, Object>) pack.getBody().get(Key.SQL_INFO.getId());
         Number rowCount;
         if (info != null && (rowCount = ((Number) info.get(Key.SQL_ROW_COUNT.getId()))) != null) {
             return rowCount.longValue();
         }
         return null;
+    }
+
+    public static List<Integer> getSQLAutoIncrementIds(TarantoolPacket pack) {
+        Map<Key, Object> info = (Map<Key, Object>) pack.getBody().get(Key.SQL_INFO.getId());
+        if (info != null) {
+            List<Integer> generatedIds = (List<Integer>) info.get(Key.SQL_INFO_AUTOINCREMENT_IDS.getId());
+            return generatedIds == null ? Collections.emptyList() : generatedIds;
+        }
+        return Collections.emptyList();
     }
 
     public static class SQLMetaData {

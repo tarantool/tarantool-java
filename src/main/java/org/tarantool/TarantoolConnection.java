@@ -80,7 +80,7 @@ public class TarantoolConnection extends TarantoolBase<List<?>>
     @Override
     public Long update(String sql, Object... bind) {
         TarantoolPacket pack = sql(sql, bind);
-        return SqlProtoUtils.getSqlRowCount(pack);
+        return SqlProtoUtils.getSQLRowCount(pack);
     }
 
     @Override

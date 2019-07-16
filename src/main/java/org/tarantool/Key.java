@@ -33,7 +33,8 @@ public enum Key implements Callable<Integer> {
     SQL_BIND(0x41),
     SQL_OPTIONS(0x42),
     SQL_INFO(0x42),
-    SQL_ROW_COUNT(0);
+    SQL_ROW_COUNT(0x00),
+    SQL_INFO_AUTOINCREMENT_IDS(0x01);
 
     int id;
 

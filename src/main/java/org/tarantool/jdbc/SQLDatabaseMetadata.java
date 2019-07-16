@@ -978,7 +978,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public boolean supportsGetGeneratedKeys() throws SQLException {
-        return false;
+        return true;
     }
 
     @Override
@@ -1104,7 +1104,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public boolean generatedKeyAlwaysReturned() throws SQLException {
-        return false;
+        return true;
     }
 
     @Override

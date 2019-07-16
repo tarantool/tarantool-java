@@ -197,6 +197,7 @@ public class JdbcStatementIT {
         assertEquals(1, affectedRows);
         ResultSet generatedKeys = stmt.getGeneratedKeys();
         assertNotNull(generatedKeys);
+        assertFalse(generatedKeys.next());
         assertEquals(ResultSet.TYPE_FORWARD_ONLY, generatedKeys.getType());
         assertEquals(ResultSet.CONCUR_READ_ONLY, generatedKeys.getConcurrency());
     }
@@ -216,25 +217,60 @@ public class JdbcStatementIT {
     }
 
     @Test
-    void testExecuteUpdateGeneratedKeys() {
-        assertThrows(
-            SQLException.class,
-            () -> stmt.executeUpdate(
-                "INSERT INTO test(id, val) VALUES (100, 'hundred'), (1000, 'thousand')",
-                Statement.RETURN_GENERATED_KEYS
-            )
-        );
+    public void testExecuteReturnGeneratedKeys() throws SQLException {
+        testHelper.executeSql("CREATE TABLE test_auto (id INT PRIMARY KEY AUTOINCREMENT)");
+
+        stmt.execute("INSERT INTO test_auto VALUES (null)", Statement.RETURN_GENERATED_KEYS);
+        assertEquals(1, stmt.getUpdateCount());
+        ResultSet generatedKeys = stmt.getGeneratedKeys();
+        assertTrue(generatedKeys.next());
+        assertEquals(1, generatedKeys.getInt("generated_key"));
+
+        testHelper.executeSql("DROP TABLE test_auto");
     }
 
     @Test
-    void testExecuteGeneratedKeys() {
-        assertThrows(
-            SQLException.class,
-            () -> stmt.execute(
-                "INSERT INTO test(id, val) VALUES (100, 'hundred'), (1000, 'thousand')",
-                Statement.RETURN_GENERATED_KEYS
-            )
+    public void testExecuteUpdateReturnGeneratedKeys() throws SQLException {
+        testHelper.executeSql("CREATE TABLE test_auto (id INT PRIMARY KEY AUTOINCREMENT)");
+
+        stmt.executeUpdate("INSERT INTO test_auto VALUES (null), (null)", Statement.RETURN_GENERATED_KEYS);
+        assertEquals(2, stmt.getUpdateCount());
+        ResultSet generatedKeys = stmt.getGeneratedKeys();
+        assertTrue(generatedKeys.next());
+        assertEquals(1, generatedKeys.getInt("generated_key"));
+        assertTrue(generatedKeys.next());
+        assertEquals(2, generatedKeys.getInt("generated_key"));
+
+        testHelper.executeSql("DROP TABLE test_auto");
+    }
+
+    @Test
+    public void testExecuteReturnEmptyGeneratedKeys() throws SQLException {
+        testHelper.executeSql("CREATE TABLE test_auto (id INT PRIMARY KEY AUTOINCREMENT)");
+
+        stmt.executeUpdate("INSERT INTO test_auto VALUES (10), (20)", Statement.RETURN_GENERATED_KEYS);
+        assertEquals(2, stmt.getUpdateCount());
+        ResultSet generatedKeys = stmt.getGeneratedKeys();
+        assertFalse(generatedKeys.next());
+
+        testHelper.executeSql("DROP TABLE test_auto");
+    }
+
+    @Test
+    public void testExecuteReturnMixedGeneratedKeys() throws SQLException {
+        testHelper.executeSql("CREATE TABLE test_auto (id INT PRIMARY KEY AUTOINCREMENT)");
+
+        stmt.executeUpdate(
+            "INSERT INTO test_auto VALUES (10), (null), (20), (null)", Statement.RETURN_GENERATED_KEYS
         );
+        assertEquals(4, stmt.getUpdateCount());
+        ResultSet generatedKeys = stmt.getGeneratedKeys();
+        assertTrue(generatedKeys.next());
+        assertEquals(11, generatedKeys.getInt("generated_key"));
+        assertTrue(generatedKeys.next());
+        assertEquals(21, generatedKeys.getInt("generated_key"));
+
+        testHelper.executeSql("DROP TABLE test_auto");
     }
 
     @Test

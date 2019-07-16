@@ -482,7 +482,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     protected void completeSql(TarantoolOp<?> future, TarantoolPacket pack) {
-        Long rowCount = SqlProtoUtils.getSqlRowCount(pack);
+        Long rowCount = SqlProtoUtils.getSQLRowCount(pack);
         if (rowCount != null) {
             ((TarantoolOp) future).complete(rowCount);
         } else {

@@ -295,7 +295,7 @@ public class JdbcDatabaseMetaDataIT {
 
     @Test
     public void testSupportGeneratedKeys() throws SQLException {
-        assertFalse(meta.supportsGetGeneratedKeys());
+        assertTrue(meta.supportsGetGeneratedKeys());
     }
 
     @Test

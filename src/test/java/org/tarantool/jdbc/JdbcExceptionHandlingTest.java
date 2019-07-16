@@ -173,7 +173,10 @@ public class JdbcExceptionHandlingTest {
 
         SQLTarantoolClientImpl client = buildSQLClient(sqlOps, null);
         final PreparedStatement prep = new SQLPreparedStatement(
-            buildTestSQLConnection(client, "jdbc:tarantool://0:0"), "TEST");
+            buildTestSQLConnection(client, "jdbc:tarantool://0:0"),
+            "TEST",
+            Statement.NO_GENERATED_KEYS
+        );
 
 
         SQLException e = assertThrows(SQLException.class, new Executable() {

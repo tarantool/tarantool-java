@@ -440,10 +440,6 @@ public class JdbcConnectionIT {
         assertThrows(SQLException.class, () -> conn.prepareStatement(sql, Integer.MAX_VALUE));
         assertThrows(SQLException.class, () -> conn.prepareStatement(sql, Integer.MIN_VALUE));
         assertThrows(SQLException.class, () -> conn.prepareStatement(sql, -76));
-        assertThrows(
-            SQLFeatureNotSupportedException.class,
-            () -> conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
-        );
     }
 
     @Test
