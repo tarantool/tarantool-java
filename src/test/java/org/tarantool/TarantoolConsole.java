@@ -25,7 +25,7 @@ public abstract class TarantoolConsole implements Closeable {
 
     private static final int TIMEOUT = 2000;
     private static final Pattern GREETING_PATTERN = Pattern.compile("^Tarantool.+\n.+\n");
-    private static final Pattern CONNECTED_PATTERN = Pattern.compile("^connected to (.*)\n");
+    private static final Pattern CONNECTED_PATTERN = Pattern.compile("^connected to (.*)\n", Pattern.MULTILINE);
     private static final Pattern REPLY_PATTERN = Pattern.compile("^.*\\n\\.{3}\\n",
         Pattern.UNIX_LINES | Pattern.DOTALL);
 
@@ -214,7 +214,7 @@ public abstract class TarantoolConsole implements Closeable {
             Map<String, String> env = builder.environment();
             env.put("PWD", workDir);
             env.put("TEST_WORKDIR", workDir);
-            env.put("COLUMNS", "256");
+            env.put("COLUMNS", "1024");
             builder.redirectErrorStream(true);
             builder.directory(new File(workDir));
 
@@ -226,7 +226,6 @@ public abstract class TarantoolConsole implements Closeable {
             reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             writer = new OutputStreamWriter(process.getOutputStream());
 
-            write("enter " + instance);
             Matcher m = expect(CONNECTED_PATTERN);
             name = m.group(1);
             prompt = Pattern.compile(Pattern.quote(name + "> "));
