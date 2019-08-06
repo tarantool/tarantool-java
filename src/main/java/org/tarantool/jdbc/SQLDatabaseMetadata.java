@@ -4,6 +4,8 @@ import static org.tarantool.util.JdbcConstants.DatabaseMetadataTable;
 
 import org.tarantool.SqlProtoUtils;
 import org.tarantool.Version;
+import org.tarantool.jdbc.type.TarantoolSqlType;
+import org.tarantool.util.TupleTwo;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -1087,16 +1089,17 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
         return asEmptyMetadataResultSet(DatabaseMetadataTable.PSEUDO_COLUMNS);
     }
 
-    private ResultSet asMetadataResultSet(List<String> columnNames, List<List<Object>> rows) throws SQLException {
-        List<SqlProtoUtils.SQLMetaData> meta = columnNames.stream()
-            .map(SqlProtoUtils.SQLMetaData::new)
+    private ResultSet asMetadataResultSet(List<TupleTwo<String, TarantoolSqlType>> meta, List<List<Object>> rows)
+        throws SQLException {
+        List<SqlProtoUtils.SQLMetaData> sqlMeta = meta.stream()
+            .map(tuple -> new SqlProtoUtils.SQLMetaData(tuple.getFirst(), tuple.getSecond()))
             .collect(Collectors.toList());
-        SQLResultHolder holder = SQLResultHolder.ofQuery(meta, rows);
+        SQLResultHolder holder = SQLResultHolder.ofQuery(sqlMeta, rows);
         return createMetadataStatement().executeMetadata(holder);
     }
 
-    private ResultSet asEmptyMetadataResultSet(List<String> columnNames) throws SQLException {
-        return asMetadataResultSet(columnNames, Collections.emptyList());
+    private ResultSet asEmptyMetadataResultSet(List<TupleTwo<String, TarantoolSqlType>> meta) throws SQLException {
+        return asMetadataResultSet(meta, Collections.emptyList());
     }
 
     @Override

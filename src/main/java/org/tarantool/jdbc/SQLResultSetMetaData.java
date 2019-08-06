@@ -5,17 +5,17 @@ import org.tarantool.util.SQLStates;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLNonTransientException;
-import java.sql.Types;
 import java.util.List;
 
 public class SQLResultSetMetaData implements ResultSetMetaData {
 
     private final List<SqlProtoUtils.SQLMetaData> sqlMetadata;
+    private final boolean readOnly;
 
-    public SQLResultSetMetaData(List<SqlProtoUtils.SQLMetaData> sqlMetaData) {
+    public SQLResultSetMetaData(List<SqlProtoUtils.SQLMetaData> sqlMetaData, boolean readOnly) {
         this.sqlMetadata = sqlMetaData;
+        this.readOnly = readOnly;
     }
 
     @Override
@@ -25,37 +25,59 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
 
     @Override
     public boolean isAutoIncrement(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        // XXX: extra flag or, at least table ID is required in meta
+        // to be able to fetch an the flag indirectly.
+        return false;
     }
 
     @Override
     public boolean isCaseSensitive(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getType().isCaseSensitive();
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * All the types can be used in {@literal WHERE} clause.
+     */
     @Override
     public boolean isSearchable(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        return true;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Always {@literal false} because
+     * Tarantool does not have monetary types.
+     */
     @Override
     public boolean isCurrency(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        return false;
     }
 
     @Override
     public int isNullable(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        // XXX: extra nullability flag or, at least table ID is required in meta
+        // to be able to fetch an the flag indirectly.
+        return ResultSetMetaData.columnNullableUnknown;
     }
 
     @Override
     public boolean isSigned(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getType().isSigned();
     }
 
     @Override
     public int getColumnDisplaySize(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getType().getDisplaySize();
     }
 
     @Override
@@ -64,6 +86,15 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
         return sqlMetadata.get(column - 1).getName();
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Name always has the same value as label
+     * because Tarantool does not differentiate
+     * column names and aliases.
+     *
+     * @see #getColumnLabel(int)
+     */
     @Override
     public String getColumnName(int column) throws SQLException {
         checkColumnIndex(column);
@@ -72,57 +103,69 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
 
     @Override
     public String getSchemaName(int column) throws SQLException {
-        return null;
+        checkColumnIndex(column);
+        return "";
     }
 
     @Override
     public int getPrecision(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getType().getPrecision();
     }
+
 
     @Override
     public int getScale(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getType().getScale();
     }
 
     @Override
     public String getTableName(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        // XXX: extra table name or, at least table ID is required in meta
+        // to be able to fetch the table name.
+        return "";
     }
 
     @Override
     public String getCatalogName(int column) throws SQLException {
-        return null;
+        checkColumnIndex(column);
+        return "";
     }
 
     @Override
     public int getColumnType(int column) throws SQLException {
-        return Types.OTHER;
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getType().getJdbcType().getTypeNumber();
     }
 
     @Override
     public String getColumnTypeName(int column) throws SQLException {
-        return "scalar";
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getType().getTypeName();
     }
 
     @Override
     public boolean isReadOnly(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        return readOnly;
     }
 
     @Override
     public boolean isWritable(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return !isReadOnly(column);
     }
 
     @Override
     public boolean isDefinitelyWritable(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return false;
     }
 
     @Override
     public String getColumnClassName(int column) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        checkColumnIndex(column);
+        return sqlMetadata.get(column - 1).getType().getJdbcType().getJavaType().getName();
     }
 
     @Override
@@ -130,7 +173,7 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
         if (isWrapperFor(type)) {
             return type.cast(this);
         }
-        throw new SQLNonTransientException("ResultSetMetadata does not wrap " + type.getName());
+        throw new SQLNonTransientException("SQLResultSetMetadata does not wrap " + type.getName());
     }
 
     @Override
@@ -150,7 +193,7 @@ public class SQLResultSetMetaData implements ResultSetMetaData {
     @Override
     public String toString() {
         return "SQLResultSetMetaData{" +
-                "sqlMetadata=" + sqlMetadata +
-                '}';
+            "sqlMetadata=" + sqlMetadata +
+            '}';
     }
 }

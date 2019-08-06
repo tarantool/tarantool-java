@@ -313,7 +313,13 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public ResultSetMetaData getMetaData() throws SQLException {
-        return getResultSet().getMetaData();
+        if (resultSet != null && !resultSet.isClosed()) {
+            return resultSet.getMetaData();
+        }
+        // XXX: it's required a support of dry-run mode to obtain
+        // a statement metadata without real query execution.
+        // see https://github.com/tarantool/tarantool/issues/3292
+        return null;
     }
 
     @Override

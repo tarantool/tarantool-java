@@ -54,7 +54,7 @@ public class SQLResultSet implements ResultSet {
     private final int holdability;
 
     public SQLResultSet(SQLResultHolder holder, TarantoolStatement ownerStatement) throws SQLException {
-        metaData = new SQLResultSetMetaData(holder.getSqlMetadata());
+        metaData = new SQLResultSetMetaData(holder.getSqlMetadata(), ownerStatement.getConnection().isReadOnly());
         statement = ownerStatement;
         scrollType = statement.getResultSetType();
         concurrencyLevel = statement.getResultSetConcurrency();

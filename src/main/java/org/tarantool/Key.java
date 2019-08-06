@@ -25,7 +25,9 @@ public enum Key implements Callable<Integer> {
     DATA(0x30),
     ERROR(0x31),
 
-    SQL_FIELD_NAME(0),
+    SQL_FIELD_NAME(0x0),
+    SQL_FIELD_TYPE(0x1),
+
     SQL_METADATA(0x32),
     SQL_TEXT(0x40),
     SQL_BIND(0x41),

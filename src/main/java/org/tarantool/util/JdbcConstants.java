@@ -1,5 +1,7 @@
 package org.tarantool.util;
 
+import org.tarantool.jdbc.type.TarantoolSqlType;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLNonTransientException;
@@ -40,304 +42,322 @@ public class JdbcConstants {
         private DatabaseMetadataTable() {
         }
 
-        public static List<String> STORED_PROCEDURES = Arrays.asList(
-            "PROCEDURE_CAT",
-            "PROCEDURE_SCHEM",
-            "PROCEDURE_NAME",
-            "RESERVED_1",
-            "RESERVED_2",
-            "RESERVED_3",
-            "REMARKS",
-            "PROCEDURE_TYPE",
-            "SPECIFIC_NAME"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> STORED_PROCEDURES = Arrays.asList(
+            TupleTwo.of("PROCEDURE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PROCEDURE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PROCEDURE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("RESERVED_1", TarantoolSqlType.UNKNOWN),
+            TupleTwo.of("RESERVED_2", TarantoolSqlType.UNKNOWN),
+            TupleTwo.of("RESERVED_3", TarantoolSqlType.UNKNOWN),
+            TupleTwo.of("REMARKS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PROCEDURE_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("SPECIFIC_NAME", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> STORED_PROCEDURE_COLUMNS = Arrays.asList(
-            "PROCEDURE_CAT",
-            "PROCEDURE_SCHEM",
-            "PROCEDURE_NAME",
-            "COLUMN_NAME",
-            "COLUMN_TYPE",
-            "DATA_TYPE",
-            "TYPE_NAME",
-            "PRECISION",
-            "LENGTH",
-            "SCALE",
-            "RADIX",
-            "NULLABLE",
-            "REMARKS",
-            "COLUMN_DEF",
-            "SQL_DATA_TYPE",
-            "SQL_DATETIME_SUB",
-            "CHAR_OCTET_LENGTH",
-            "ORDINAL_POSITION",
-            "IS_NULLABLE",
-            "SPECIFIC_NAME"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> STORED_PROCEDURE_COLUMNS = Arrays.asList(
+            TupleTwo.of("PROCEDURE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PROCEDURE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PROCEDURE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PRECISION", TarantoolSqlType.INTEGER),
+            TupleTwo.of("LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("SCALE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("RADIX", TarantoolSqlType.INTEGER),
+            TupleTwo.of("NULLABLE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("REMARKS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_DEF", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SQL_DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("SQL_DATETIME_SUB", TarantoolSqlType.INTEGER),
+            TupleTwo.of("CHAR_OCTET_LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("ORDINAL_POSITION", TarantoolSqlType.INTEGER),
+            TupleTwo.of("IS_NULLABLE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SPECIFIC_NAME", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> TABLES = Arrays.asList(
-            "TABLE_CAT",
-            "TABLE_SCHEM",
-            "TABLE_NAME",
-            "TABLE_TYPE",
-            "REMARKS",
-            "TYPE_CAT",
-            "TYPE_SCHEM",
-            "TYPE_NAME",
-            "SELF_REFERENCING_COL_NAME",
-            "REF_GENERATION"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> TABLES = Arrays.asList(
+            TupleTwo.of("TABLE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_TYPE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("REMARKS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SELF_REFERENCING_COL_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("REF_GENERATION", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> TABLE_TYPES = Collections.singletonList(
-            "TABLE_TYPE"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> TABLE_TYPES = Collections.singletonList(
+            TupleTwo.of("TABLE_TYPE", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> SCHEMAS = Arrays.asList(
-            "TABLE_SCHEM",
-            "TABLE_CATALOG"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> SCHEMAS = Arrays.asList(
+            TupleTwo.of("TABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_CATALOG", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> CATALOGS = Collections.singletonList(
-            "TABLE_CAT"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> CATALOGS = Collections.singletonList(
+            TupleTwo.of("TABLE_CAT", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> BEST_ROW_IDENTIFIER = Arrays.asList(
-            "SCOPE",
-            "COLUMN_NAME",
-            "DATA_TYPE",
-            "TYPE_NAME",
-            "COLUMN_SIZE",
-            "BUFFER_LENGTH",
-            "DECIMAL_DIGITS",
-            "PSEUDO_COLUMN"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> BEST_ROW_IDENTIFIER = Arrays.asList(
+            TupleTwo.of("SCOPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("COLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_SIZE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("BUFFER_LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("DECIMAL_DIGITS", TarantoolSqlType.INTEGER),
+            TupleTwo.of("PSEUDO_COLUMN", TarantoolSqlType.INTEGER)
         );
 
-        public static List<String> COLUMNS = Arrays.asList(
-            "TABLE_CAT",
-            "TABLE_SCHEM",
-            "TABLE_NAME",
-            "COLUMN_NAME",
-            "DATA_TYPE",
-            "TYPE_NAME",
-            "COLUMN_SIZE",
-            "BUFFER_LENGTH",
-            "DECIMAL_DIGITS",
-            "NUM_PREC_RADIX",
-            "NULLABLE",
-            "REMARKS",
-            "COLUMN_DEF",
-            "SQL_DATA_TYPE",
-            "SQL_DATETIME_SUB",
-            "CHAR_OCTET_LENGTH",
-            "ORDINAL_POSITION",
-            "IS_NULLABLE",
-            "SCOPE_CATALOG",
-            "SCOPE_SCHEMA",
-            "SCOPE_TABLE",
-            "SOURCE_DATA_TYPE",
-            "IS_AUTOINCREMENT",
-            "IS_GENERATEDCOLUMN"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> COLUMNS = Arrays.asList(
+            TupleTwo.of("TABLE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_SIZE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("BUFFER_LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("DECIMAL_DIGITS", TarantoolSqlType.INTEGER),
+            TupleTwo.of("NUM_PREC_RADIX", TarantoolSqlType.INTEGER),
+            TupleTwo.of("NULLABLE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("REMARKS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_DEF", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SQL_DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("SQL_DATETIME_SUB", TarantoolSqlType.INTEGER),
+            TupleTwo.of("CHAR_OCTET_LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("ORDINAL_POSITION", TarantoolSqlType.INTEGER),
+            TupleTwo.of("IS_NULLABLE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SCOPE_CATALOG", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SCOPE_SCHEMA", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SCOPE_TABLE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SOURCE_DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("IS_AUTOINCREMENT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("IS_GENERATEDCOLUMN", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> COLUMN_PRIVILEGES = Arrays.asList(
-            "TABLE_CAT",
-            "TABLE_SCHEM",
-            "TABLE_NAME",
-            "COLUMN_NAME",
-            "GRANTOR",
-            "GRANTEE",
-            "PRIVILEGE",
-            "IS_GRANTABLE"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> COLUMN_PRIVILEGES = Arrays.asList(
+            TupleTwo.of("TABLE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("GRANTOR", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("GRANTEE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PRIVILEGE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("IS_GRANTABLE", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> TABLE_PRIVILEGES = Arrays.asList(
-            "TABLE_CAT",
-            "TABLE_SCHEM",
-            "TABLE_NAME",
-            "GRANTOR",
-            "GRANTEE",
-            "PRIVILEGE",
-            "IS_GRANTABLE"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> TABLE_PRIVILEGES = Arrays.asList(
+            TupleTwo.of("TABLE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("GRANTOR", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("GRANTEE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PRIVILEGE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("IS_GRANTABLE", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> VERSION_COLUMNS = Arrays.asList(
-            "SCOPE",
-            "COLUMN_NAME",
-            "DATA_TYPE",
-            "TYPE_NAME",
-            "COLUMN_SIZE",
-            "BUFFER_LENGTH",
-            "DECIMAL_DIGITS",
-            "PSEUDO_COLUMN"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> VERSION_COLUMNS = Arrays.asList(
+            TupleTwo.of("SCOPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("COLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_SIZE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("BUFFER_LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("DECIMAL_DIGITS", TarantoolSqlType.INTEGER),
+            TupleTwo.of("PSEUDO_COLUMN", TarantoolSqlType.INTEGER)
         );
 
-        public static List<String> PRIMARY_KEYS = Arrays.asList(
-            "TABLE_CAT",
-            "TABLE_SCHEM",
-            "TABLE_NAME",
-            "COLUMN_NAME",
-            "KEY_SEQ",
-            "PK_NAME"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> PRIMARY_KEYS = Arrays.asList(
+            TupleTwo.of("TABLE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("KEY_SEQ", TarantoolSqlType.INTEGER),
+            TupleTwo.of("PK_NAME", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> FOREIGN_KEYS = Arrays.asList(
-            "PKTABLE_CAT",
-            "PKTABLE_SCHEM",
-            "PKTABLE_NAME",
-            "PKCOLUMN_NAME",
-            "FKTABLE_CAT",
-            "FKTABLE_SCHEM",
-            "FKTABLE_NAME",
-            "FKCOLUMN_NAME",
-            "KEY_SEQ",
-            "UPDATE_RULE",
-            "DELETE_RULE",
-            "FK_NAME",
-            "PK_NAME",
-            "DEFERRABILITY"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> FOREIGN_KEYS = Arrays.asList(
+            TupleTwo.of("PKTABLE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PKTABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PKTABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PKCOLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("FKTABLE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("FKTABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("FKTABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("FKCOLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("KEY_SEQ", TarantoolSqlType.INTEGER),
+            TupleTwo.of("UPDATE_RULE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("DELETE_RULE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("FK_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PK_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("DEFERRABILITY", TarantoolSqlType.INTEGER)
         );
 
-        public static List<String> TYPE_INFO = Arrays.asList(
-            "TYPE_NAME",
-            "DATA_TYPE",
-            "PRECISION",
-            "LITERAL_PREFIX",
-            "LITERAL_SUFFIX",
-            "CREATE_PARAMS",
-            "NULLABLE",
-            "CASE_SENSITIVE",
-            "SEARCHABLE",
-            "UNSIGNED_ATTRIBUTE",
-            "FIXED_PREC_SCALE",
-            "AUTO_INCREMENT",
-            "LOCAL_TYPE_NAME",
-            "MINIMUM_SCALE",
-            "MAXIMUM_SCALE",
-            "SQL_DATA_TYPE",
-            "SQL_DATETIME_SUB",
-            "NUM_PREC_RADIX"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> TYPE_INFO = Arrays.asList(
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("PRECISION", TarantoolSqlType.INTEGER),
+            TupleTwo.of("LITERAL_PREFIX", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("LITERAL_SUFFIX", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("CREATE_PARAMS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("NULLABLE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("CASE_SENSITIVE", TarantoolSqlType.BOOLEAN),
+            TupleTwo.of("SEARCHABLE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("UNSIGNED_ATTRIBUTE", TarantoolSqlType.BOOLEAN),
+            TupleTwo.of("FIXED_PREC_SCALE", TarantoolSqlType.BOOLEAN),
+            TupleTwo.of("AUTO_INCREMENT", TarantoolSqlType.BOOLEAN),
+            TupleTwo.of("LOCAL_TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("MINIMUM_SCALE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("MAXIMUM_SCALE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("SQL_DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("SQL_DATETIME_SUB", TarantoolSqlType.INTEGER),
+            TupleTwo.of("NUM_PREC_RADIX", TarantoolSqlType.INTEGER)
         );
 
-        public static List<String> INDEX_INFO = Arrays.asList(
-            "TABLE_CAT",
-            "TABLE_SCHEM",
-            "TABLE_NAME",
-            "NON_UNIQUE",
-            "INDEX_QUALIFIER",
-            "INDEX_NAME",
-            "TYPE",
-            "ORDINAL_POSITION",
-            "COLUMN_NAME",
-            "ASC_OR_DESC",
-            "CARDINALITY",
-            "PAGES",
-            "FILTER_CONDITION"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> INDEX_INFO = Arrays.asList(
+            TupleTwo.of("TABLE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("NON_UNIQUE", TarantoolSqlType.BOOLEAN),
+            TupleTwo.of("INDEX_QUALIFIER", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("INDEX_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("ORDINAL_POSITION", TarantoolSqlType.INTEGER),
+            TupleTwo.of("COLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("ASC_OR_DESC", TarantoolSqlType.INTEGER),
+            TupleTwo.of("CARDINALITY", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PAGES", TarantoolSqlType.INTEGER),
+            TupleTwo.of("FILTER_CONDITION", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> UDTS = Arrays.asList(
-            "TYPE_CAT",
-            "TYPE_SCHEM",
-            "TYPE_NAME",
-            "CLASS_NAME",
-            "DATA_TYPE",
-            "REMARKS",
-            "BASE_TYPE"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> UDTS = Arrays.asList(
+            TupleTwo.of("TYPE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("CLASS_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("REMARKS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("BASE_TYPE", TarantoolSqlType.INTEGER)
         );
 
-        public static List<String> SUPER_TYPES = Arrays.asList(
-            "TYPE_CAT",
-            "TYPE_SCHEM",
-            "TYPE_NAME",
-            "SUPERTYPE_CAT",
-            "SUPERTYPE_SCHEM",
-            "SUPERTYPE_NAME"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> SUPER_TYPES = Arrays.asList(
+            TupleTwo.of("TYPE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SUPERTYPE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SUPERTYPE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SUPERTYPE_NAME", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> SUPER_TABLES = Arrays.asList(
-            "TABLE_CAT",
-            "TABLE_SCHEM",
-            "TABLE_NAME",
-            "SUPERTABLE_NAME"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> SUPER_TABLES = Arrays.asList(
+            TupleTwo.of("TYPE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SUPERTABLE_NAME", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> FUNCTIONS = Arrays.asList(
-            "FUNCTION_CAT",
-            "FUNCTION_SCHEM",
-            "FUNCTION_NAME",
-            "REMARKS",
-            "FUNCTION_TYPE",
-            "SPECIFIC_NAME"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> FUNCTIONS = Arrays.asList(
+            TupleTwo.of("FUNCTION_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("FUNCTION_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("FUNCTION_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("REMARKS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("FUNCTION_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("SPECIFIC_NAME", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> FUNCTION_COLUMNS = Arrays.asList(
-            "FUNCTION_CAT",
-            "FUNCTION_SCHEM",
-            "FUNCTION_NAME",
-            "COLUMN_NAME",
-            "COLUMN_TYPE",
-            "DATA_TYPE",
-            "TYPE_NAME",
-            "PRECISION",
-            "LENGTH",
-            "SCALE",
-            "RADIX",
-            "NULLABLE",
-            "REMARKS",
-            "CHAR_OCTET_LENGTH",
-            "ORDINAL_POSITION",
-            "IS_NULLABLE",
-            "SPECIFIC_NAME"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> FUNCTION_COLUMNS = Arrays.asList(
+            TupleTwo.of("FUNCTION_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("FUNCTION_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("FUNCTION_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("PRECISION", TarantoolSqlType.INTEGER),
+            TupleTwo.of("LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("SCALE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("RADIX", TarantoolSqlType.INTEGER),
+            TupleTwo.of("NULLABLE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("REMARKS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("CHAR_OCTET_LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("ORDINAL_POSITION", TarantoolSqlType.INTEGER),
+            TupleTwo.of("IS_NULLABLE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SPECIFIC_NAME", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> PSEUDO_COLUMNS = Arrays.asList(
-            "FUNCTION_CAT",
-            "FUNCTION_SCHEM",
-            "FUNCTION_NAME",
-            "COLUMN_NAME",
-            "COLUMN_TYPE",
-            "DATA_TYPE",
-            "TYPE_NAME",
-            "PRECISION",
-            "LENGTH",
-            "SCALE",
-            "RADIX",
-            "NULLABLE",
-            "REMARKS",
-            "CHAR_OCTET_LENGTH",
-            "ORDINAL_POSITION",
-            "IS_NULLABLE",
-            "SPECIFIC_NAME"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> PSEUDO_COLUMNS = Arrays.asList(
+            TupleTwo.of("TABLE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TABLE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("COLUMN_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("COLUMN_SIZE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("DECIMAL_DIGITS", TarantoolSqlType.INTEGER),
+            TupleTwo.of("NUM_PREC_RADIX", TarantoolSqlType.INTEGER),
+            TupleTwo.of("COLUMN_USAGE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("REMARKS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("CHAR_OCTET_LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("IS_NULLABLE", TarantoolSqlType.VARCHAR)
         );
 
-        public static List<String> ATTRIBUTES = Arrays.asList(
-            "TYPE_CAT",
-            "TYPE_SCHEM",
-            "TYPE_NAME",
-            "ATTR_NAME",
-            "DATA_TYPE",
-            "ATTR_TYPE_NAME",
-            "ATTR_SIZE",
-            "DECIMAL_DIGITS",
-            "NUM_PREC_RADIX",
-            "NULLABLE",
-            "REMARKS",
-            "ATTR_DEF",
-            "SQL_DATA_TYPE",
-            "SQL_DATETIME_SUB",
-            "CHAR_OCTET_LENGTH",
-            "ORDINAL_POSITION",
-            "IS_NULLABLE",
-            "SCOPE_CATALOG",
-            "SCOPE_SCHEMA",
-            "SCOPE_TABLE",
-            "SOURCE_DATA_TYPE"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> ATTRIBUTES = Arrays.asList(
+            TupleTwo.of("TYPE_CAT", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE_SCHEM", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("ATTR_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("ATTR_TYPE_NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("ATTR_SIZE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("DECIMAL_DIGITS", TarantoolSqlType.INTEGER),
+            TupleTwo.of("NUM_PREC_RADIX", TarantoolSqlType.INTEGER),
+            TupleTwo.of("NULLABLE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("REMARKS", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("ATTR_DEF", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SQL_DATA_TYPE", TarantoolSqlType.INTEGER),
+            TupleTwo.of("SQL_DATETIME_SUB", TarantoolSqlType.INTEGER),
+            TupleTwo.of("CHAR_OCTET_LENGTH", TarantoolSqlType.INTEGER),
+            TupleTwo.of("ORDINAL_POSITION", TarantoolSqlType.INTEGER),
+            TupleTwo.of("IS_NULLABLE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SCOPE_CATALOG", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SCOPE_SCHEMA", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SCOPE_TABLE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("SOURCE_DATA_TYPE", TarantoolSqlType.INTEGER)
         );
 
-        public static List<String> CLIENT_INFO_PROPERTIES = Arrays.asList(
-            "NAME",
-            "MAX_LEN",
-            "DEFAULT_VALUE",
-            "DESCRIPTION"
+        @SuppressWarnings("unchecked")
+        public static List<TupleTwo<String, TarantoolSqlType>> CLIENT_INFO_PROPERTIES = Arrays.asList(
+            TupleTwo.of("NAME", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("MAX_LEN", TarantoolSqlType.INTEGER),
+            TupleTwo.of("DEFAULT_VALUE", TarantoolSqlType.VARCHAR),
+            TupleTwo.of("DESCRIPTION", TarantoolSqlType.VARCHAR)
         );
 
     }

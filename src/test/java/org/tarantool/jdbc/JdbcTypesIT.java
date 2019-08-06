@@ -9,6 +9,7 @@ import static org.tarantool.TestUtils.fromHex;
 
 import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
+import org.tarantool.jdbc.type.TarantoolSqlType;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -165,14 +166,29 @@ class JdbcTypesIT {
     }
 
     private static String getCreateTableSQL() {
+
+        TarantoolSqlType[] types = {
+            TarantoolSqlType.FLOAT,
+            TarantoolSqlType.DOUBLE,
+            TarantoolSqlType.REAL,
+
+            TarantoolSqlType.INT,
+            TarantoolSqlType.INTEGER,
+
+            TarantoolSqlType.VARCHAR,
+            TarantoolSqlType.TEXT,
+
+            TarantoolSqlType.SCALAR
+        };
+
         StringBuilder sb = new StringBuilder("CREATE TABLE ");
         sb.append("test_types");
         sb.append("(KEY INT PRIMARY KEY");
-        for (TarantoolSqlType tntType : TarantoolSqlType.values()) {
+        for (TarantoolSqlType tntType : types) {
             sb.append(", F");
             sb.append(tntType.ordinal());
             sb.append(" ");
-            sb.append(tntType.sqlType);
+            sb.append(tntType.getDisplayType());
         }
         sb.append(")");
         return sb.toString();
