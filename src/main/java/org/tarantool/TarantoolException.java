@@ -56,7 +56,7 @@ public class TarantoolException extends RuntimeException {
      *
      * @return {@code true} if retry can possibly help to overcome this error.
      */
-    boolean isTransient() {
+    public boolean isTransient() {
         switch ((int) code) {
         case ERR_READONLY:
         case ERR_TIMEOUT:
