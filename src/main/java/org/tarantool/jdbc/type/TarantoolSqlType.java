@@ -10,23 +10,33 @@ public enum TarantoolSqlType {
 
     UNKNOWN(TarantoolType.UNKNOWN, JdbcType.UNKNOWN, "unknown"),
 
+    // float, double, real used to be number aliases before 2.2
     FLOAT(TarantoolType.NUMBER, JdbcType.FLOAT, "float"),
     DOUBLE(TarantoolType.NUMBER, JdbcType.DOUBLE, "double"),
     REAL(TarantoolType.NUMBER, JdbcType.REAL, "real"),
+    // was introduced in Tarantool 2.2.1
+    NUMBER(TarantoolType.NUMBER, JdbcType.DOUBLE, "number"),
 
-    INT(TarantoolType.INTEGER, JdbcType.INTEGER, "int"),
-    INTEGER(TarantoolType.INTEGER, JdbcType.INTEGER, "integer"),
+    INT(TarantoolType.INTEGER, JdbcType.BIGINT, "int"),
+    INTEGER(TarantoolType.INTEGER, JdbcType.BIGINT, "integer"),
+    // was introduced in 2.2
+    UNSIGNED(TarantoolType.UNSIGNED, JdbcType.BIGINT, "integer"),
 
+    // were introduced in 2.2
     BOOL(TarantoolType.BOOLEAN, JdbcType.BOOLEAN, "bool"),
     BOOLEAN(TarantoolType.BOOLEAN, JdbcType.BOOLEAN, "boolean"),
 
+    STRING(TarantoolType.STRING, JdbcType.VARCHAR, "string"),
+    TEXT(TarantoolType.STRING, JdbcType.VARCHAR, "text"),
     VARCHAR(TarantoolType.STRING, JdbcType.VARCHAR, "varchar") {
         @Override
         public String getDisplayType() {
             return getTypeName() + "(128)";
         }
     },
-    TEXT(TarantoolType.STRING, JdbcType.VARCHAR, "text"),
+
+    // was introduced in 2.2
+    VARBINARY(TarantoolType.VARBINARY, JdbcType.VARBINARY, "varbinary"),
 
     SCALAR(TarantoolType.SCALAR, JdbcType.BINARY, "scalar");
 
@@ -34,9 +44,11 @@ public enum TarantoolSqlType {
     static {
         defaultSqlTypeMapping = new HashMap<>();
         defaultSqlTypeMapping.put(TarantoolType.BOOLEAN, TarantoolSqlType.BOOLEAN);
-        defaultSqlTypeMapping.put(TarantoolType.STRING, TarantoolSqlType.VARCHAR);
+        defaultSqlTypeMapping.put(TarantoolType.STRING, TarantoolSqlType.STRING);
         defaultSqlTypeMapping.put(TarantoolType.INTEGER, TarantoolSqlType.INTEGER);
-        defaultSqlTypeMapping.put(TarantoolType.NUMBER, TarantoolSqlType.DOUBLE);
+        defaultSqlTypeMapping.put(TarantoolType.UNSIGNED, TarantoolSqlType.UNSIGNED);
+        defaultSqlTypeMapping.put(TarantoolType.NUMBER, TarantoolSqlType.NUMBER);
+        defaultSqlTypeMapping.put(TarantoolType.VARBINARY, TarantoolSqlType.VARBINARY);
         defaultSqlTypeMapping.put(TarantoolType.SCALAR, TarantoolSqlType.SCALAR);
     }
 

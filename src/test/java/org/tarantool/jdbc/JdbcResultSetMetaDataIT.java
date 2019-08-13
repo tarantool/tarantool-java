@@ -6,11 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
+import static org.tarantool.TestAssumptions.assumeServerVersionLessThan;
+import static org.tarantool.TestAssumptions.assumeServerVersionOutOfRange;
 
 import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
-import org.tarantool.jdbc.type.JdbcType;
-import org.tarantool.jdbc.type.TarantoolSqlType;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -201,9 +201,12 @@ public class JdbcResultSetMetaDataIT {
     @Test
     @DisplayName("returned case insensitive columns")
     public void testCaseInsensitiveColumns() throws SQLException {
-        testHelper.executeSql(
-            "CREATE TABLE test(id INT PRIMARY KEY, num_val DOUBLE)"
-        );
+        assumeServerVersionOutOfRange(testHelper.getInstanceVersion(), ServerVersion.V_2_2, ServerVersion.V_2_2_1);
+        if (ServerVersion.V_2_2.isGreaterThan(testHelper.getInstanceVersion())) {
+            testHelper.executeSql("CREATE TABLE test(id INT PRIMARY KEY, num_val DOUBLE)");
+        } else {
+            testHelper.executeSql("CREATE TABLE test(id INT PRIMARY KEY, num_val NUMBER)");
+        }
         try (
             Statement statement = connection.createStatement();
             ResultSet resultSet = statement.executeQuery("SELECT * FROM test")
@@ -218,9 +221,16 @@ public class JdbcResultSetMetaDataIT {
     @Test
     @DisplayName("returned searchable columns")
     public void testSearchableColumns() throws SQLException {
-        testHelper.executeSql(
-            "CREATE TABLE test(id INT PRIMARY KEY, num_val DOUBLE, text_val TEXT, bin_val SCALAR)"
-        );
+        assumeServerVersionOutOfRange(testHelper.getInstanceVersion(), ServerVersion.V_2_2, ServerVersion.V_2_2_1);
+        if (ServerVersion.V_2_2.isGreaterThan(testHelper.getInstanceVersion())) {
+            testHelper.executeSql(
+                "CREATE TABLE test(id INT PRIMARY KEY, num_val DOUBLE, text_val TEXT, bin_val SCALAR)"
+            );
+        } else {
+            testHelper.executeSql(
+                "CREATE TABLE test(id INT PRIMARY KEY, num_val NUMBER, text_val TEXT, bin_val SCALAR)"
+            );
+        }
         try (
             Statement statement = connection.createStatement();
             ResultSet resultSet = statement.executeQuery("SELECT * FROM test")
@@ -237,9 +247,16 @@ public class JdbcResultSetMetaDataIT {
     @Test
     @DisplayName("returned no monetary columns")
     public void testCurrencyColumns() throws SQLException {
-        testHelper.executeSql(
-            "CREATE TABLE test(id INT PRIMARY KEY, num_val DOUBLE, text_val TEXT, bin_val SCALAR)"
-        );
+        assumeServerVersionOutOfRange(testHelper.getInstanceVersion(), ServerVersion.V_2_2, ServerVersion.V_2_2_1);
+        if (ServerVersion.V_2_2.isGreaterThan(testHelper.getInstanceVersion())) {
+            testHelper.executeSql(
+                "CREATE TABLE test(id INT PRIMARY KEY, num_val DOUBLE, text_val TEXT, bin_val SCALAR)"
+            );
+        } else {
+            testHelper.executeSql(
+                "CREATE TABLE test(id INT PRIMARY KEY, num_val NUMBER, text_val TEXT, bin_val SCALAR)"
+            );
+        }
         try (
             Statement statement = connection.createStatement();
             ResultSet resultSet = statement.executeQuery("SELECT * FROM test")
@@ -254,8 +271,9 @@ public class JdbcResultSetMetaDataIT {
     }
 
     @Test
-    @DisplayName("returned signed columns")
-    public void testSignedColumns() throws SQLException {
+    @DisplayName("returned signed decimal columns")
+    public void testSignedDecimalColumns() throws SQLException {
+        assumeServerVersionLessThan(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
         testHelper.executeSql(
             "CREATE TABLE test(id INT PRIMARY KEY, double_val DOUBLE, real_val REAL, float_val FLOAT)"
         );
@@ -269,6 +287,23 @@ public class JdbcResultSetMetaDataIT {
             assertTrue(rsMeta.isSigned(2));
             assertTrue(rsMeta.isSigned(3));
             assertTrue(rsMeta.isSigned(4));
+        }
+    }
+
+    @Test
+    @DisplayName("returned signed number column")
+    public void testSignedNumberColumn() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2_1);
+        testHelper.executeSql(
+            "CREATE TABLE test(id INT PRIMARY KEY, num_val NUMBER)"
+        );
+        try (
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery("SELECT * FROM test")
+        ) {
+            ResultSetMetaData rsMeta = resultSet.getMetaData();
+            assertTrue(rsMeta.isSigned(1));
+            assertTrue(rsMeta.isSigned(2));
         }
     }
 
@@ -292,8 +327,9 @@ public class JdbcResultSetMetaDataIT {
     }
 
     @Test
-    @DisplayName("returned numeric column types")
-    public void testColumnsNumericTypes() throws SQLException {
+    @DisplayName("returned number type aliases")
+    public void testColumnsNumberTypeAliases() throws SQLException {
+        assumeServerVersionLessThan(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
         testHelper.executeSql(
             "CREATE TABLE test(id INT PRIMARY KEY, f_val FLOAT, d_val DOUBLE, r_val REAL)"
         );
@@ -303,23 +339,42 @@ public class JdbcResultSetMetaDataIT {
         ) {
             ResultSetMetaData rsMeta = resultSet.getMetaData();
 
-            assertEquals(Types.INTEGER, rsMeta.getColumnType(1));
+            assertEquals(Types.BIGINT, rsMeta.getColumnType(1));
             assertEquals("integer", rsMeta.getColumnTypeName(1));
-            assertEquals("java.lang.Integer", rsMeta.getColumnClassName(1));
+            assertEquals("java.lang.Long", rsMeta.getColumnClassName(1));
 
             // we cannot distinguish numeric types because Tarantool
             // receives double noSQL type for all the numeric SQL types
             assertEquals(Types.DOUBLE, rsMeta.getColumnType(2));
-            assertEquals("double", rsMeta.getColumnTypeName(2));
+            assertEquals("number", rsMeta.getColumnTypeName(2));
             assertEquals("java.lang.Double", rsMeta.getColumnClassName(2));
 
             assertEquals(Types.DOUBLE, rsMeta.getColumnType(3));
-            assertEquals("double", rsMeta.getColumnTypeName(3));
+            assertEquals("number", rsMeta.getColumnTypeName(3));
             assertEquals("java.lang.Double", rsMeta.getColumnClassName(3));
 
             assertEquals(Types.DOUBLE, rsMeta.getColumnType(4));
-            assertEquals("double", rsMeta.getColumnTypeName(4));
+            assertEquals("number", rsMeta.getColumnTypeName(4));
             assertEquals("java.lang.Double", rsMeta.getColumnClassName(4));
+        }
+    }
+
+    @Test
+    @DisplayName("returned number column type")
+    public void testColumnsNumericTypes() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2_1);
+        testHelper.executeSql(
+            "CREATE TABLE test(id INT PRIMARY KEY, num_val NUMBER)"
+        );
+        try (
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery("SELECT * FROM test")
+        ) {
+            ResultSetMetaData rsMeta = resultSet.getMetaData();
+
+            assertEquals(Types.DOUBLE, rsMeta.getColumnType(2));
+            assertEquals("number", rsMeta.getColumnTypeName(2));
+            assertEquals("java.lang.Double", rsMeta.getColumnClassName(2));
         }
     }
 
@@ -335,17 +390,17 @@ public class JdbcResultSetMetaDataIT {
         ) {
             ResultSetMetaData rsMeta = resultSet.getMetaData();
 
-            assertEquals(Types.INTEGER, rsMeta.getColumnType(1));
+            assertEquals(Types.BIGINT, rsMeta.getColumnType(1));
             assertEquals("integer", rsMeta.getColumnTypeName(1));
-            assertEquals("java.lang.Integer", rsMeta.getColumnClassName(1));
+            assertEquals("java.lang.Long", rsMeta.getColumnClassName(1));
 
             assertEquals(Types.VARCHAR, rsMeta.getColumnType(2));
-            assertEquals("varchar", rsMeta.getColumnTypeName(2));
+            assertEquals("string", rsMeta.getColumnTypeName(2));
             assertEquals("java.lang.String", rsMeta.getColumnClassName(2));
 
             // TEXT and VARCHAR are not distinguishable
             assertEquals(Types.VARCHAR, rsMeta.getColumnType(3));
-            assertEquals("varchar", rsMeta.getColumnTypeName(3));
+            assertEquals("string", rsMeta.getColumnTypeName(3));
             assertEquals("java.lang.String", rsMeta.getColumnClassName(3));
 
             assertEquals(Types.BINARY, rsMeta.getColumnType(4));

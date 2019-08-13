@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
+import static org.tarantool.TestAssumptions.assumeServerVersionLessThan;
 import static org.tarantool.TestUtils.fromHex;
 
 import org.tarantool.ServerVersion;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
@@ -30,26 +32,27 @@ import java.sql.Timestamp;
 
 class JdbcTypesIT {
 
-    public static Integer[] INT_VALS = new Integer[] { Integer.MIN_VALUE, 0, Integer.MAX_VALUE, 1, 100, -50 };
-    public static Double[] DOUBLE_VALS = new Double[] { 0.0d, Double.MIN_VALUE, Double.MAX_VALUE, 1.00001d, 100.5d };
-    public static Float[] FLOAT_VALS = new Float[] { 0.0f, Float.MIN_VALUE, Float.MAX_VALUE, 1.00001f, 100.5f };
-    public static String[] STRING_VALS = new String[] { "", "1", "A", "test test" };
-    public static Byte[] BYTE_VALS = new Byte[] { Byte.MIN_VALUE, Byte.MAX_VALUE, (byte)0, (byte)100 };
-    public static Short[] SHORT_VALS = new Short[] { Short.MIN_VALUE, Short.MAX_VALUE, (short)0, (short)1000 };
-    public static Long[] LONG_VALS = new Long[] { Long.MIN_VALUE, Long.MAX_VALUE, 0L, 100000000L};
-    public static BigDecimal[] BIGDEC_VALS = new BigDecimal[] {
+    public static Integer[] INT_VALS = { Integer.MIN_VALUE, 0, Integer.MAX_VALUE, 1, 100, -50 };
+    public static Double[] DOUBLE_VALS = { 0.0d, Double.MIN_VALUE, Double.MAX_VALUE, 1.00001d, 100.5d };
+    public static Float[] FLOAT_VALS = { 0.0f, Float.MIN_VALUE, Float.MAX_VALUE, 1.00001f, 100.5f };
+    public static String[] STRING_VALS = { "", "1", "A", "test test" };
+    public static Byte[] BYTE_VALS = { Byte.MIN_VALUE, Byte.MAX_VALUE, (byte)0, (byte)100 };
+    public static Short[] SHORT_VALS = { Short.MIN_VALUE, Short.MAX_VALUE, (short)0, (short)1000 };
+    public static Long[] LONG_VALS = { Long.MIN_VALUE, Long.MAX_VALUE, 0L, 100000000L};
+    public static BigDecimal[] BIGDEC_VALS = {
         BigDecimal.valueOf(Double.MIN_VALUE), BigDecimal.valueOf(Double.MAX_VALUE), BigDecimal.ZERO, BigDecimal.ONE
     };
-    public static byte[][] BINARY_VALS = new byte[][] {
+    public static BigInteger[] BIGINT_VALS = {
+        BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.TEN),
+        BigInteger.valueOf(2).pow(64).subtract(BigInteger.ONE)
+    };
+    public static byte[][] BINARY_VALS = {
         fromHex(""), fromHex("00"), fromHex("FFFF"), fromHex("0102030405060708")
     };
-    public static Date[] DATE_VALS = new Date[] { Date.valueOf("1983-03-14"), new Date(129479994) };
+    public static Date[] DATE_VALS = { Date.valueOf("1983-03-14"), new Date(129479994) };
+    public static Boolean[] BOOLEAN_VALS = { Boolean.FALSE, Boolean.TRUE };
 
-    private static final String[] INIT_SQL = new String[] {
-        getCreateTableSQL()
-    };
-
-    private static final String[] CLEAN_SQL = new String[] {
+    private static final String[] CLEAN_SQL = {
         "DROP TABLE IF EXISTS test_types"
     };
 
@@ -74,113 +77,227 @@ class JdbcTypesIT {
     }
 
     @BeforeEach
-    void setUpTest() throws SQLException {
+    void setUpTest() {
         assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
-        testHelper.executeSql(INIT_SQL);
     }
 
     @AfterEach
-    void tearDownTest() throws SQLException {
+    void tearDownTest() {
         assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
         testHelper.executeSql(CLEAN_SQL);
     }
 
     @Test
     void testSetByte() throws SQLException {
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.INT, TarantoolSqlType.INTEGER, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", Byte.class)
-            .setColumns(TarantoolSqlType.INT, TarantoolSqlType.INTEGER)
+            .setColumns(targetTypes)
             .setValues(BYTE_VALS)
             .testTypes();
     }
 
     @Test
     void testSetShort() throws SQLException {
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.INT, TarantoolSqlType.INTEGER, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", Short.class)
-            .setColumns(TarantoolSqlType.INT, TarantoolSqlType.INTEGER)
+            .setColumns(targetTypes)
             .setValues(SHORT_VALS)
             .testTypes();
     }
 
     @Test
     void testSetInt() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
+
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.INT, TarantoolSqlType.INTEGER, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", Integer.class)
-            .setColumns(TarantoolSqlType.INT, TarantoolSqlType.INTEGER)
+            .setColumns(targetTypes)
+            .setValues(INT_VALS)
+            .testTypes();
+    }
+
+    @Test
+    void testSetIntUsingNumber() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2_1);
+
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.NUMBER };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
+        new TarantoolTestTypeHelper<>(connection, "test_types", Integer.class)
+            .setColumns(targetTypes)
             .setValues(INT_VALS)
             .testTypes();
     }
 
     @Test
     void testSetLong() throws SQLException {
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.INT, TarantoolSqlType.INTEGER, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", Long.class)
-            .setColumns(TarantoolSqlType.INT, TarantoolSqlType.INTEGER)
+            .setColumns(targetTypes)
             .setValues(LONG_VALS)
             .testTypes();
     }
 
     @Test
+    void testSetLongUsingNumber() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2_1);
+
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.NUMBER };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
+        new TarantoolTestTypeHelper<>(connection, "test_types", Long.class)
+            .setColumns(targetTypes)
+            .setValues(LONG_VALS)
+            .testTypes();
+    }
+
+    @Test
+    void testSetBigIntegerUsingUnsigned() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
+
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.UNSIGNED, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
+        new TarantoolTestTypeHelper<>(connection, "test_types", BigInteger.class)
+            .setColumns(targetTypes)
+            .setValues(BIGINT_VALS)
+            .testTypes();
+    }
+
+    @Test
+    void testSetBigInteger() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.INT, TarantoolSqlType.INTEGER, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
+        new TarantoolTestTypeHelper<>(connection, "test_types", BigInteger.class)
+            .setColumns(targetTypes)
+            .setValues(BIGINT_VALS)
+            .testTypes();
+    }
+
+    @Test
     void testSetString() throws SQLException {
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.VARCHAR, TarantoolSqlType.TEXT, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", String.class)
-            .setColumns(TarantoolSqlType.VARCHAR, TarantoolSqlType.TEXT)
+            .setColumns(targetTypes)
             .setValues(STRING_VALS)
             .testTypes();
     }
 
     @Test
+    void testSetBoolean() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
+
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.BOOLEAN, TarantoolSqlType.BOOL, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
+        new TarantoolTestTypeHelper<>(connection, "test_types", Boolean.class)
+            .setColumns(targetTypes)
+            .setValues(BOOLEAN_VALS)
+            .testTypes();
+    }
+
+    @Test
     void testSetFloat() throws SQLException {
+        assumeServerVersionLessThan(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
+
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.REAL, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", Float.class)
-            .setColumns(TarantoolSqlType.REAL)
+            .setColumns(targetTypes)
             .setValues(FLOAT_VALS)
             .testTypes();
     }
 
     @Test
     void testSetDouble() throws SQLException {
+        assumeServerVersionLessThan(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
+
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.FLOAT, TarantoolSqlType.DOUBLE, TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", Double.class)
-            .setColumns(TarantoolSqlType.FLOAT, TarantoolSqlType.DOUBLE)
+            .setColumns(targetTypes)
             .setValues(DOUBLE_VALS)
             .testTypes();
     }
 
     @Test
     void testSetBigDecimal() throws SQLException {
+        assumeServerVersionLessThan(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
+
+        TarantoolSqlType[] targetTypes = {
+            TarantoolSqlType.REAL, TarantoolSqlType.FLOAT, TarantoolSqlType.DOUBLE, TarantoolSqlType.SCALAR
+        };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", BigDecimal.class)
-            .setColumns(TarantoolSqlType.REAL, TarantoolSqlType.FLOAT, TarantoolSqlType.DOUBLE)
+            .setColumns(targetTypes)
             .setValues(BIGDEC_VALS)
             .testTypes();
     }
 
     @Test
-    void testSetByteArray() throws SQLException {
+    void testSetBigDecimalUsingNumber() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2_1);
+
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.NUMBER };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
+        new TarantoolTestTypeHelper<>(connection, "test_types", BigDecimal.class)
+            .setColumns(targetTypes)
+            .setValues(BIGDEC_VALS)
+            .testTypes();
+    }
+
+    @Test
+    void testSetByteArrayUsingScalar() throws SQLException {
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.SCALAR };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", byte[].class)
-            .setColumns(TarantoolSqlType.SCALAR)
+            .setColumns(targetTypes)
+            .setValues(BINARY_VALS)
+            .testTypes();
+    }
+
+    @Test
+    void testSetByteArrayUsingVarbinary() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
+
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.VARBINARY };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
+        new TarantoolTestTypeHelper<>(connection, "test_types", byte[].class)
+            .setColumns(targetTypes)
             .setValues(BINARY_VALS)
             .testTypes();
     }
 
     @Test
     void testSetDate() throws SQLException {
+        TarantoolSqlType[] targetTypes = { TarantoolSqlType.INT, TarantoolSqlType.INTEGER };
+        testHelper.executeSql(getCreateTypeTableSQL(targetTypes));
+
         new TarantoolTestTypeHelper<>(connection, "test_types", Date.class)
-            .setColumns(TarantoolSqlType.INT, TarantoolSqlType.INTEGER)
+            .setColumns(targetTypes)
             .setValues(DATE_VALS)
             .testTypes();
     }
 
-    private static String getCreateTableSQL() {
-
-        TarantoolSqlType[] types = {
-            TarantoolSqlType.FLOAT,
-            TarantoolSqlType.DOUBLE,
-            TarantoolSqlType.REAL,
-
-            TarantoolSqlType.INT,
-            TarantoolSqlType.INTEGER,
-
-            TarantoolSqlType.VARCHAR,
-            TarantoolSqlType.TEXT,
-
-            TarantoolSqlType.SCALAR
-        };
-
+    private static String getCreateTypeTableSQL(TarantoolSqlType... types) {
         StringBuilder sb = new StringBuilder("CREATE TABLE ");
         sb.append("test_types");
         sb.append("(KEY INT PRIMARY KEY");
@@ -307,6 +424,8 @@ class JdbcTypesIT {
                 ps.setBoolean(col, (Boolean)val);
             } else if (cls == BigDecimal.class) {
                 ps.setBigDecimal(col, (BigDecimal) val);
+            } else if (cls == BigInteger.class) {
+                ps.setObject(col, val);
             } else if (cls == byte[].class) {
                 ps.setBytes(col, (byte[])val);
             } else if (cls == Date.class) {
@@ -348,6 +467,9 @@ class JdbcTypesIT {
             } else if (cls == BigDecimal.class) {
                 assertEquals(0, ((BigDecimal)val).compareTo(rs.getBigDecimal(col)));
                 assertEquals(0, ((BigDecimal)val).compareTo(rs.getBigDecimal(name)));
+            } else if (cls == BigInteger.class) {
+                assertEquals(val, rs.getObject(col));
+                assertEquals(val, rs.getObject(name));
             } else if (cls == byte[].class) {
                 assertArrayEquals((byte[])val, rs.getBytes(col));
                 assertArrayEquals((byte[])val, rs.getBytes(name));

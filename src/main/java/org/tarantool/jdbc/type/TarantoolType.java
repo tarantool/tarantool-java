@@ -10,9 +10,12 @@ public enum TarantoolType {
     STRING("string", false, true, Integer.MAX_VALUE, 0, Integer.MAX_VALUE),
     // precision is 20 due to Tarantool integer type has range [-2^63-1..2^64-1]
     INTEGER("integer", true, false, 20, 0, 20),
+    // precision is 20 due to Tarantool unsigned integer type has range [0..2^64-1]
+    UNSIGNED("unsigned", false, false, 20, 0, 20),
     // precision is 20 due to Tarantool allows both integer and floating-point values under number type
     NUMBER("number", true, false, 20, 16, 24),
-    SCALAR("scalar", false, true, Integer.MAX_VALUE, 0, Integer.MAX_VALUE);
+    SCALAR("scalar", false, true, Integer.MAX_VALUE, 0, Integer.MAX_VALUE),
+    VARBINARY("varbinary", false, true, Integer.MAX_VALUE, 0, Integer.MAX_VALUE);
 
     private final String typeName;
     private final boolean signed;
