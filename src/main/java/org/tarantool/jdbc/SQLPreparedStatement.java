@@ -2,8 +2,11 @@ package org.tarantool.jdbc;
 
 import org.tarantool.util.SQLStates;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Array;
@@ -31,6 +34,7 @@ import java.util.Map;
 public class SQLPreparedStatement extends SQLStatement implements PreparedStatement {
 
     private static final String INVALID_CALL_MESSAGE = "The method cannot be called on a PreparedStatement.";
+    private static final int STREAM_WRITE_CHUNK_SIZE = 4096;
 
     private final String sql;
     private final Map<Integer, Object> parameters;
@@ -182,37 +186,40 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream parameterValue, int length) throws SQLException {
-        setParameter(parameterIndex, parameterValue);
+        setAsciiStream(parameterIndex, parameterValue, (long) length);
     }
 
     @Override
-    public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public void setAsciiStream(int parameterIndex, InputStream parameterValue) throws SQLException {
+        setCharStream(parameterIndex, parameterValue, Integer.MAX_VALUE, "ASCII");
     }
 
     @Override
-    public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public void setAsciiStream(int parameterIndex, InputStream parameterValue, long length) throws SQLException {
+        ensureLengthLowerBound(length);
+        setCharStream(parameterIndex, parameterValue, length, "ASCII");
     }
 
     @Override
     public void setUnicodeStream(int parameterIndex, InputStream parameterValue, int length) throws SQLException {
-        setParameter(parameterIndex, parameterValue);
+        ensureLengthLowerBound(length);
+        setCharStream(parameterIndex, parameterValue, length, "UTF-8");
     }
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream parameterValue, int length) throws SQLException {
-        setParameter(parameterIndex, parameterValue);
+        setBinaryStream(parameterIndex, parameterValue, (long) length);
     }
 
     @Override
-    public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public void setBinaryStream(int parameterIndex, InputStream parameterValue, long length) throws SQLException {
+        ensureLengthLowerBound(length);
+        setBinStream(parameterIndex, parameterValue, length);
     }
 
     @Override
-    public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+    public void setBinaryStream(int parameterIndex, InputStream parameterValue) throws SQLException {
+        setBinStream(parameterIndex, parameterValue, Integer.MAX_VALUE);
     }
 
     @Override
@@ -257,17 +264,18 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        setCharacterStream(parameterIndex, reader, (long) length);
     }
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        ensureLengthLowerBound(length);
+        setCharStream(parameterIndex, reader, length);
     }
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        setCharStream(parameterIndex, reader, Integer.MAX_VALUE);
     }
 
     @Override
@@ -343,12 +351,12 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
 
     @Override
     public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        setCharacterStream(parameterIndex, value, length);
     }
 
     @Override
     public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        setCharacterStream(parameterIndex, value);
     }
 
     @Override
@@ -415,6 +423,73 @@ public class SQLPreparedStatement extends SQLStatement implements PreparedStatem
             }
         }
         return objects;
+    }
+
+    private void ensureLengthLowerBound(long length) throws SQLException {
+        if (length < 0) {
+            throw new SQLException("Stream size cannot be negative", SQLStates.INVALID_PARAMETER_VALUE.getSqlState());
+        }
+    }
+
+    private void ensureLengthUpperBound(long length) throws SQLException {
+        if (length > Integer.MAX_VALUE) {
+            throw new SQLException("Stream size is too large", SQLStates.INVALID_PARAMETER_VALUE.getSqlState());
+        }
+    }
+
+    private void setCharStream(int parameterIndex,
+                               InputStream parameterValue,
+                               long length,
+                               String encoding) throws SQLException {
+        ensureLengthUpperBound(length);
+        try {
+            byte[] bytes = convertToBytes(parameterValue, length);
+            setParameter(parameterIndex, new String(bytes, 0, bytes.length, encoding));
+        } catch (UnsupportedEncodingException e) {
+            throw new SQLException("Unsupported encoding", SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), e);
+        }
+    }
+
+    private void setCharStream(int parameterIndex, Reader reader, long length) throws SQLException {
+        ensureLengthUpperBound(length);
+        try {
+            StringBuilder value = new StringBuilder(STREAM_WRITE_CHUNK_SIZE);
+            char[] buffer = new char[STREAM_WRITE_CHUNK_SIZE];
+            int totalRead = 0;
+            int charsRead;
+            while (totalRead < length &&
+                (charsRead = reader.read(buffer, 0, (int) Math.min(length - totalRead, STREAM_WRITE_CHUNK_SIZE))) != -1) {
+                value.append(buffer, 0, charsRead);
+                totalRead += charsRead;
+            }
+            setParameter(parameterIndex, value.toString());
+        } catch (IOException e) {
+            throw new SQLException("Cannot read from the reader", SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), e);
+        }
+    }
+
+    private void setBinStream(int parameterIndex,
+                              InputStream parameterValue,
+                              long length) throws SQLException {
+        ensureLengthUpperBound(length);
+        setBytes(parameterIndex, convertToBytes(parameterValue, length));
+    }
+
+    private byte[] convertToBytes(InputStream parameterValue, long length) throws SQLException {
+        try {
+            int bytesRead;
+            int totalRead = 0;
+            byte[] buffer = new byte[STREAM_WRITE_CHUNK_SIZE];
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream(STREAM_WRITE_CHUNK_SIZE);
+            while (totalRead < length &&
+                (bytesRead = parameterValue.read(buffer, 0, (int) Math.min(length - totalRead, STREAM_WRITE_CHUNK_SIZE))) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+                totalRead += bytesRead;
+            }
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            throw new SQLException("Cannot read stream", SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), e);
+        }
     }
 
 }

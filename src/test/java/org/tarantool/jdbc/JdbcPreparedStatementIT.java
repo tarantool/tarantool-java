@@ -1,5 +1,6 @@
 package org.tarantool.jdbc;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -7,6 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyObject;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
 import org.tarantool.ServerVersion;
@@ -21,6 +26,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -30,13 +41,14 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 public class JdbcPreparedStatementIT {
 
     private static final String[] INIT_SQL = new String[] {
-        "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100))",
+        "CREATE TABLE test(id INT PRIMARY KEY, val VARCHAR(100), bin_val SCALAR)",
     };
 
     private static final String[] CLEAN_SQL = new String[] {
@@ -108,7 +120,7 @@ public class JdbcPreparedStatementIT {
 
     @Test
     public void testExecuteWrongQuery() throws SQLException {
-        prep = conn.prepareStatement("INSERT INTO test VALUES (?, ?)");
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
         prep.setInt(1, 200);
         prep.setString(2, "two hundred");
 
@@ -118,7 +130,7 @@ public class JdbcPreparedStatementIT {
 
     @Test
     public void testExecuteUpdate() throws Exception {
-        prep = conn.prepareStatement("INSERT INTO test VALUES(?, ?)");
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES(?, ?)");
         assertNotNull(prep);
 
         prep.setInt(1, 100);
@@ -166,7 +178,7 @@ public class JdbcPreparedStatementIT {
 
     @Test
     public void testExecuteReturnsUpdateCount() throws Exception {
-        prep = conn.prepareStatement("INSERT INTO test VALUES(?, ?), (?, ?)");
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES(?, ?), (?, ?)");
         assertNotNull(prep);
 
         prep.setInt(1, 10);
@@ -230,7 +242,7 @@ public class JdbcPreparedStatementIT {
 
     @Test
     public void testSupportGeneratedKeys() throws SQLException {
-        prep = conn.prepareStatement("INSERT INTO test values (50, 'fifty')", Statement.NO_GENERATED_KEYS);
+        prep = conn.prepareStatement("INSERT INTO test(id, val) values (50, 'fifty')", Statement.NO_GENERATED_KEYS);
         assertFalse(prep.execute());
         assertEquals(1, prep.getUpdateCount());
 
@@ -336,7 +348,7 @@ public class JdbcPreparedStatementIT {
 
     @Test
     public void testMoreResultsWithUpdateCount() throws SQLException {
-        prep = conn.prepareStatement("INSERT INTO test VALUES (?, ?)");
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
         prep.setInt(1, 9);
         prep.setString(2, "nine");
 
@@ -370,7 +382,7 @@ public class JdbcPreparedStatementIT {
 
         assertThrows(SQLFeatureNotSupportedException.class, () -> prep.getMoreResults(Statement.CLOSE_ALL_RESULTS));
 
-        prep = conn.prepareStatement("INSERT INTO test VALUES (?, ?)");
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
         prep.setInt(1, 21);
         prep.setString(2, "twenty one");
         prep.execute();
@@ -388,7 +400,7 @@ public class JdbcPreparedStatementIT {
 
         assertThrows(SQLFeatureNotSupportedException.class, () -> prep.getMoreResults(Statement.KEEP_CURRENT_RESULT));
 
-        prep = conn.prepareStatement("INSERT INTO test VALUES (?, ?)");
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
         prep.setInt(1, 22);
         prep.setString(2, "twenty two");
         prep.execute();
@@ -558,6 +570,153 @@ public class JdbcPreparedStatementIT {
         assertTrue(prep.isPoolable());
         prep.setPoolable(false);
         assertFalse(prep.isPoolable());
+    }
+
+    @Test
+    public void testSetAsciiStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        prep.setInt(1, 1);
+        InputStream asciiStream = new ByteArrayInputStream("one".getBytes("ASCII"));
+        prep.setAsciiStream(2, asciiStream);
+
+        assertFalse(prep.execute());
+        assertEquals("one", consoleSelect(1).get(1));
+    }
+
+    @Test
+    public void testSetAsciiLimitedStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        prep.setInt(1, 1);
+        InputStream asciiStream = new ByteArrayInputStream("one and two and even three".getBytes("ASCII"));
+        prep.setAsciiStream(2, asciiStream, 3);
+
+        assertFalse(prep.execute());
+        assertEquals("one", consoleSelect(1).get(1));
+    }
+
+    @Test
+    public void testSetNegativeAsciiStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        prep.setInt(1, 1);
+        InputStream asciiStream = new ByteArrayInputStream("one and two and even three".getBytes("ASCII"));
+        SQLException error = assertThrows(SQLException.class, () -> prep.setAsciiStream(2, asciiStream, -10));
+        assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
+    }
+
+    @Test
+    public void testSetBadStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+
+        InputStream throwingStream = mock(InputStream.class);
+        when(throwingStream.read(anyObject(), anyInt(), anyInt())).thenThrow(IOException.class);
+
+        SQLException error = assertThrows(
+            SQLException.class,
+            () -> prep.setAsciiStream(2, throwingStream)
+        );
+        assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
+        assertEquals(IOException.class, error.getCause().getClass());
+    }
+
+    @Test
+    public void testSetUnicodeLimitedStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        prep.setInt(1, 1);
+        InputStream unicodeStream = new ByteArrayInputStream("zéro one два みっつ 四 Fünf".getBytes("UTF-8"));
+        // zéro is 5 bytes length because é consists of tow bytes 0xC3 0xA9
+        prep.setUnicodeStream(2, unicodeStream, 5);
+
+        assertFalse(prep.execute());
+        assertEquals("zéro", consoleSelect(1).get(1));
+    }
+
+    @Test
+    public void testSetNegativeUnicodeStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        prep.setInt(1, 1);
+        InputStream unicodeStream = new ByteArrayInputStream("one and two and even three".getBytes("UTF-8"));
+        SQLException error = assertThrows(SQLException.class, () -> prep.setUnicodeStream(2, unicodeStream, -9));
+        assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
+    }
+
+    @Test
+    public void testSetBinaryStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, bin_val) VALUES (?, ?)");
+        prep.setInt(1, 1);
+        byte[] bytes = TestUtils.fromHex("00010203");
+        prep.setBinaryStream(2, new ByteArrayInputStream(bytes));
+
+        assertFalse(prep.execute());
+        assertArrayEquals(bytes, ((String) consoleSelect(1).get(2)).getBytes(StandardCharsets.US_ASCII));
+    }
+
+    @Test
+    public void testSetBinaryLimitedStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, bin_val) VALUES (?, ?)");
+        prep.setInt(1, 1);
+        byte[] bytes = TestUtils.fromHex("00010203040506");
+        prep.setBinaryStream(2, new ByteArrayInputStream(bytes), 2);
+
+        assertFalse(prep.execute());
+        assertArrayEquals(
+            Arrays.copyOf(bytes, 2),
+            ((String) consoleSelect(1).get(2)).getBytes(StandardCharsets.US_ASCII)
+        );
+    }
+
+    @Test
+    public void testSetNegativeBinaryStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, bin_val) VALUES (?, ?)");
+        byte[] bytes = TestUtils.fromHex("00010203040506");
+        SQLException error = assertThrows(
+            SQLException.class,
+            () -> prep.setBinaryStream(2, new ByteArrayInputStream(bytes), -4)
+        );
+        assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
+    }
+
+    @Test
+    public void testSetCharacterStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        prep.setInt(1, 2);
+        prep.setCharacterStream(2, new StringReader("two"));
+
+        assertFalse(prep.execute());
+        assertEquals("two", consoleSelect(2).get(1));
+    }
+
+    @Test
+    public void testSetCharacterLimitedStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        prep.setInt(1, 2);
+        prep.setCharacterStream(2, new StringReader("two or maybe four"), 3);
+
+        assertFalse(prep.execute());
+        assertEquals("two", consoleSelect(2).get(1));
+    }
+
+    @Test
+    public void testSetNegativeCharacterStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        SQLException error = assertThrows(
+            SQLException.class,
+            () -> prep.setCharacterStream(2, new StringReader("four"), -10)
+        );
+        assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
+    }
+
+    @Test
+    public void testSetBadCharacterStream() throws Exception {
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+
+        Reader throwingReader = mock(Reader.class);
+        when(throwingReader.read(anyObject(), anyInt(), anyInt())).thenThrow(IOException.class);
+
+        SQLException error = assertThrows(
+            SQLException.class,
+            () -> prep.setCharacterStream(2, throwingReader)
+        );
+        assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
     }
 
     private List<?> consoleSelect(Object key) {
