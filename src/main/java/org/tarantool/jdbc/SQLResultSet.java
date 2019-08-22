@@ -336,7 +336,7 @@ public class SQLResultSet implements ResultSet {
     @Override
     public InputStream getUnicodeStream(int columnIndex) throws SQLException {
         String string = getString(columnIndex);
-        return string == null ? null : new ByteArrayInputStream(string.getBytes(Charset.forName("UTF-16")));
+        return string == null ? null : new ByteArrayInputStream(string.getBytes(Charset.forName("UTF-8")));
     }
 
     @Override
