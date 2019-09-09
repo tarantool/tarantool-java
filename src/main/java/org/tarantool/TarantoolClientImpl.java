@@ -1,11 +1,15 @@
 package org.tarantool;
 
+import org.tarantool.logging.Logger;
+import org.tarantool.logging.LoggerFactory;
 import org.tarantool.protocol.ProtoUtils;
 import org.tarantool.protocol.ReadableViaSelectorChannel;
 import org.tarantool.protocol.TarantoolGreeting;
 import org.tarantool.protocol.TarantoolPacket;
+import org.tarantool.util.StringUtils;
 
 import java.io.IOException;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
@@ -27,6 +31,8 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements TarantoolClient {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(TarantoolClientImpl.class);
 
     protected TarantoolClientConfig config;
     protected long operationTimeout;
@@ -143,6 +149,15 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         int retryNumber = 0;
         while (!Thread.currentThread().isInterrupted()) {
             try {
+                if (lastError != null) {
+                    LOGGER.warn(() -> {
+                            SocketAddress address = socketProvider.getAddress();
+                            return "Attempt to (re-)connect to Tarantool instance " +
+                                (StringUtils.isBlank(config.username) ? "" : config.username + ":*****@") +
+                                (address == null ? "unknown" : address);
+                        }, lastError
+                    );
+                }
                 channel = socketProvider.get(retryNumber++, lastError);
             } catch (Exception e) {
                 closeChannel(channel);
@@ -708,6 +723,14 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
         public Object[] getArgs() {
             return args;
+        }
+
+        @Override
+        public String toString() {
+            return "TarantoolOp{" +
+                "id=" + id +
+                ", code=" + code +
+                '}';
         }
 
         /**

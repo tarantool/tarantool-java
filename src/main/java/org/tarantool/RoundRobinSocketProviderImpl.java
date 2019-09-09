@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -93,13 +94,7 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
      * @return socket addresses
      */
     public List<SocketAddress> getAddresses() {
-        Lock readLock = addressListLock.readLock();
-        readLock.lock();
-        try {
-            return Collections.unmodifiableList(this.socketAddresses);
-        } finally {
-            readLock.unlock();
-        }
+        return readGuard(() -> Collections.unmodifiableList(this.socketAddresses));
     }
 
     /**
@@ -109,14 +104,10 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
      *     if {@link #currentPosition} has {@link #UNSET_POSITION} value
      */
     protected InetSocketAddress getLastObtainedAddress() {
-        Lock readLock = addressListLock.readLock();
-        readLock.lock();
-        try {
+        return readGuard(() -> {
             int index = currentPosition.get();
             return index != UNSET_POSITION ? socketAddresses.get(index) : null;
-        } finally {
-            readLock.unlock();
-        }
+        });
     }
 
     /**
@@ -176,13 +167,7 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
      * @return Number of configured addresses.
      */
     protected int getAddressCount() {
-        Lock readLock = addressListLock.readLock();
-        readLock.lock();
-        try {
-            return socketAddresses.size();
-        } finally {
-            readLock.unlock();
-        }
+        return readGuard(socketAddresses::size);
     }
 
     /**
@@ -191,11 +176,25 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
      * @return Socket address to use for the next reconnection attempt
      */
     protected InetSocketAddress getNextSocketAddress() {
+        return readGuard(() -> {
+            int position = currentPosition.updateAndGet(i -> (i + 1) % socketAddresses.size());
+            return socketAddresses.get(position);
+        });
+    }
+
+    @Override
+    public SocketAddress getAddress() {
+        return readGuard(() -> {
+            int position = (currentPosition.get() + 1) % socketAddresses.size();
+            return socketAddresses.get(position);
+        });
+    }
+
+    private <R> R readGuard(Supplier<R> supplier) {
         Lock readLock = addressListLock.readLock();
         readLock.lock();
         try {
-            int position = currentPosition.updateAndGet(i -> (i + 1) % socketAddresses.size());
-            return socketAddresses.get(position);
+            return supplier.get();
         } finally {
             readLock.unlock();
         }

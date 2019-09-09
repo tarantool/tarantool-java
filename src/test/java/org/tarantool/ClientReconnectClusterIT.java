@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.ConnectException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -82,6 +85,48 @@ public class ClientReconnectClusterIT {
     @AfterEach
     public void tearDownTest() {
         stopInstancesAndAwait(SRV1, SRV2, SRV3);
+    }
+
+    @Test
+    @DisplayName("requests were re-issued after reconnection")
+    public void testRetriesOnReconnect() throws ExecutionException, InterruptedException {
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        TarantoolClusterClientConfig config = makeDefaultClusterClientConfig();
+        config.operationExpiryTimeMillis = 3_000;
+        TarantoolClusterClient client = new TarantoolClusterClient(
+            config,
+            "localhost:" + PORTS[0],
+            "127.0.0.1:" + PORTS[1],
+            "localhost:" + PORTS[2]
+        ) {
+            boolean notFirst;
+
+            @Override
+            protected void reconnect(Throwable lastError) {
+                if (notFirst) {
+                    tryAwait(barrier);
+                }
+                notFirst = true;
+                super.reconnect(lastError);
+            }
+        };
+
+        stopInstancesAndAwait(SRV1);
+
+        List<Future<?>> futures = new ArrayList<>();
+        futures.add(client.asyncOps().eval("return 1+1"));
+        futures.add(client.asyncOps().eval("return 1+2"));
+        futures.add(client.asyncOps().eval("return 1+3"));
+        futures.add(client.asyncOps().eval("return 1+4"));
+
+        tryAwait(barrier);
+
+        for (Future<?> future : futures) {
+            future.get();
+        }
+
+        stopInstancesAndAwait(SRV2);
+        stopInstancesAndAwait(SRV3);
     }
 
     @Test

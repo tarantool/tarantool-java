@@ -2,6 +2,8 @@ package org.tarantool;
 
 import org.tarantool.cluster.TarantoolClusterDiscoverer;
 import org.tarantool.cluster.TarantoolClusterStoredFunctionDiscoverer;
+import org.tarantool.logging.Logger;
+import org.tarantool.logging.LoggerFactory;
 import org.tarantool.protocol.TarantoolPacket;
 import org.tarantool.util.StringUtils;
 
@@ -26,6 +28,8 @@ import java.util.concurrent.locks.StampedLock;
  * unless the configured expiration time is over.
  */
 public class TarantoolClusterClient extends TarantoolClientImpl {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(TarantoolClusterClient.class);
 
     /**
      * Need some execution context to retry writes.
@@ -153,6 +157,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         } else {
             assert retries != null;
             retries.put(future.getId(), future);
+            LOGGER.trace("Request {0} was delayed because of {1}", future, e);
             return false;
         }
     }
@@ -194,12 +199,17 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
             // First call is before the constructor finished. Skip it.
             return;
         }
-        Collection<TarantoolOp<?>> futuresToRetry = new ArrayList<>(retries.values());
+        Collection<TarantoolOp<?>> delayed = new ArrayList<>(retries.values());
+        Collection<TarantoolOp<?>> reissued = new ArrayList<>(retries.size());
         retries.clear();
-        for (final TarantoolOp<?> future : futuresToRetry) {
+        for (final TarantoolOp<?> future : delayed) {
             if (!future.isDone()) {
                 executor.execute(() -> registerOperation(future));
+                reissued.add(future);
             }
+        }
+        for (final TarantoolOp<?> future : reissued) {
+            LOGGER.trace("{0} was re-issued after reconnection", future);
         }
     }
 

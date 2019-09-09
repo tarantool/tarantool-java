@@ -24,6 +24,7 @@ public class SingleSocketChannelProviderImpl extends BaseSocketChannelProvider {
         setAddress(address);
     }
 
+    @Override
     public SocketAddress getAddress() {
         return address;
     }

@@ -3,6 +3,7 @@ package org.tarantool;
 import static java.net.StandardSocketOptions.SO_LINGER;
 
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.channels.SocketChannel;
 
 /**
@@ -37,7 +38,7 @@ public class TestSocketChannelProvider implements SocketChannelProvider {
                  * default behaviour).
                  */
                 channel.setOption(SO_LINGER, soLinger);
-                channel.connect(new InetSocketAddress(host, port));
+                channel.connect(getAddress());
                 return channel;
             } catch (Exception e) {
                 if (budget < System.currentTimeMillis()) {
@@ -52,5 +53,10 @@ public class TestSocketChannelProvider implements SocketChannelProvider {
             }
         }
         throw new RuntimeException(new InterruptedException());
+    }
+
+    @Override
+    public SocketAddress getAddress() {
+        return new InetSocketAddress(host, port);
     }
 }

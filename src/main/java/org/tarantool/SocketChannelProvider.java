@@ -19,4 +19,15 @@ public interface SocketChannelProvider {
      */
     SocketChannel get(int retryNumber, Throwable lastError);
 
+    /**
+     * Gets an address that will be used when
+     * {@link #get(int, Throwable)} is invoked.
+     *
+     * @return effective address or {@literal null}
+     *     if it cannot be calculated in advance.
+     */
+    default SocketAddress getAddress() {
+        return null;
+    }
+
 }

@@ -1,4 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.tarantool</groupId>
@@ -12,6 +13,7 @@
         <mockito.version>1.10.19</mockito.version>
         <!-- logger dependency versions -->
         <sfl4j.version>1.7.26</sfl4j.version>
+        <project.testResources>${project.basedir}/src/test/resources</project.testResources>
     </properties>
     <name>Tarantool Connector for Java</name>
     <url>https://github.com/tarantool/tarantool-java</url>
@@ -73,17 +75,24 @@
                 <artifactId>templating-maven-plugin</artifactId>
                 <version>1.0.0</version>
                 <executions>
-                  <execution>
-                    <id>filter-src</id>
-                    <goals>
-                      <goal>filter-sources</goal>
-                    </goals>
-                  </execution>
+                    <execution>
+                        <id>filter-src</id>
+                        <goals>
+                            <goal>filter-sources</goal>
+                        </goals>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.0.0-M3</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <java.util.logging.config.file>
+                            ${project.testResources}/jul-silent.properties
+                        </java.util.logging.config.file>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -99,6 +108,12 @@
                 </executions>
                 <configuration>
                     <trimStackTrace>false</trimStackTrace>
+                    <systemPropertyVariables>
+                        <java.util.logging.config.file>
+                            ${project.testResources}/jul-silent.properties
+                        </java.util.logging.config.file>
+                    </systemPropertyVariables>
+
                 </configuration>
             </plugin>
             <plugin>
