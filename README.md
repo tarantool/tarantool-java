@@ -15,8 +15,11 @@ To get the Java connector for Tarantool 1.6.9, visit
 
 ## Table of contents
 * [Getting started](#getting-started)
+* [Spring NamedParameterJdbcTemplate usage example](#spring-namedparameterjdbctemplate-usage-example)
 * [JDBC](#JDBC)
 * [Cluster support](#cluster-support)
+* [Logging](#logging)
+* [Building](#building)
 * [Where to get help](#where-to-get-help)
 
 ## Getting started
@@ -395,7 +398,7 @@ client.syncOps().insert(45, Arrays.asList(1, 1));
   The client does its best to catch the moment when there are no pending responses
   and perform a reconnection.  
 
-### Client config options
+### Cluster client config options
 
 In addition to the options for [the standard client](#client-config-options), cluster
 config provides some extra options:
@@ -409,12 +412,41 @@ config provides some extra options:
    cluster nodes.
    Default value is `60 * 1000` (1 minute).
 
-## Where to get help
+## Logging
 
-Got problems or questions? Post them on
-[Stack Overflow](http://stackoverflow.com/questions/ask/advice) with the
-`tarantool` and `java` tags, or use these tags to search the existing knowledge
-base for possible answers and solutions.
+The connector uses its own logging facade to abstract from any logging libraries
+which can be used inside the apps where the connector attached. At the moment,
+the facade supports JUL as a default logging system, SLF4J facade, and Logback
+directly via SLF4J interface.
+
+### Logging integration
+
+The logging facade offers several ways in integrate its internal logging with foreign one in order:
+
+* Using system property `org.tarantool.logging.provider`. Supported values are *jdk* and *slf4j*
+  for the java util logging and SLF4J/Logback respectively. For instance, use 
+  `java -Dorg.tarantool.logging.provider=slf4j <...>`.
+
+* Using Java SPI mechanism. Implement your own provider org.tarantool.logging.LoggerProvider
+  To register your provider save `META-INF.services/org.tarantool.logging.LoggerProvider` file
+  with a single line text contains a fully-qualified class name of the provider implementation.
+
+```bash
+cat META-INF/services/org.tarantool.logging.LoggerProvider
+org.mydomain.MySimpleLoggerProvider
+```
+
+* CLASSPATH exploring. Now, the connector will use SLF4J if Logback is also in use. 
+
+* If nothing is successful JUL will be used by default.
+
+### Supported loggers
+
+| Logger name                                    | Level | Description                                       |
+| ---------------------------------------------- | ----- | ------------------------------------------------- |
+| o.t.c.TarantoolClusterStoredFunctionDiscoverer | WARN  | prints out invalid discovery addresses            |
+| o.t.TarantoolClusterClient                     | TRACE | prints out request retries after transient errors |
+| o.t.TarantoolClientImpl                        | WARN  | prints out reconnect issues                       |
 
 ## Building
 
@@ -429,3 +461,10 @@ To run integration tests use:
 ```bash
 ./mvnw clean verify
 ```
+
+## Where to get help
+
+Got problems or questions? Post them on
+[Stack Overflow](http://stackoverflow.com/questions/ask/advice) with the
+`tarantool` and `java` tags, or use these tags to search the existing knowledge
+base for possible answers and solutions.
