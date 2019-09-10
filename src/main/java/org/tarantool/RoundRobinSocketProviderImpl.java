@@ -140,7 +140,7 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
     @Override
     protected SocketChannel makeAttempt(int retryNumber, Throwable lastError) throws IOException {
         if (retryNumber > getAddressCount()) {
-            throwFatalError("No more connection addresses are left.");
+            throwFatalError("No more connection addresses are left.", lastError);
         }
 
         int retriesLimit = getRetriesLimit();
@@ -165,7 +165,7 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
     @Override
     public void setRetriesLimit(int retriesLimit) {
         if (retriesLimit == 0) {
-            throwFatalError("Retries count should be at least 1 or more");
+            throwFatalError("Retries count should be at least 1 or more", null);
         }
         super.setRetriesLimit(retriesLimit);
     }
@@ -212,8 +212,8 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
         updateAddressList(addresses);
     }
 
-    private void throwFatalError(String message) {
-        throw new CommunicationException(message);
+    private void throwFatalError(String message, Throwable lastError) {
+        throw new CommunicationException(message, lastError);
     }
 
 }

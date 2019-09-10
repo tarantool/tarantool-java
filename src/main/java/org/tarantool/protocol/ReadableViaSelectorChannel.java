@@ -37,14 +37,14 @@ public class ReadableViaSelectorChannel implements ReadableByteChannel {
         count = n = channel.read(buffer);
 
         if (n < 0) {
-            throw new CommunicationException("Channel read failed " + n);
+            throw new CommunicationException("Channel read failed " + formatReadBytes(n));
         }
 
         while (buffer.remaining() > 0) {
             selector.select();
             n = channel.read(buffer);
             if (n < 0) {
-                throw new CommunicationException("Channel read failed: " + n);
+                throw new CommunicationException("Channel read failed: " + formatReadBytes(n));
             }
             count += n;
         }
@@ -60,5 +60,16 @@ public class ReadableViaSelectorChannel implements ReadableByteChannel {
     public void close() throws IOException {
         selector.close();
         channel.close();
+    }
+
+    /**
+     * Formats the bytes count to a human readable message.
+     *
+     * @param bytes number of bytes
+     *
+     * @return formatted message
+     */
+    private String formatReadBytes(int bytes) {
+        return bytes < 0 ? "EOF" : bytes + " bytes";
     }
 }

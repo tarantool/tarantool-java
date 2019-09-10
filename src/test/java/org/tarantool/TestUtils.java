@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.nio.channels.SocketChannel;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -288,6 +289,70 @@ public class TestUtils {
         config.initTimeoutMillis = 2000;
         config.sharedBufferSize = 128;
         return config;
+    }
+
+    /**
+     * Wraps a socket channel provider
+     * {@link SocketChannelProvider#get(int, Throwable)} method.
+     * When an error is raised the wrapper substitutes
+     * this error by the predefined one. The original value is
+     * still accessible as a cause of the injected error.
+     *
+     * @param provider provider to be wrapped
+     * @param error error to be thrown instead of original
+     *
+     * @return wrapped provider
+     */
+    public static SocketChannelProvider wrapByErroredProvider(SocketChannelProvider provider, RuntimeException error) {
+        return new SocketChannelProvider() {
+            private final SocketChannelProvider delegate = provider;
+
+            @Override
+            public SocketChannel get(int retryNumber, Throwable lastError) {
+                try {
+                    return delegate.get(retryNumber, lastError);
+                } catch (Exception e) {
+                    error.initCause(e);
+                    throw error;
+                }
+            }
+        };
+    }
+
+    /**
+     * Searches recursively the given cause for a root error.
+     *
+     * @param error root error
+     * @param cause cause to be found
+     *
+     * @return {@literal true} if cause is found within a cause chain
+     */
+    public static boolean findCause(Throwable error, Throwable cause) {
+        while (error.getCause() != null) {
+            error = error.getCause();
+            if (cause.equals(error)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Searches recursively the first cause being the given class type.
+     *
+     * @param error root error
+     * @param type cause class to be found
+     *
+     * @return {@literal true} if cause is found within a cause chain
+     */
+    public static boolean findCause(Throwable error, Class<?> type) {
+        while (error.getCause() != null) {
+            error = error.getCause();
+            if (type == error.getClass()) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

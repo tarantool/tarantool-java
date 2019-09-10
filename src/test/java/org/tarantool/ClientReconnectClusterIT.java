@@ -2,6 +2,8 @@ package org.tarantool;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.tarantool.TestUtils.findCause;
 import static org.tarantool.TestUtils.makeDefaultClusterClientConfig;
 import static org.tarantool.TestUtils.makeDiscoveryFunction;
 
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.net.ConnectException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
@@ -391,6 +394,73 @@ public class ClientReconnectClusterIT {
 
         stopInstancesAndAwait(SRV3);
         expectDisconnected(client, spaceId, pkId);
+    }
+
+    @Test
+    void testRoundRobinSocketProviderRefusedByFakeReason() {
+        stopInstancesAndAwait(SRV1);
+        stopInstancesAndAwait(SRV2);
+        stopInstancesAndAwait(SRV3);
+
+        RuntimeException error = new RuntimeException("Fake error");
+        TarantoolClusterClientConfig config = makeDefaultClusterClientConfig();
+        config.initTimeoutMillis = 1000;
+        Throwable exception = assertThrows(
+            CommunicationException.class,
+            () -> {
+                new TarantoolClusterClient(
+                    config,
+                    TestUtils.wrapByErroredProvider(new RoundRobinSocketProviderImpl(
+                        "localhost:" + PORTS[0],
+                        "localhost:" + PORTS[1],
+                        "localhost:" + PORTS[2]
+                    ), error)
+                );
+            }
+        );
+        assertTrue(findCause(exception, error));
+    }
+
+    @Test
+    void testRoundRobinSocketProviderRefused() {
+        stopInstancesAndAwait(SRV1);
+        stopInstancesAndAwait(SRV2);
+        stopInstancesAndAwait(SRV3);
+
+        TarantoolClusterClientConfig config = makeDefaultClusterClientConfig();
+        config.initTimeoutMillis = 1000;
+        Throwable exception = assertThrows(
+            CommunicationException.class,
+            () -> {
+                new TarantoolClusterClient(
+                    config,
+                    new RoundRobinSocketProviderImpl("localhost:" + PORTS[0])
+                );
+            }
+        );
+        assertTrue(findCause(exception, ConnectException.class));
+    }
+
+    @Test
+    void testRoundRobinSocketProviderRefusedAfterConnect() {
+        final TarantoolClientImpl client = makeClusterClient(
+            "localhost:" + PORTS[0],
+            "localhost:" + PORTS[1],
+            "localhost:" + PORTS[2]
+        );
+
+        client.ping();
+        stopInstancesAndAwait(SRV1);
+
+        client.ping();
+        stopInstancesAndAwait(SRV2);
+
+        client.ping();
+        stopInstancesAndAwait(SRV3);
+
+        CommunicationException exception = assertThrows(CommunicationException.class, client::ping);
+        Throwable origin = exception.getCause();
+        assertEquals(origin, client.getThumbstone());
     }
 
     private void tryAwait(CyclicBarrier barrier) {

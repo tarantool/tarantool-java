@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.tarantool.TestUtils.findCause;
 import static org.tarantool.TestUtils.makeDefaultClientConfig;
 import static org.tarantool.TestUtils.makeTestClient;
 
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
 import java.time.Duration;
 import java.util.Collections;
@@ -27,6 +29,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.LockSupport;
 
@@ -377,7 +380,7 @@ public class ClientReconnectIT {
     /**
      * Verify that we don't exceed a file descriptor limit (and so likely don't
      * leak file descriptors) when trying to connect to an existing node with
-     * wrong authentification credentials.
+     * wrong authentication credentials.
      * <p>
      * The test sets SO_LINGER to 0 for outgoing connections to avoid producing
      * many TIME_WAIT sockets, because an available port range can be
@@ -412,13 +415,103 @@ public class ClientReconnectIT {
         client.close();
     }
 
-    private TestSocketChannelProvider makeZeroLingerProvider() {
+    @Test
+    void testFirstConnectionRefused() {
+        RuntimeException error = new RuntimeException("Fake error");
+        TarantoolClientConfig config = makeDefaultClientConfig();
+        config.initTimeoutMillis = 100;
+        Throwable exception = assertThrows(
+            CommunicationException.class,
+            () -> new TarantoolClientImpl(makeErroredProvider(error), config)
+        );
+        assertTrue(findCause(exception, error));
+    }
+
+    @Test
+    void testConnectionRefusedAfterConnect() {
+        TarantoolClientImpl client = new TarantoolClientImpl(makeErroredProvider(null), makeDefaultClientConfig());
+        client.ping();
+
+        testHelper.stopInstance();
+        CommunicationException exception = assertThrows(CommunicationException.class, client::ping);
+
+        Throwable origin = exception.getCause();
+        assertEquals(origin, client.getThumbstone());
+
+        testHelper.startInstance();
+    }
+
+    @Test
+    void testSocketProviderRefusedByFakeReason() {
+        TarantoolClientConfig config = makeDefaultClientConfig();
+        RuntimeException error = new RuntimeException("Fake error");
+        config.initTimeoutMillis = 1000;
+
+        SingleSocketChannelProviderImpl socketProvider = new SingleSocketChannelProviderImpl("localhost:3301");
+
+        testHelper.stopInstance();
+        Throwable exception = assertThrows(
+            CommunicationException.class,
+            () -> new TarantoolClientImpl(TestUtils.wrapByErroredProvider(socketProvider, error), config)
+        );
+        testHelper.startInstance();
+        assertTrue(findCause(exception, error));
+    }
+
+    @Test
+    void testSingleSocketProviderRefused() {
+        testHelper.stopInstance();
+
+        TarantoolClientConfig config = makeDefaultClientConfig();
+        config.initTimeoutMillis = 1000;
+
+        SingleSocketChannelProviderImpl socketProvider = new SingleSocketChannelProviderImpl("localhost:3301");
+
+        Throwable exception = assertThrows(
+            CommunicationException.class,
+            () -> new TarantoolClientImpl(socketProvider, config)
+        );
+        testHelper.startInstance();
+        assertTrue(findCause(exception, ConnectException.class));
+    }
+
+    @Test
+    void testSingleSocketProviderRefusedAfterConnect() {
+        TarantoolClientImpl client = new TarantoolClientImpl(socketChannelProvider, makeDefaultClientConfig());
+
+        client.ping();
+        testHelper.stopInstance();
+
+        CommunicationException exception = assertThrows(CommunicationException.class, client::ping);
+        Throwable origin = exception.getCause();
+        assertEquals(origin, client.getThumbstone());
+
+        testHelper.startInstance();
+    }
+
+    private SocketChannelProvider makeZeroLingerProvider() {
         return new TestSocketChannelProvider(
             TarantoolTestHelper.HOST, TarantoolTestHelper.PORT, RESTART_TIMEOUT
         ).setSoLinger(0);
     }
 
-    TarantoolClient makeClient(SocketChannelProvider provider) {
+    private SocketChannelProvider makeErroredProvider(RuntimeException error) {
+        return new SocketChannelProvider() {
+            private final SocketChannelProvider delegate = makeZeroLingerProvider();
+            private AtomicReference<RuntimeException> errorReference = new AtomicReference<>(error);
+
+            @Override
+            public SocketChannel get(int retryNumber, Throwable lastError) {
+                RuntimeException rawError = errorReference.get();
+                if (rawError != null) {
+                    throw rawError;
+                }
+                return delegate.get(retryNumber, lastError);
+            }
+        };
+    }
+
+    private TarantoolClient makeClient(SocketChannelProvider provider) {
         return new TarantoolClientImpl(provider, makeDefaultClientConfig());
     }
 

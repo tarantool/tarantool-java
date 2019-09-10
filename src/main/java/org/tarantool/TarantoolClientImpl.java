@@ -28,9 +28,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements TarantoolClient {
 
-    public static final CommunicationException NOT_INIT_EXCEPTION
-        = new CommunicationException("Not connected, initializing connection");
-
     protected TarantoolClientConfig config;
     protected long operationTimeout;
 
@@ -101,7 +98,6 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     private void initClient(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
-        this.thumbstone = NOT_INIT_EXCEPTION;
         this.config = config;
         this.initialRequestSize = config.defaultRequestSize;
         this.operationTimeout = config.operationExpiryTimeMillis;
@@ -130,8 +126,8 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
                 CommunicationException e = new CommunicationException(
                     initTimeoutMillis +
                         "ms is exceeded when waiting for client initialization. " +
-                        "You could configure init timeout in TarantoolConfig"
-                );
+                        "You could configure init timeout in TarantoolConfig",
+                    thumbstone);
 
                 close(e);
                 throw e;
@@ -147,7 +143,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         int retryNumber = 0;
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                channel = socketProvider.get(retryNumber++, lastError == NOT_INIT_EXCEPTION ? null : lastError);
+                channel = socketProvider.get(retryNumber++, lastError);
             } catch (Exception e) {
                 closeChannel(channel);
                 lastError = e;
