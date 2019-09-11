@@ -130,6 +130,53 @@ all the results, you could override this:
 protected void complete(TarantoolPacket packet, TarantoolOp<?> future);
 ```
 
+### Client config options
+
+The client configuration options are represented through the `TarantoolClientConfig` class.
+
+Supported options are follow:
+
+1. `username` is used to authenticate and authorize an user in a Taratool server instance.
+   Default value is `null` that means client will attempt to auth as a *guest*.
+2. `password` is used to authenticate an user in a Taratool server instance.
+   Default value is `null`.
+3. `defaultRequestSize` used to be an initial binary buffer size in bytes to send requests.
+   Default value is `4096` (4 KB).
+4. `predictedFutures` is used to initialize an initial capacity of hash map which stores
+   response futures. The client is asynchronous under the hood even though it provides
+   a synchronous operations using `java.concurrent.CompletableFuture`.
+   Default value is `(1024 * 1024) / 0.75) + 1`.
+5. `writerThreadPriority` describes a priority of writer thread.
+   Default value is `Thread.NORM_PRIORITY` (5).
+6. `readerThreadPriority` describes a priority of reader thread.
+   Default value is `Thread.NORM_PRIORITY` (5).
+7. `sharedBufferSize` sets a shared buffer size in bytes (place where client collects
+   requests when socket is busy on write).
+   Default value is `8 * 1024 * 1024` (8 MB).
+8. `directWriteFactor` is used as a factor to calculate a threshold whether
+   request will be accommodated in the shared buffer. If the request size exceeds
+   `directWriteFactor * sharedBufferSize` request is sent directly.
+   Defualt value is `0.5`.
+9. `writeTimeoutMillis` sets the max time in ms to perform writing and send the bytes.
+    Default value is 60 * 1000 (1 minute).
+10. `useNewCall` configures whether client has to use new *CALL* request signature or old
+    one used to be active in Tarantool 1.6.
+    Default value is `true`.
+11. `initTimeoutMillis` sets a max time in ms to establish connection to the server
+    Default values is `60 * 1000L` (1 minute).
+12. `connectionTimeout` is a hint and can be passed to the socket providers which
+    implement `ConfigurableSocketChannelProvider` interface. This hint should be
+    interpreter as a connection timeout in ms per attempt where `0` means no limit.
+    This options restricts a time budget to perform one connection attempt, while
+    `initTimeoutMillis` limits an overall time to obtain a connection.
+    Default value is `2 * 1000` (2 seconds).
+13. `retryCount` is a hint and can be passed to the socket providers which
+    implement `ConfigurableSocketChannelProvider` interface. This hint should be
+    interpreter as a maximal number of attempts to connect to Tarantool instance.
+    Default value is `3`.  
+14. `operationExpiryTimeMillis` is a default request timeout in ms.
+    Default value is `1000` (1 second).
+
 ## Spring NamedParameterJdbcTemplate usage example
 
 The JDBC driver uses `TarantoolClient` implementation to provide a communication with server.
@@ -347,6 +394,20 @@ client.syncOps().insert(45, Arrays.asList(1, 1));
   new list. It may take some time to graceful disconnect from the current node.
   The client does its best to catch the moment when there are no pending responses
   and perform a reconnection.  
+
+### Client config options
+
+In addition to the options for [the standard client](#client-config-options), cluster
+config provides some extra options:
+
+1. `executor` defines an executor that will be used as a thread of execution to retry writes.
+   Default values is `null` which means the cluster client will use *a single thread executor*.
+2. `clusterDiscoveryEntryFunction` is a name of the stored function to be used to fetch list of
+   instances.
+   Default value is `null` (not set).
+3. `clusterDiscoveryDelayMillis` describes how often in ms to poll the server for a new list of
+   cluster nodes.
+   Default value is `60 * 1000` (1 minute).
 
 ## Where to get help
 
