@@ -91,21 +91,45 @@ public class FireAndForgetClientOperationsIT {
 
     @Test
     public void testFireAndForgetOperations() {
+        testHelper.executeLua(
+            "box.space.basic_test:insert{1, '1'}",
+            "box.space.basic_test:insert{5, '5'}",
+            "box.space.basic_test:insert{10, '10'}",
+            "box.space.basic_test:insert{20, '20'}",
+            "box.space.basic_test:insert{30, '30'}"
+        );
+
         TarantoolClientOps<Integer, List<?>, Object, Long> ffOps = client.fireAndForgetOps();
 
-        Set<Long> syncIds = new HashSet<Long>();
+        Set<Long> syncIds = new HashSet<>();
 
-        syncIds.add(ffOps.insert(spaceId, Arrays.asList(10, "10")));
-        syncIds.add(ffOps.delete(spaceId, Collections.singletonList(10)));
+        syncIds.add(ffOps.delete(spaceId, Collections.singletonList(1)));
 
-        syncIds.add(ffOps.insert(spaceId, Arrays.asList(10, "10")));
+        syncIds.add(ffOps.insert(spaceId, Arrays.asList(2, "2")));
+
+        syncIds.add(ffOps.replace(spaceId, Arrays.asList(3, "3")));
+        syncIds.add(ffOps.replace(spaceId, Arrays.asList(5, "five")));
+
         syncIds.add(ffOps.update(spaceId, Collections.singletonList(10), Arrays.asList("=", 1, "ten")));
 
-        syncIds.add(ffOps.replace(spaceId, Arrays.asList(20, "20")));
-        syncIds.add(ffOps.upsert(spaceId, Collections.singletonList(20), Arrays.asList(20, "twenty"),
-            Arrays.asList("=", 1, "twenty")));
+        syncIds.add(
+            ffOps.upsert(
+                spaceId,
+                Collections.singletonList(20),
+                Arrays.asList(20, "twenty"),
+                Arrays.asList("=", 1, "twenty")
+            )
+        );
 
-        syncIds.add(ffOps.insert(spaceId, Arrays.asList(30, "30")));
+        syncIds.add(
+            ffOps.upsert(
+                spaceId,
+                Collections.singletonList(25),
+                Arrays.asList(25, "25"),
+                Arrays.asList("=", 1, "twenty five")
+            )
+        );
+
         syncIds.add(ffOps.call("box.space.basic_test:delete", Collections.singletonList(30)));
 
         // Check the syncs.
@@ -117,9 +141,66 @@ public class FireAndForgetClientOperationsIT {
         client.syncOps().ping();
 
         // Check the effects
+        assertEquals(Collections.emptyList(), consoleSelect(SPACE_NAME, 1));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 2), Arrays.asList(2, "2"));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 3), Arrays.asList(3, "3"));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 5), Arrays.asList(5, "five"));
         checkRawTupleResult(consoleSelect(SPACE_NAME, 10), Arrays.asList(10, "ten"));
         checkRawTupleResult(consoleSelect(SPACE_NAME, 20), Arrays.asList(20, "twenty"));
-        assertEquals(consoleSelect(SPACE_NAME, 30), Collections.emptyList());
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 25), Arrays.asList(25, "25"));
+        assertEquals(Collections.emptyList(), consoleSelect(SPACE_NAME, 30));
+    }
+
+    @Test
+    public void testFireAndForgetStringOperations() {
+        testHelper.executeLua(
+            "box.space.basic_test:insert{2, '2'}",
+            "box.space.basic_test:insert{20, '20'}",
+            "box.space.basic_test:insert{200, '200'}",
+            "box.space.basic_test:insert{2000, '2000'}"
+        );
+
+        TarantoolClientOps<Integer, List<?>, Object, Long> ffOps = client.fireAndForgetOps();
+        Set<Long> syncIds = new HashSet<>();
+
+        syncIds.add(ffOps.delete(SPACE_NAME, Collections.singletonList(2)));
+        syncIds.add(ffOps.insert(SPACE_NAME, Arrays.asList(3, "3")));
+        syncIds.add(ffOps.replace(spaceId, Arrays.asList(2000, "2k")));
+        syncIds.add(ffOps.replace(spaceId, Arrays.asList(3000, "3k")));
+        syncIds.add(ffOps.update(SPACE_NAME, Collections.singletonList(20), Arrays.asList("=", 1, "twenty")));
+        syncIds.add(
+            ffOps.upsert(
+                SPACE_NAME,
+                Collections.singletonList(200),
+                Arrays.asList(200, "200"),
+                Arrays.asList("=", 1, "two hundred")
+            )
+        );
+        syncIds.add(
+            ffOps.upsert(
+                SPACE_NAME,
+                Collections.singletonList(400),
+                Arrays.asList(400, "400"),
+                Arrays.asList("=", 1, "four hundred")
+            )
+        );
+
+        // Check the syncs.
+        assertFalse(syncIds.contains(0L));
+        assertEquals(7, syncIds.size());
+
+        // The reply for synchronous ping will
+        // indicate to us that previous fire & forget operations are completed.
+        client.syncOps().ping();
+
+        // Check the effects
+        assertEquals(consoleSelect(SPACE_NAME, 2), Collections.emptyList());
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 3), Arrays.asList(3, "3"));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 20), Arrays.asList(20, "twenty"));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 200), Arrays.asList(200, "two hundred"));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 400), Arrays.asList(400, "400"));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 2000), Arrays.asList(2000, "2k"));
+        checkRawTupleResult(consoleSelect(SPACE_NAME, 3000), Arrays.asList(3000, "3k"));
     }
 
     private List<?> consoleSelect(String spaceName, Object key) {

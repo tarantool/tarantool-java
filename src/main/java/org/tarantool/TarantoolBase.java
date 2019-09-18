@@ -6,10 +6,9 @@ import org.tarantool.protocol.TarantoolGreeting;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.channels.SocketChannel;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer, List<?>, Object, Result> {
+public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Result> {
     protected String serverVersion;
     protected MsgPackLite msgPackLite = MsgPackLite.INSTANCE;
     protected AtomicLong syncId = new AtomicLong();
@@ -38,16 +37,6 @@ public abstract class TarantoolBase<Result> extends AbstractTarantoolOps<Integer
                 channel.close();
             } catch (IOException ignored) {
                 // no-op
-            }
-        }
-    }
-
-    protected void validateArgs(Object[] args) {
-        if (args != null) {
-            for (int i = 0; i < args.length; i += 2) {
-                if (args[i + 1] == null) {
-                    throw new NullPointerException(((Key) args[i]).name() + " should not be null");
-                }
             }
         }
     }

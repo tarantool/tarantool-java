@@ -15,7 +15,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
@@ -159,13 +158,7 @@ public class ClientReconnectIT {
 
         client.close();
 
-        ExecutionException e = assertThrows(ExecutionException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                res.get();
-            }
-        });
-        assertEquals("Connection is closed.", e.getCause().getMessage());
+        ExecutionException e = assertThrows(ExecutionException.class, res::get);
     }
 
     /**
@@ -189,16 +182,12 @@ public class ClientReconnectIT {
 
         testHelper.stopInstance();
 
-        assertThrows(ExecutionException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                mustFail.get();
-            }
-        });
-
-        testHelper.startInstance();
+        ExecutionException executionException = assertThrows(ExecutionException.class, mustFail::get);
+        assertEquals(executionException.getCause().getClass(), CommunicationException.class);
 
         writeEnabled.set(true);
+        testHelper.startInstance();
+
 
         try {
             client.waitAlive(RESTART_TIMEOUT, TimeUnit.MILLISECONDS);

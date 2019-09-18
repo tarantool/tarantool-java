@@ -1,5 +1,11 @@
 package org.tarantool;
 
+import static org.tarantool.protocol.ProtoConstants.ERR_LOADING;
+import static org.tarantool.protocol.ProtoConstants.ERR_LOCAL_INSTANCE_ID_IS_READ_ONLY;
+import static org.tarantool.protocol.ProtoConstants.ERR_READONLY;
+import static org.tarantool.protocol.ProtoConstants.ERR_TIMEOUT;
+import static org.tarantool.protocol.ProtoConstants.ERR_WRONG_SCHEMA_VERSION;
+
 /**
  * A remote server error with error code and message.
  *
@@ -7,11 +13,6 @@ package org.tarantool;
  * @version $Id: $
  */
 public class TarantoolException extends RuntimeException {
-    /* taken from src/box/errcode.h */
-    public static final int ERR_READONLY = 7;
-    public static final int ERR_TIMEOUT = 78;
-    public static final int ERR_LOADING = 116;
-    public static final int ERR_LOCAL_INSTANCE_ID_IS_READ_ONLY = 128;
 
     private static final long serialVersionUID = 1L;
     long code;
@@ -60,6 +61,7 @@ public class TarantoolException extends RuntimeException {
         switch ((int) code) {
         case ERR_READONLY:
         case ERR_TIMEOUT:
+        case ERR_WRONG_SCHEMA_VERSION:
         case ERR_LOADING:
         case ERR_LOCAL_INSTANCE_ID_IS_READ_ONLY:
             return true;

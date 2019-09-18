@@ -29,8 +29,9 @@ public class TarantoolPacket {
                     potenticalCode != null ? potenticalCode.getClass().toString() : "null"
             );
         }
+        Long code = (Long) potenticalCode;
 
-        return (Long) potenticalCode;
+        return code == 0 ? code : ProtoUtils.extractErrorCode(code);
     }
 
     public Long getSync() {
@@ -47,5 +48,17 @@ public class TarantoolPacket {
 
     public boolean hasBody() {
         return body != null && body.size() > 0;
+    }
+
+    public long getSchemaId() {
+        return (Long) headers.get(Key.SCHEMA_ID.getId());
+    }
+
+    public Object getData() {
+        return hasBody() ? body.get(Key.DATA.getId()) : null;
+    }
+
+    public Object getError() {
+        return hasBody() ? body.get(Key.ERROR.getId()) : null;
     }
 }

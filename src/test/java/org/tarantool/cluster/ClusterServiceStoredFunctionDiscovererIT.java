@@ -9,7 +9,6 @@ import static org.tarantool.TestUtils.makeDefaultClusterClientConfig;
 import static org.tarantool.TestUtils.makeDiscoveryFunction;
 
 import org.tarantool.CommunicationException;
-import org.tarantool.TarantoolClient;
 import org.tarantool.TarantoolClientImpl;
 import org.tarantool.TarantoolClusterClientConfig;
 import org.tarantool.TarantoolException;
@@ -36,7 +35,7 @@ public class ClusterServiceStoredFunctionDiscovererIT {
     private static TarantoolTestHelper testHelper;
 
     private TarantoolClusterClientConfig clusterConfig;
-    private TarantoolClient client;
+    private TarantoolClientImpl client;
 
     @BeforeAll
     public static void setupEnv() {

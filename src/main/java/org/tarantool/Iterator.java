@@ -1,5 +1,7 @@
 package org.tarantool;
 
+import java.util.Arrays;
+
 // Iterator info was taken from here https://github.com/tarantool/tarantool/blob/f66584c3bcdffe61d6d99a4868a9b72d62338a11/src/box/iterator_type.h#L62
 public enum Iterator {
     EQ(0), // key == x ASC order
@@ -24,4 +26,12 @@ public enum Iterator {
     public int getValue() {
         return value;
     }
+
+    public static Iterator valueOf(int value) {
+        return Arrays.stream(Iterator.values())
+            .filter(v -> value == v.getValue())
+            .findFirst()
+            .orElseThrow(IllegalArgumentException::new);
+    }
+
 }

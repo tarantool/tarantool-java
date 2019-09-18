@@ -276,7 +276,7 @@ public class TestUtils {
         config.username = TarantoolTestHelper.USERNAME;
         config.password = TarantoolTestHelper.PASSWORD;
         config.initTimeoutMillis = 2000;
-        config.operationExpiryTimeMillis = 1000;
+        config.operationExpiryTimeMillis = 2000;
         config.sharedBufferSize = 128;
         config.executor = null;
         return config;

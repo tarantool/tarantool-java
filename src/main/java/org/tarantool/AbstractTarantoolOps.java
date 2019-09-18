@@ -1,62 +1,204 @@
 package org.tarantool;
 
+import static org.tarantool.TarantoolRequestArgumentFactory.cacheLookupValue;
+import static org.tarantool.TarantoolRequestArgumentFactory.value;
 
-public abstract class AbstractTarantoolOps<Space, Tuple, Operation, Result>
-    implements TarantoolClientOps<Space, Tuple, Operation, Result> {
+import org.tarantool.schema.TarantoolSchemaMeta;
+
+import java.util.List;
+
+public abstract class AbstractTarantoolOps<Result>
+    implements TarantoolClientOps<Integer, List<?>, Object, Result> {
 
     private Code callCode = Code.CALL;
 
-    protected abstract Result exec(Code code, Object... args);
+    protected abstract Result exec(TarantoolRequest request);
 
-    public Result select(Space space, Space index, Tuple key, int offset, int limit, Iterator iterator) {
+    protected abstract TarantoolSchemaMeta getSchemaMeta();
+
+    public Result select(Integer space, Integer index, List<?> key, int offset, int limit, Iterator iterator) {
         return select(space, index, key, offset, limit, iterator.getValue());
     }
 
-    public Result select(Space space, Space index, Tuple key, int offset, int limit, int iterator) {
+    @Override
+    public Result select(String space, String index, List<?> key, int offset, int limit, Iterator iterator) {
+        return select(space, index, key, offset, limit, iterator.getValue());
+    }
+
+    @Override
+    public Result select(Integer space, Integer index, List<?> key, int offset, int limit, int iterator) {
         return exec(
-            Code.SELECT,
-            Key.SPACE, space,
-            Key.INDEX, index,
-            Key.KEY, key,
-            Key.ITERATOR, iterator,
-            Key.LIMIT, limit,
-            Key.OFFSET, offset
+            new TarantoolRequest(
+                Code.SELECT,
+                value(Key.SPACE), value(space),
+                value(Key.INDEX), value(index),
+                value(Key.KEY), value(key),
+                value(Key.ITERATOR), value(iterator),
+                value(Key.LIMIT), value(limit),
+                value(Key.OFFSET), value(offset)
+            )
         );
     }
 
-    public Result insert(Space space, Tuple tuple) {
-        return exec(Code.INSERT, Key.SPACE, space, Key.TUPLE, tuple);
+    @Override
+    public Result select(String space, String index, List<?> key, int offset, int limit, int iterator) {
+        return exec(
+            new TarantoolRequest(
+                Code.SELECT,
+                value(Key.SPACE), cacheLookupValue(() -> getSchemaMeta().getSpace(space).getId()),
+                value(Key.INDEX), cacheLookupValue(() -> getSchemaMeta().getSpaceIndex(space, index).getId()),
+                value(Key.KEY), value(key),
+                value(Key.ITERATOR), value(iterator),
+                value(Key.LIMIT), value(limit),
+                value(Key.OFFSET), value(offset)
+            )
+        );
     }
 
-    public Result replace(Space space, Tuple tuple) {
-        return exec(Code.REPLACE, Key.SPACE, space, Key.TUPLE, tuple);
+    @Override
+    public Result insert(Integer space, List<?> tuple) {
+        return exec(new TarantoolRequest(
+                Code.INSERT,
+                value(Key.SPACE), value(space),
+                value(Key.TUPLE), value(tuple)
+            )
+        );
     }
 
-    public Result update(Space space, Tuple key, Operation... args) {
-        return exec(Code.UPDATE, Key.SPACE, space, Key.KEY, key, Key.TUPLE, args);
+    @Override
+    public Result insert(String space, List<?> tuple) {
+        return exec(
+            new TarantoolRequest(
+                Code.INSERT,
+                value(Key.SPACE), cacheLookupValue(() -> getSchemaMeta().getSpace(space).getId()),
+                value(Key.TUPLE), value(tuple)
+            )
+        );
     }
 
-    public Result upsert(Space space, Tuple key, Tuple def, Operation... args) {
-        return exec(Code.UPSERT, Key.SPACE, space, Key.KEY, key, Key.TUPLE, def, Key.UPSERT_OPS, args);
+    @Override
+    public Result replace(Integer space, List<?> tuple) {
+        return exec(
+            new TarantoolRequest(
+                Code.REPLACE,
+                value(Key.SPACE), value(space),
+                value(Key.TUPLE), value(tuple)
+            )
+        );
     }
 
-    public Result delete(Space space, Tuple key) {
-        return exec(Code.DELETE, Key.SPACE, space, Key.KEY, key);
+    @Override
+    public Result replace(String space, List<?> tuple) {
+        return exec(
+            new TarantoolRequest(
+                Code.REPLACE,
+                value(Key.SPACE), cacheLookupValue(() -> getSchemaMeta().getSpace(space).getId()),
+                value(Key.TUPLE), value(tuple)
+            )
+        );
     }
 
+    @Override
+    public Result update(Integer space, List<?> key, Object... operations) {
+        return exec(
+            new TarantoolRequest(
+                Code.UPDATE,
+                value(Key.SPACE), value(space),
+                value(Key.KEY), value(key),
+                value(Key.TUPLE), value(operations)
+            )
+        );
+    }
+
+    @Override
+    public Result update(String space, List<?> key, Object... operations) {
+        return exec(
+            new TarantoolRequest(
+                Code.UPDATE,
+                value(Key.SPACE), cacheLookupValue(() -> getSchemaMeta().getSpace(space).getId()),
+                value(Key.KEY), value(key),
+                value(Key.TUPLE), value(operations)
+            )
+        );
+    }
+
+    @Override
+    public Result upsert(Integer space, List<?> key, List<?> defTuple, Object... operations) {
+        return exec(
+            new TarantoolRequest(
+                Code.UPSERT,
+                value(Key.SPACE), value(space),
+                value(Key.KEY), value(key),
+                value(Key.TUPLE), value(defTuple),
+                value(Key.UPSERT_OPS), value(operations)
+            )
+        );
+    }
+
+    @Override
+    public Result upsert(String space, List<?> key, List<?> defTuple, Object... operations) {
+        return exec(
+            new TarantoolRequest(
+                Code.UPSERT,
+                value(Key.SPACE), cacheLookupValue(() -> getSchemaMeta().getSpace(space).getId()),
+                value(Key.KEY), value(key),
+                value(Key.TUPLE), value(defTuple),
+                value(Key.UPSERT_OPS), value(operations)
+            )
+        );
+    }
+
+    @Override
+    public Result delete(Integer space, List<?> key) {
+        return exec(
+            new TarantoolRequest(
+                Code.DELETE,
+                value(Key.SPACE), value(space),
+                value(Key.KEY), value(key)
+            )
+        );
+    }
+
+    @Override
+    public Result delete(String space, List<?> key) {
+        return exec(
+            new TarantoolRequest(
+                Code.DELETE,
+                value(Key.SPACE), cacheLookupValue(() -> getSchemaMeta().getSpace(space).getId()),
+                value(Key.KEY), value(key)
+            )
+        );
+    }
+
+    @Override
     public Result call(String function, Object... args) {
-        return exec(callCode, Key.FUNCTION, function, Key.TUPLE, args);
+        return exec(
+            new TarantoolRequest(
+                callCode,
+                value(Key.FUNCTION), value(function),
+                value(Key.TUPLE), value(args)
+            )
+        );
     }
 
+    @Override
     public Result eval(String expression, Object... args) {
-        return exec(Code.EVAL, Key.EXPRESSION, expression, Key.TUPLE, args);
+        return exec(
+            new TarantoolRequest(
+                Code.EVAL,
+                value(Key.EXPRESSION), value(expression),
+                value(Key.TUPLE), value(args)
+            )
+        );
     }
 
+    @Override
     public void ping() {
-        exec(Code.PING);
+        exec(new TarantoolRequest(Code.PING));
     }
 
     public void setCallCode(Code callCode) {
         this.callCode = callCode;
     }
+
 }

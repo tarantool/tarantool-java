@@ -580,12 +580,10 @@ public class TarantoolClientOpsIT {
     @MethodSource("getClientOps")
     public void testInsertDuplicateKey(SyncOpsProvider provider) {
         final List tup = Arrays.asList(1, "uno");
-        TarantoolException ex = assertThrows(TarantoolException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                provider.getClientOps().insert(spaceId, tup);
-            }
-        });
+        TarantoolException ex = assertThrows(
+            TarantoolException.class,
+            () -> provider.getClientOps().insert(spaceId, tup)
+        );
         assertEquals("Duplicate key exists in unique index 'pk' in space 'basic_test'", ex.getMessage());
 
         // Check the tuple stayed intact.

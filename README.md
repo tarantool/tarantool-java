@@ -131,7 +131,7 @@ Feel free to override any method of `TarantoolClientImpl`. For example, to hook
 all the results, you could override this:
 
 ```java
-protected void complete(TarantoolPacket packet, TarantoolOp<?> future);
+protected void complete(TarantoolPacket packet, CompletableFuture<?> future);
 ```
 
 ### Client config options
@@ -180,6 +180,55 @@ Supported options are follow:
     Default value is `3`.  
 14. `operationExpiryTimeMillis` is a default request timeout in ms.
     Default value is `1000` (1 second).
+
+## String space/index resolution
+
+Each operation that requires space or index to be executed, can work with
+number ID as well as string name of a space or an index.
+Assume, we have `my_space` space with space ID `512` and its primary index
+`primary` with index ID `0`. Then, for instance, `select` operations can be
+performed using their names:
+
+```java
+client.syncOps().select(512, 0, Collections.singletonList(1), 0, 1, Iterator.EQ);
+// or using more convenient way
+client.syncOps().select("my_space", "primary", Collections.singletonList(1), 0, 1, Iterator.EQ);
+```
+
+Because _iproto_ has not yet supported string spaces and indexes, a client caches current server
+schema in memory. The client relies on protocol SCHEMA_ID and sends each request with respect to
+cached schema version. The schema is used primarily to resolve string names of spaces or indexes
+against its integer IDs.
+
+### Schema update
+
+1. Just after a (re-)connection to the Tarantool instance.
+   The client cannot guarantee that new instance is the same and has same schema,
+   thus, the client drops the cached schema and fetches new one.
+2. Receiving a schema version error as a response to our request.
+   It's possible some request can be rejected by server because of schema
+   mismatching between client and server. In this case the schema will be
+   reloaded and the refused request will be resent using the updated schema
+   version.
+3. Sending a DDL request and receiving a new version in a response.
+4. Sending a request against a non-existent space/index name.
+   The client cannot exactly know whether name was not found because of
+   it does not exist or it has not the latest schema version. A ping request
+   is sent in the case to check a schema version and then a client will reload
+   it if needed. The original request will be retried if a space / an index
+   name will be found in a new schema.
+
+### Schema support caveats
+
+1. Each schema reloading requires at least two extra requests to fetch spaces and
+   indexes metadata respectively. There is also a ping request followed by reloading
+   of the schema to check whether the client has outdated version (see point 4 in
+   [Schema update](#schema-update)).
+2. In some circumstance, requests can be rejected several times until both client's
+   and server's versions matches. It may take significant amount of time or even be
+   a cause of request timeout.
+3. The client guarantees an order of synchronous requests per thread. Other cases such
+   as asynchronous or multi-threaded requests may be out of order before the execution.
 
 ## Spring NamedParameterJdbcTemplate usage example
 

@@ -1,12 +1,12 @@
 package org.tarantool.jdbc;
 
-import org.tarantool.Code;
 import org.tarantool.CommunicationException;
-import org.tarantool.Key;
 import org.tarantool.SocketChannelProvider;
 import org.tarantool.SqlProtoUtils;
 import org.tarantool.TarantoolClientConfig;
 import org.tarantool.TarantoolClientImpl;
+import org.tarantool.TarantoolOperation;
+import org.tarantool.TarantoolRequest;
 import org.tarantool.protocol.TarantoolPacket;
 import org.tarantool.util.JdbcConstants;
 import org.tarantool.util.SQLStates;
@@ -32,6 +32,8 @@ import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
@@ -538,8 +541,8 @@ public class SQLConnection implements TarantoolConnection {
         checkNotClosed();
         SQLTarantoolClientImpl.SQLRawOps sqlOps = client.sqlRawOps();
         SQLBatchResultHolder batchResult = useNetworkTimeout(timeout)
-             ? sqlOps.executeBatch(queries)
-             : sqlOps.executeBatch(timeout, queries);
+            ? sqlOps.executeBatch(queries)
+            : sqlOps.executeBatch(timeout, queries);
 
         return batchResult;
     }
@@ -734,13 +737,13 @@ public class SQLConnection implements TarantoolConnection {
     static class SQLTarantoolClientImpl extends TarantoolClientImpl {
 
         private Future<?> executeQuery(SQLQueryHolder queryHolder) {
-            return exec(Code.EXECUTE, Key.SQL_TEXT, queryHolder.getQuery(), Key.SQL_BIND, queryHolder.getParams());
+            return exec(makeSqlRequest(queryHolder.getQuery(), queryHolder.getParams()));
         }
 
         private Future<?> executeQuery(SQLQueryHolder queryHolder, long timeoutMillis) {
-            return exec(
-                timeoutMillis, Code.EXECUTE, Key.SQL_TEXT, queryHolder.getQuery(), Key.SQL_BIND, queryHolder.getParams()
-            );
+            TarantoolRequest request = makeSqlRequest(queryHolder.getQuery(), queryHolder.getParams());
+            request.setTimeout(Duration.of(timeoutMillis, ChronoUnit.MILLIS));
+            return exec(request);
         }
 
         final SQLRawOps sqlRawOps = new SQLRawOps() {
@@ -809,12 +812,12 @@ public class SQLConnection implements TarantoolConnection {
         }
 
         @Override
-        protected void completeSql(TarantoolOp<?> future, TarantoolPacket pack) {
+        protected void completeSql(TarantoolOperation operation, TarantoolPacket pack) {
             Long rowCount = SqlProtoUtils.getSQLRowCount(pack);
             SQLResultHolder result = (rowCount == null)
                 ? SQLResultHolder.ofQuery(SqlProtoUtils.getSQLMetadata(pack), SqlProtoUtils.getSQLData(pack))
                 : SQLResultHolder.ofUpdate(rowCount.intValue(), SqlProtoUtils.getSQLAutoIncrementIds(pack));
-            ((TarantoolOp) future).complete(result);
+            ((CompletableFuture) operation.getResult()).complete(result);
         }
 
         interface SQLRawOps {

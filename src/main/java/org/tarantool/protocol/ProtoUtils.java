@@ -213,7 +213,7 @@ public abstract class ProtoUtils {
     private static void assertNoErrCode(TarantoolPacket authResponse) {
         Long code = (Long) authResponse.getHeaders().get(Key.CODE.getId());
         if (code != 0) {
-            Object error = authResponse.getBody().get(Key.ERROR.getId());
+            Object error = authResponse.getError();
             String errorMsg = error instanceof String ? (String) error : new String((byte[]) error);
             throw new TarantoolException(code, errorMsg);
         }
@@ -305,7 +305,22 @@ public abstract class ProtoUtils {
         return buffer;
     }
 
+    /**
+     * Extracts an error code.
+     *
+     * @param code in 0x8XXX format
+     *
+     * @return actual error code (which is a XXX part)
+     */
+    public static long extractErrorCode(long code) {
+        if ((code & ProtoConstants.ERROR_TYPE_MARKER) == 0) {
+            throw new IllegalArgumentException(String.format("Code %h does not follow 0x8XXX format", code));
+        }
+        return (~ProtoConstants.ERROR_TYPE_MARKER & code);
+    }
+
     private static class ByteArrayOutputStream extends java.io.ByteArrayOutputStream {
+
         public ByteArrayOutputStream(int size) {
             super(size);
         }
@@ -313,6 +328,7 @@ public abstract class ProtoUtils {
         ByteBuffer toByteBuffer() {
             return ByteBuffer.wrap(buf, 0, count);
         }
+
     }
 
 }

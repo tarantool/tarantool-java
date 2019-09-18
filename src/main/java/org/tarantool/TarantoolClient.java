@@ -1,5 +1,7 @@
 package org.tarantool;
 
+import org.tarantool.schema.TarantoolSchemaMeta;
+
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
@@ -28,5 +30,7 @@ public interface TarantoolClient {
     void waitAlive() throws InterruptedException;
 
     boolean waitAlive(long timeout, TimeUnit unit) throws InterruptedException;
+
+    TarantoolSchemaMeta getSchemaMeta();
 
 }

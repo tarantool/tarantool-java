@@ -1,11 +1,12 @@
 package org.tarantool.cluster;
 
-import org.tarantool.TarantoolClient;
+import org.tarantool.TarantoolClientImpl;
 import org.tarantool.TarantoolClientOps;
 import org.tarantool.TarantoolClusterClientConfig;
 import org.tarantool.logging.Logger;
 import org.tarantool.logging.LoggerFactory;
 import org.tarantool.util.StringUtils;
+import org.tarantool.util.TupleTwo;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -14,34 +15,37 @@ import java.util.Set;
 /**
  * A cluster nodes discoverer based on calling a predefined function
  * which returns list of nodes.
- *
+ * <p>
  * The function has to have no arguments and return list of
  * the strings which follow <code>host[:port]</code> format
+ * <p>
+ * This class is not a part of public API.
  */
 public class TarantoolClusterStoredFunctionDiscoverer implements TarantoolClusterDiscoverer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TarantoolClusterStoredFunctionDiscoverer.class);
 
-    private TarantoolClient client;
+    private TarantoolClientImpl client;
     private String entryFunction;
 
-    public TarantoolClusterStoredFunctionDiscoverer(TarantoolClusterClientConfig clientConfig, TarantoolClient client) {
+    public TarantoolClusterStoredFunctionDiscoverer(TarantoolClusterClientConfig clientConfig,
+                                                    TarantoolClientImpl client) {
         this.client = client;
         this.entryFunction = clientConfig.clusterDiscoveryEntryFunction;
     }
 
     @Override
     public Set<String> getInstances() {
-        TarantoolClientOps<Integer, List<?>, Object, List<?>> syncOperations = client.syncOps();
+        TarantoolClientOps<Integer, List<?>, Object, TupleTwo<List<?>, Long>> syncOperations = client.unsafeSchemaOps();
 
-        List<?> list = syncOperations.call(entryFunction);
+        TupleTwo<List<?>, Long> result = syncOperations.call(entryFunction);
         // discoverer expects a single array result from the function now;
         // in order to protect this contract the discoverer does a strict
         // validation against the data returned;
         // this strict-mode allows us to extend the contract in a non-breaking
         // way for old clients just reserve an extra return value in
         // terms of Lua multi-result support.;
-        return checkAndFilterAddresses(list);
+        return checkAndFilterAddresses(result.getFirst());
     }
 
     /**
