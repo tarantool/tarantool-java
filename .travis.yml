@@ -13,6 +13,7 @@ env:
   - TNT_VERSION=1.10
   - TNT_VERSION=2x
   - TNT_VERSION=2.2
+  - TNT_VERSION=2.3
 
 stages:
   - checkstyle
