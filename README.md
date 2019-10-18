@@ -24,13 +24,14 @@ To get the Java connector for Tarantool 1.6.9, visit
 
 ## Getting started
 
-1. Add a dependency to your `pom.xml` file:
+1. Add a dependency to your `pom.xml` file (look for a last version on the
+   [releases page](https://github.com/tarantool/tarantool-java/releases)):
 
 ```xml
 <dependency>
   <groupId>org.tarantool</groupId>
   <artifactId>connector</artifactId>
-  <version>1.9.1</version>
+  <version>1.9.2</version>
 </dependency>
 ```
 
