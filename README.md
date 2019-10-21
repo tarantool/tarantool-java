@@ -160,7 +160,7 @@ Supported options are follow:
 8. `directWriteFactor` is used as a factor to calculate a threshold whether
    request will be accommodated in the shared buffer. If the request size exceeds
    `directWriteFactor * sharedBufferSize` request is sent directly.
-   Defualt value is `0.5`.
+   Default value is `0.5`.
 9. `writeTimeoutMillis` sets the max time in ms to perform writing and send the bytes.
     Default value is 60 * 1000 (1 minute).
 10. `useNewCall` configures whether client has to use new *CALL* request signature or old
@@ -254,7 +254,7 @@ stmt.addBatch();
 int[] updateCounts = stmt.executeBatch();
 ```
 
-The connector uses a pipeliing when it performs a batch request. It means
+The connector uses a pipelining when it performs a batch request. It means
 each query is asynchronously sent one-by-one in order they were specified
 in the batch.
 
