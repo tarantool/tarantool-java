@@ -270,6 +270,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
      * {@code timeoutMillis} will override the default
      * timeout. 0 means the limitless operation.
      *
+     * @param timeoutMillis operation timeout
      * @param code operation code
      * @param args operation arguments
      *
@@ -736,6 +737,11 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         /**
          * Missed in jdk8 CompletableFuture operator to limit execution
          * by time.
+         *
+         * @param timeout execution timeout
+         * @param unit measurement unit for given timeout value
+         *
+         * @return a future on which the method is called
          */
         public TarantoolOp<V> orTimeout(long timeout, TimeUnit unit) {
             if (timeout < 0) {
@@ -838,6 +844,8 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
         /**
          * Set CLOSED state, drop RECONNECT state.
+         *
+         * @return whether a state was changed to CLOSED
          */
         protected boolean close() {
             for (; ; ) {
@@ -856,9 +864,13 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         }
 
         /**
-         * Move from a current state to a give one.
+         * Move from a current state to a given one.
          * <p>
          * Some moves are forbidden.
+         *
+         * @param mask union of states
+         *
+         * @return whether a state was changed to given one
          */
         protected boolean acquire(int mask) {
             for (; ; ) {
@@ -913,6 +925,10 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
         /**
          * Reconnection uses another way to await state via receiving a signal
          * instead of latches.
+         *
+         * @param state desired state
+         *
+         * @throws InterruptedException if the current thread is interrupted
          */
         protected void awaitState(int state) throws InterruptedException {
             if (state == RECONNECT) {

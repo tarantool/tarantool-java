@@ -38,6 +38,7 @@ public abstract class ProtoUtils {
      * Reads tarantool binary protocol's packet from {@code inputStream}.
      *
      * @param inputStream ready to use input stream
+     * @param msgPackLite MessagePack decoder instance
      *
      * @return Nonnull instance of packet
      *
@@ -64,6 +65,7 @@ public abstract class ProtoUtils {
      *
      * @param bufferReader readable channel that have to be in blocking mode
      *                     or instance of {@link ReadableViaSelectorChannel}
+     * @param msgPackLite MessagePack decoder instance
      *
      * @return tarantool binary protocol message wrapped by instance of {@link TarantoolPacket}
      *
@@ -121,6 +123,7 @@ public abstract class ProtoUtils {
      * @param socket   a socket channel to a tarantool node
      * @param username auth username
      * @param password auth password
+     * @param msgPackLite MessagePack encoder / decoder instance
      *
      * @return object with information about a connection/
      *
@@ -163,6 +166,7 @@ public abstract class ProtoUtils {
      * @param channel  a socket channel to tarantool node. The channel have to be in blocking mode
      * @param username auth username
      * @param password auth password
+     * @param msgPackLite MessagePack encoder / decoder instance
      *
      * @return object with information about a connection/
      *

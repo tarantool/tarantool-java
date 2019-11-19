@@ -17,6 +17,7 @@ import java.util.ServiceLoader;
  * } </pre>
  * <p>
  * There are four major attempts to load the logger provider:
+ * <ol>
  * <li>
  * Use a runtime system property {@literal org.tarantool.logging.provider}.
  * Possible values are 'slf4j' or 'jdk'. (for instance,
@@ -32,6 +33,7 @@ import java.util.ServiceLoader;
  * <li>
  * Use JUL implementation if none of above attempts are successful.
  * </li>
+ * </ol>
  * <p>
  * This class is not a part of public API.
  */

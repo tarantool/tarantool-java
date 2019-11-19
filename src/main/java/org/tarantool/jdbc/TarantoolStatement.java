@@ -12,6 +12,9 @@ public interface TarantoolStatement extends Statement {
     /**
      * Checks for statement completion and closes itself,
      * according to {@link Statement#closeOnCompletion()}.
+     *
+     * @throws SQLException if this method is called on a closed
+     *                      {@code Statement}
      */
     void checkCompletion() throws SQLException;
 
