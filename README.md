@@ -56,7 +56,7 @@ SocketChannelProvider socketChannelProvider = new SingleSocketChannelProviderImp
 TarantoolClient client = new TarantoolClientImpl(socketChannelProvider, config);
 ```
 
-You could implement your own `SocketChannelProvider`. It should return 
+You could implement your own `SocketChannelProvider`. It should return
 a connected `SocketChannel`. Feel free to implement `get(int retryNumber, Throwable lastError)`
 using your appropriate strategy to obtain the channel. The strategy can take into
 account current attempt number (retryNumber) and the last transient error occurred on
@@ -177,7 +177,7 @@ Supported options are follow:
 13. `retryCount` is a hint and can be passed to the socket providers which
     implement `ConfigurableSocketChannelProvider` interface. This hint should be
     interpreter as a maximal number of attempts to connect to Tarantool instance.
-    Default value is `3`.  
+    Default value is `3`.
 14. `operationExpiryTimeMillis` is a default request timeout in ms.
     Default value is `1000` (1 second).
 
@@ -283,6 +283,31 @@ order in which they were added to the batch"
 - The driver continues processing the remaining commands in a batch once execution
 of a command fails.
 
+### Connection Fail-over
+
+To enable simple connection fail-over you can specify multiple nodes (host and port pairs) in the connection url. The
+driver will try to once connect to each of them in order until the connection succeeds. If none succeed, a normal
+connection exception is thrown.
+
+The syntax for the connection url is:
+
+jdbc:tarantool://[user-info@][nodes][?parameters]
+
+where
+* `user-info` is an optional colon separated username and password like `admin:secret`;
+* `nodes` is a set of comma separated pairs like `host1[:port1][,host2[:port2] ... ]`;
+* `parameters` is a set of optional cluster parameters (in addition to other ones) such as
+  `clusterDiscoveryEntryFunction` and `clusterDiscoveryDelayMillis` (see [Cluster support](#cluster-support) for more
+  details).
+
+For instance,
+
+jdbc:postgresql://tnt-node-1:3301,tnt-node2,tnt-node-3:3302?clusterDiscoveryEntryFunction=fetchNodes
+
+will try to connect to the Tarantool servers using initial set of nodes in the order they were listed in the URL. Also,
+there is `clusterDiscoveryEntryFunction` parameter specified to enable cluster nodes discovery that can refresh the list
+of available nodes.
+
 ## Cluster support
 
 To be more fault-tolerant the connector provides cluster extensions. In
@@ -307,7 +332,7 @@ connection to _one instance_ before failing an attempt. The provider requires
 positive retry count to work properly. The socket timeout is used to limit
 an interval between connections attempts per instance. In other words, the provider
 follows a pattern _connection should succeed after N attempts with M interval between
-them at max_. 
+them at max_.
 
 ### Basic cluster client usage
 
@@ -326,7 +351,7 @@ an initial list of nodes:
 ```java
 String[] nodes = new String[] { "myHost1:3301", "myHost2:3302", "myHost3:3301" };
 TarantoolClusterClient client = new TarantoolClusterClient(config, nodes);
-``` 
+```
 
 3. Work with the client using same API as defined in `TarantoolClient`:
 
@@ -336,10 +361,10 @@ client.syncOps().insert(23, Arrays.asList(1, 1));
 
 ### Auto-discovery
 
-Auto-discovery feature allows a cluster client to fetch addresses of 
+Auto-discovery feature allows a cluster client to fetch addresses of
 cluster nodes to reflect changes related to the cluster topology. To achieve
-this you have to create a Lua function on the server side which returns 
-a single array result. Client periodically polls the server to obtain a 
+this you have to create a Lua function on the server side which returns
+a single array result. Client periodically polls the server to obtain a
 fresh list and apply it if its content changes.
 
 1. On the server side create a function which returns nodes:
@@ -356,20 +381,20 @@ You need to pay attention to a function contract we are currently supporting:
   and an optional colon followed by digits of the port). Also, the port must be
   in a range between 1 and 65535 if one is presented.
 * A discovery function _may_ return multi-results but the client takes
-  into account only first of them (i.e. `return {'host:3301'}, discovery_delay`, where 
+  into account only first of them (i.e. `return {'host:3301'}, discovery_delay`, where
   the second result is unused). Even more, any extra results __are reserved__ by the client
   in order to extend its contract with a backward compatibility.
 * A discovery function _should NOT_ return no results, empty result, wrong type result,
   and Lua errors. The client discards such kinds of results but it does not affect the discovery
-  process for next scheduled tasks. 
+  process for next scheduled tasks.
 
 2. On the client side configure discovery settings in `TarantoolClusterClientConfig`:
 
 ```java
 TarantoolClusterClientConfig config = new TarantoolClusterClientConfig();
 // fill other settings
-config.clusterDiscoveryEntryFunction = "get_cluster_nodes"; // discovery function used to fetch nodes 
-config.clusterDiscoveryDelayMillis = 60_000;                // how often client polls the discovery server  
+config.clusterDiscoveryEntryFunction = "get_cluster_nodes"; // discovery function used to fetch nodes
+config.clusterDiscoveryDelayMillis = 60_000;                // how often client polls the discovery server
 ```
 
 3. Create a client using the config made above.
@@ -383,21 +408,21 @@ client.syncOps().insert(45, Arrays.asList(1, 1));
 
 * You need to set _not empty_ value to `clusterDiscoveryEntryFunction` to enable auto-discovery feature.
 * There are only two cases when a discovery task runs: just after initialization of the cluster
-  client and a periodical scheduler timeout defined in `TarantoolClusterClientConfig.clusterDiscoveryDelayMillis`. 
+  client and a periodical scheduler timeout defined in `TarantoolClusterClientConfig.clusterDiscoveryDelayMillis`.
 * A discovery task always uses an active client connection to get the nodes list.
   It's in your responsibility to provide a function availability as well as a consistent
   nodes list on all instances you initially set or obtain from the task.
 * Every address which is unmatched with `host[:port]` pattern will be filtered out from
   the target addresses list.
 * If some error occurs while a discovery task is running then this task
-  will be aborted without any after-effects for next task executions. These cases, for instance, are 
-  a wrong function result (see discovery function contract) or a broken connection. 
+  will be aborted without any after-effects for next task executions. These cases, for instance, are
+  a wrong function result (see discovery function contract) or a broken connection.
   There is an exception if the client is closed then discovery process will stop permanently.
 * It's possible to obtain a list which does NOT contain the node we are currently
-  connected to. It leads the client to try to reconnect to another node from the 
+  connected to. It leads the client to try to reconnect to another node from the
   new list. It may take some time to graceful disconnect from the current node.
   The client does its best to catch the moment when there are no pending responses
-  and perform a reconnection.  
+  and perform a reconnection.
 
 ### Cluster client config options
 
@@ -425,7 +450,7 @@ directly via SLF4J interface.
 The logging facade offers several ways in integrate its internal logging with foreign one in order:
 
 * Using system property `org.tarantool.logging.provider`. Supported values are *jdk* and *slf4j*
-  for the java util logging and SLF4J/Logback respectively. For instance, use 
+  for the java util logging and SLF4J/Logback respectively. For instance, use
   `java -Dorg.tarantool.logging.provider=slf4j <...>`.
 
 * Using Java SPI mechanism. Implement your own provider org.tarantool.logging.LoggerProvider
@@ -437,7 +462,7 @@ cat META-INF/services/org.tarantool.logging.LoggerProvider
 org.mydomain.MySimpleLoggerProvider
 ```
 
-* CLASSPATH exploring. Now, the connector will use SLF4J if Logback is also in use. 
+* CLASSPATH exploring. Now, the connector will use SLF4J if Logback is also in use.
 
 * If nothing is successful JUL will be used by default.
 
@@ -452,10 +477,10 @@ org.mydomain.MySimpleLoggerProvider
 ## Building
 
 To run unit tests use:
- 
+
 ```bash
 ./mvnw clean test
-``` 
+```
 
 To run integration tests use:
 

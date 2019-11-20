@@ -8,21 +8,21 @@ import java.util.Properties;
 public enum SQLProperty {
     HOST(
         "host",
-        "Tarantool server host",
+        "Tarantool server host (may be specified in the URL directly)",
         "localhost",
         null,
         true
     ),
     PORT(
         "port",
-        "Tarantool server port",
+        "Tarantool server port (may be specified in the URL directly)",
         "3301",
         null,
         true
     ),
     SOCKET_CHANNEL_PROVIDER(
         "socketChannelProvider",
-        "SocketProvider class implements org.tarantool.SocketChannelProvider",
+        "SocketProvider class that implements org.tarantool.SocketChannelProvider",
         null,
         null,
         false
@@ -54,6 +54,22 @@ public enum SQLProperty {
         "The number of milliseconds to wait before a timeout is occurred for the query. " +
             "The default value is 0 (infinite) timeout.",
         "0",
+        null,
+        false
+    ),
+    CLUSTER_DISCOVERY_ENTRY_FUNCTION(
+        "clusterDiscoveryEntryFunction",
+        "The name of the stored function to be used to fetch list of Tarantool instances." +
+            "It's unspecified by default.",
+        null,
+        null,
+        false
+    ),
+    CLUSTER_DISCOVERY_DELAY_MILLIS(
+        "clusterDiscoveryDelayMillis",
+        "A java.util.concurrent.Executor implementation that will be used to retry sending queries " +
+            "during a reconnaction. Default value is not specified.",
+        "60000",
         null,
         false
     );

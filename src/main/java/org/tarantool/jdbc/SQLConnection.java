@@ -5,10 +5,11 @@ import org.tarantool.CommunicationException;
 import org.tarantool.Key;
 import org.tarantool.SocketChannelProvider;
 import org.tarantool.SqlProtoUtils;
-import org.tarantool.TarantoolClientConfig;
-import org.tarantool.TarantoolClientImpl;
+import org.tarantool.TarantoolClusterClient;
+import org.tarantool.TarantoolClusterClientConfig;
 import org.tarantool.protocol.TarantoolPacket;
 import org.tarantool.util.JdbcConstants;
+import org.tarantool.util.NodeSpec;
 import org.tarantool.util.SQLStates;
 
 import java.io.IOException;
@@ -43,6 +44,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Tarantool {@link Connection} implementation.
@@ -60,34 +62,64 @@ public class SQLConnection implements TarantoolConnection {
     private DatabaseMetaData cachedMetadata;
     private int resultSetHoldability = UNSET_HOLDABILITY;
 
-    public SQLConnection(String url, Properties properties) throws SQLException {
-        this.url = url;
-        this.properties = properties;
+    /**
+     * Creates a new connection to Tarantool server.
+     *
+     * @param originUrl raw URL string that was used to parse connection parameters
+     * @param properties extra parameters to configure a connection
+     *
+     * @deprecated use {@link #SQLConnection(String, List, Properties)} instead
+     */
+    @Deprecated
+    public SQLConnection(String originUrl, Properties properties) throws SQLException {
+        this(originUrl, Collections.emptyList(), properties);
+    }
 
+    /**
+     * Creates a new connection to Tarantool server.
+     *
+     * @param originUrl  raw URL string that was used to parse connection parameters
+     * @param nodes      initial set of Tarantool nodes
+     * @param properties extra parameters to configure a connection
+     *
+     * @throws SQLException if any errors occur during the connecting
+     */
+    public SQLConnection(String originUrl,
+                         List<NodeSpec> nodes,
+                         Properties properties) throws SQLException {
+        this.url = originUrl;
+        this.properties = properties;
         try {
-            client = makeSqlClient(makeAddress(properties), makeConfigFromProperties(properties));
+            client = makeSqlClient(makeAddresses(nodes, properties), makeConfigFromProperties(properties));
         } catch (Exception e) {
             throw new SQLException("Couldn't initiate connection using " + SQLDriver.diagProperties(properties), e);
         }
     }
 
-    protected SQLTarantoolClientImpl makeSqlClient(String address, TarantoolClientConfig config) {
-        return new SQLTarantoolClientImpl(address, config);
+    protected SQLTarantoolClientImpl makeSqlClient(List<String> addresses, TarantoolClusterClientConfig config) {
+        return new SQLTarantoolClientImpl(addresses, config);
     }
 
-    private String makeAddress(Properties properties) throws SQLException {
-        String host = SQLProperty.HOST.getString(properties);
-        int port = SQLProperty.PORT.getInt(properties);
-        return host + ":" + port;
+    private List<String> makeAddresses(List<NodeSpec> nodes, Properties properties) throws SQLException {
+        List<String> addresses = nodes.stream()
+            .map(NodeSpec::toString)
+            .collect(Collectors.toList());
+        if (addresses.isEmpty()) {
+            addresses.add(SQLProperty.HOST.getString(properties) + ":" + SQLProperty.PORT.getString(properties));
+        }
+        return addresses;
     }
 
-    private TarantoolClientConfig makeConfigFromProperties(Properties properties) throws SQLException {
-        TarantoolClientConfig clientConfig = new TarantoolClientConfig();
+    private TarantoolClusterClientConfig makeConfigFromProperties(Properties properties) throws SQLException {
+        TarantoolClusterClientConfig clientConfig = new TarantoolClusterClientConfig();
         clientConfig.username = SQLProperty.USER.getString(properties);
         clientConfig.password = SQLProperty.PASSWORD.getString(properties);
 
         clientConfig.operationExpiryTimeMillis = SQLProperty.QUERY_TIMEOUT.getInt(properties);
         clientConfig.initTimeoutMillis = SQLProperty.LOGIN_TIMEOUT.getInt(properties);
+
+        clientConfig.clusterDiscoveryEntryFunction = SQLProperty.CLUSTER_DISCOVERY_ENTRY_FUNCTION.getString(properties);
+        clientConfig.clusterDiscoveryDelayMillis = SQLProperty.CLUSTER_DISCOVERY_DELAY_MILLIS.getInt(properties);
 
         return clientConfig;
     }
@@ -538,8 +570,8 @@ public class SQLConnection implements TarantoolConnection {
         checkNotClosed();
         SQLTarantoolClientImpl.SQLRawOps sqlOps = client.sqlRawOps();
         SQLBatchResultHolder batchResult = useNetworkTimeout(timeout)
-             ? sqlOps.executeBatch(queries)
-             : sqlOps.executeBatch(timeout, queries);
+            ? sqlOps.executeBatch(queries)
+            : sqlOps.executeBatch(timeout, queries);
 
         return batchResult;
     }
@@ -731,7 +763,7 @@ public class SQLConnection implements TarantoolConnection {
         return "Failed to execute SQL: " + query.getQuery() + ", params: " + query.getParams();
     }
 
-    static class SQLTarantoolClientImpl extends TarantoolClientImpl {
+    static class SQLTarantoolClientImpl extends TarantoolClusterClient {
 
         private Future<?> executeQuery(SQLQueryHolder queryHolder) {
             return exec(Code.EXECUTE, Key.SQL_TEXT, queryHolder.getQuery(), Key.SQL_BIND, queryHolder.getParams());
@@ -794,13 +826,13 @@ public class SQLConnection implements TarantoolConnection {
             }
         };
 
-        SQLTarantoolClientImpl(String address, TarantoolClientConfig config) {
-            super(address, config);
+        SQLTarantoolClientImpl(List<String> addresses, TarantoolClusterClientConfig config) {
+            super(config, addresses);
             msgPackLite = SQLMsgPackLite.INSTANCE;
         }
 
-        SQLTarantoolClientImpl(SocketChannelProvider socketProvider, TarantoolClientConfig config) {
-            super(socketProvider, config);
+        SQLTarantoolClientImpl(SocketChannelProvider socketProvider, TarantoolClusterClientConfig config) {
+            super(config, socketProvider);
             msgPackLite = SQLMsgPackLite.INSTANCE;
         }
 

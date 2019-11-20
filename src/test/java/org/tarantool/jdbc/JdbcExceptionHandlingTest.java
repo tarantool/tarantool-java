@@ -19,8 +19,8 @@ import static org.tarantool.jdbc.SQLDatabaseMetadata._VINDEX;
 import static org.tarantool.jdbc.SQLDatabaseMetadata._VSPACE;
 
 import org.tarantool.CommunicationException;
-import org.tarantool.TarantoolClientConfig;
 import org.tarantool.TarantoolClientOps;
+import org.tarantool.TarantoolClusterClientConfig;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -227,9 +227,10 @@ public class JdbcExceptionHandlingTest {
                                                  String url,
                                                  Properties properties)
         throws SQLException {
-        return new SQLConnection(url, properties) {
+        return new SQLConnection(url, Collections.emptyList(), properties) {
             @Override
-            protected SQLTarantoolClientImpl makeSqlClient(String address, TarantoolClientConfig config) {
+            protected SQLTarantoolClientImpl makeSqlClient(List<String> addresses,
+                                                           TarantoolClusterClientConfig config) {
                 return client;
             }
         };

@@ -11,12 +11,12 @@ import static org.junit.jupiter.api.Assertions.fail;
 import org.tarantool.CommunicationException;
 import org.tarantool.SocketChannelProvider;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.net.URI;
 import java.nio.channels.SocketChannel;
 import java.sql.Driver;
 import java.sql.DriverManager;
@@ -26,21 +26,28 @@ import java.util.Properties;
 
 public class JdbcDriverTest {
 
+    private SQLDriver driver;
+
+    @BeforeEach
+    void setUp() {
+        driver = new SQLDriver();
+    }
+
     @Test
     public void testParseQueryString() throws Exception {
-        SQLDriver drv = new SQLDriver();
-
         Properties prop = new Properties();
         SQLProperty.USER.setString(prop, "adm");
         SQLProperty.PASSWORD.setString(prop, "secret");
 
-        URI uri = new URI(String.format(
+        String uri = String.format(
             "jdbc:tarantool://server.local:3302?%s=%s&%s=%d",
-            SQLProperty.SOCKET_CHANNEL_PROVIDER.getName(), "some.class",
-            SQLProperty.QUERY_TIMEOUT.getName(), 5000)
+            SQLProperty.SOCKET_CHANNEL_PROVIDER.getName(),
+            "some.class",
+            SQLProperty.QUERY_TIMEOUT.getName(),
+            5000
         );
 
-        Properties result = drv.parseQueryString(uri, prop);
+        Properties result = driver.parseConnectionString(uri, prop);
         assertNotNull(result);
 
         assertEquals("server.local", SQLProperty.HOST.getString(result));
@@ -53,8 +60,7 @@ public class JdbcDriverTest {
 
     @Test
     public void testParseQueryStringUserInfoInURI() throws Exception {
-        SQLDriver drv = new SQLDriver();
-        Properties result = drv.parseQueryString(new URI("jdbc:tarantool://adm:secret@server.local"), null);
+        Properties result = driver.parseConnectionString("jdbc:tarantool://adm:secret@server.local", null);
         assertNotNull(result);
         assertEquals("server.local", SQLProperty.HOST.getString(result));
         assertEquals("3301", SQLProperty.PORT.getString(result));
@@ -63,7 +69,29 @@ public class JdbcDriverTest {
     }
 
     @Test
-    public void testParseQueryStringValidations() {
+    public void testParseWrongURL() throws Exception {
+        checkParseQueryStringValidation(
+            "jdbc:tarantool:adm:secret@server.local",
+            null,
+            "Invalid URL: '//' is not presented."
+        );
+    }
+
+    @Test
+    public void testParseMultiHostURI() throws Exception {
+        Properties result = driver.parseConnectionString(
+            "jdbc:tarantool://user:pwd@server.local,localhost:3301,192.168.0.1:3302",
+            null
+        );
+        assertNotNull(result);
+        assertEquals("server.local,localhost,192.168.0.1", SQLProperty.HOST.getString(result));
+        assertEquals("3301,3301,3302", SQLProperty.PORT.getString(result));
+        assertEquals("user", SQLProperty.USER.getString(result));
+        assertEquals("pwd", SQLProperty.PASSWORD.getString(result));
+    }
+
+    @Test
+    public void testParseWrongPort() {
         // Check non-number port
         checkParseQueryStringValidation("jdbc:tarantool://0",
             new Properties() {
@@ -78,43 +106,35 @@ public class JdbcDriverTest {
 
         // Check high port
         checkParseQueryStringValidation("jdbc:tarantool://0:65536", null, "Port is out of range: 65536");
+    }
 
-        // Check non-number init timeout
-        checkParseQueryStringValidation(
-            String.format("jdbc:tarantool://0:3301?%s=nan", SQLProperty.LOGIN_TIMEOUT.getName()),
-            null,
-            "Property loginTimeout must be a valid number."
-        );
-
-        // Check negative init timeout
-        checkParseQueryStringValidation(
-            String.format("jdbc:tarantool://0:3301?%s=-100", SQLProperty.LOGIN_TIMEOUT.getName()),
-            null,
-            "Property loginTimeout must not be negative."
-        );
-
-        // Check non-number operation timeout
-        checkParseQueryStringValidation(
-            String.format("jdbc:tarantool://0:3301?%s=nan", SQLProperty.QUERY_TIMEOUT.getName()),
-            null,
-            "Property queryTimeout must be a valid number."
-        );
-
-        // Check negative operation timeout
-        checkParseQueryStringValidation(
-            String.format("jdbc:tarantool://0:3301?%s=-100", SQLProperty.QUERY_TIMEOUT.getName()),
-            null,
-            "Property queryTimeout must not be negative."
-        );
+    @Test
+    void testParseInvalidNumbers() {
+        SQLProperty[] properties = {
+            SQLProperty.LOGIN_TIMEOUT,
+            SQLProperty.QUERY_TIMEOUT,
+            SQLProperty.CLUSTER_DISCOVERY_DELAY_MILLIS
+        };
+        for (SQLProperty property : properties) {
+            checkParseQueryStringValidation(
+                String.format("jdbc:tarantool://0:3301?%s=nan", property.getName()),
+                null,
+                String.format("Property %s must be a valid number.", property.getName())
+            );
+            checkParseQueryStringValidation(
+                String.format("jdbc:tarantool://0:3301?%s=-100", property.getName()),
+                null,
+                String.format("Property %s must not be negative.", property.getName())
+            );
+        }
     }
 
     @Test
     public void testGetPropertyInfo() throws SQLException {
-        Driver drv = new SQLDriver();
         Properties props = new Properties();
-        DriverPropertyInfo[] info = drv.getPropertyInfo("jdbc:tarantool://server.local:3302", props);
+        DriverPropertyInfo[] info = driver.getPropertyInfo("jdbc:tarantool://server.local:3302", props);
         assertNotNull(info);
-        assertEquals(7, info.length);
+        assertEquals(9, info.length);
 
         for (DriverPropertyInfo e : info) {
             assertNotNull(e.name);
@@ -142,6 +162,12 @@ public class JdbcDriverTest {
             } else if (SQLProperty.QUERY_TIMEOUT.getName().equals(e.name)) {
                 assertFalse(e.required);
                 assertEquals("0", e.value);
+            } else if (SQLProperty.CLUSTER_DISCOVERY_ENTRY_FUNCTION.getName().equals(e.name)) {
+                assertFalse(e.required);
+                assertNull(e.value);
+            } else if (SQLProperty.CLUSTER_DISCOVERY_DELAY_MILLIS.getName().equals(e.name)) {
+                assertFalse(e.required);
+                assertEquals("60000", e.value);
             } else {
                 fail("Unknown property '" + e.name + "'");
             }
@@ -184,6 +210,14 @@ public class JdbcDriverTest {
         }
     }
 
+    @Test
+    void testAcceptUrl() throws SQLException {
+        assertFalse(driver.acceptsURL("http://localhost"));
+        assertFalse(driver.acceptsURL("jdbc:mysql://host1/myDb"));
+        assertTrue(driver.acceptsURL("jdbc:tarantool://localhost:3301"));
+        assertThrows(SQLException.class, () -> driver.acceptsURL(null));
+    }
+
     private void checkCustomSocketProviderFail(String providerClassName, String errMsg) throws SQLException {
         final Driver drv = DriverManager.getDriver("jdbc:tarantool:");
         final Properties prop = new Properties();
@@ -194,15 +228,9 @@ public class JdbcDriverTest {
         assertTrue(e.getMessage().startsWith(errMsg), e.getMessage());
     }
 
-    private void checkParseQueryStringValidation(final String uri, final Properties prop, String errMsg) {
-        final SQLDriver drv = new SQLDriver();
-        SQLException e = assertThrows(SQLException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                drv.parseQueryString(new URI(uri), prop);
-            }
-        });
-        assertTrue(e.getMessage().startsWith(errMsg), e.getMessage());
+    private void checkParseQueryStringValidation(final String uri, final Properties properties, String error) {
+        SQLException e = assertThrows(SQLException.class, () -> driver.parseConnectionString(uri, properties));
+        assertTrue(e.getMessage().startsWith(error), e.getMessage());
     }
 
     static class TestSQLProviderThatReturnsNull implements SocketChannelProvider {

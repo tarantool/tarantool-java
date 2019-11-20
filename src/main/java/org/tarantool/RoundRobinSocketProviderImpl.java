@@ -61,7 +61,18 @@ public class RoundRobinSocketProviderImpl extends BaseSocketChannelProvider impl
      * @throws IllegalArgumentException if addresses aren't provided
      */
     public RoundRobinSocketProviderImpl(String... addresses) {
-        updateAddressList(Arrays.asList(addresses));
+        this(Arrays.asList(addresses));
+    }
+
+    /**
+     * Constructs an instance.
+     *
+     * @param addresses optional list of addresses in a form of host[:port]
+     *
+     * @throws IllegalArgumentException if addresses aren't provided
+     */
+    public RoundRobinSocketProviderImpl(List<String> addresses) {
+        updateAddressList(addresses);
         setRetriesLimit(DEFAULT_RETRIES_PER_CONNECTION);
     }
 

@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
 import org.tarantool.ServerVersion;
-import org.tarantool.TarantoolClientConfig;
+import org.tarantool.TarantoolClusterClientConfig;
 import org.tarantool.TarantoolTestHelper;
 import org.tarantool.protocol.TarantoolPacket;
 
@@ -21,6 +21,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
 import java.sql.Statement;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 
 public class JdbcConnectionTimeoutIT {
@@ -46,10 +48,11 @@ public class JdbcConnectionTimeoutIT {
     @BeforeEach
     void setUp() throws SQLException {
         assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_1);
-        connection = new SQLConnection("", new Properties()) {
+        connection = new SQLConnection("", Collections.emptyList(), new Properties()) {
             @Override
-            protected SQLTarantoolClientImpl makeSqlClient(String address, TarantoolClientConfig config) {
-                return new SQLTarantoolClientImpl(address, config) {
+            protected SQLTarantoolClientImpl makeSqlClient(List<String> addresses,
+                                                           TarantoolClusterClientConfig config) {
+                return new SQLTarantoolClientImpl(addresses, config) {
                     @Override
                     protected void completeSql(TarantoolOp<?> operation, TarantoolPacket pack) {
                         try {

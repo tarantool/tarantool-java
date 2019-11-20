@@ -3,12 +3,15 @@ package org.tarantool.jdbc.ds;
 import org.tarantool.jdbc.SQLConnection;
 import org.tarantool.jdbc.SQLConstant;
 import org.tarantool.jdbc.SQLProperty;
+import org.tarantool.util.NodeSpec;
 
 import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLNonTransientException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -26,7 +29,7 @@ public class SQLDataSource implements TarantoolDataSource, DataSource {
 
     @Override
     public Connection getConnection() throws SQLException {
-        return new SQLConnection(makeUrl(), new Properties(properties));
+        return new SQLConnection(makeUrl(), makeNodeSpecs(), new Properties(properties));
     }
 
     @Override
@@ -34,7 +37,7 @@ public class SQLDataSource implements TarantoolDataSource, DataSource {
         Properties copyProperties = new Properties(properties);
         SQLProperty.USER.setString(copyProperties, username);
         SQLProperty.PASSWORD.setString(copyProperties, password);
-        return new SQLConnection(makeUrl(), copyProperties);
+        return new SQLConnection(makeUrl(), makeNodeSpecs(), copyProperties);
     }
 
     @Override
@@ -156,4 +159,10 @@ public class SQLDataSource implements TarantoolDataSource, DataSource {
             SQLProperty.HOST.getString(properties) + ":" + SQLProperty.PORT.getString(properties);
     }
 
+    private List<NodeSpec> makeNodeSpecs() throws SQLException {
+        return Collections.singletonList(new NodeSpec(
+            SQLProperty.HOST.getString(properties),
+            SQLProperty.PORT.getInt(properties)
+        ));
+    }
 }

@@ -10,7 +10,9 @@ import org.tarantool.util.StringUtils;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,6 +57,16 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
      * @param addresses Array of addresses in the form of host[:port].
      */
     public TarantoolClusterClient(TarantoolClusterClientConfig config, String... addresses) {
+        this(config, makeClusterSocketProvider(Arrays.asList(addresses)));
+    }
+
+    /**
+     * Constructs a new cluster client.
+     *
+     * @param config    Configuration.
+     * @param addresses List of addresses in the form of host[:port].
+     */
+    public TarantoolClusterClient(TarantoolClusterClientConfig config, List<String> addresses) {
         this(config, makeClusterSocketProvider(addresses));
     }
 
@@ -270,7 +282,7 @@ public class TarantoolClusterClient extends TarantoolClientImpl {
         }
     }
 
-    private static RoundRobinSocketProviderImpl makeClusterSocketProvider(String[] addresses) {
+    private static RoundRobinSocketProviderImpl makeClusterSocketProvider(List<String> addresses) {
         return new RoundRobinSocketProviderImpl(addresses);
     }
 
