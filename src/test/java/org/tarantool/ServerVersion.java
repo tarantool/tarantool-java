@@ -8,7 +8,8 @@ public enum ServerVersion {
     V_1_10("1", "10", "0"),
     V_2_1("2", "1", "0"),
     V_2_2("2", "2", "0"),
-    V_2_2_1("2", "2", "1");
+    V_2_2_1("2", "2", "1"),
+    V_2_3("2", "3", "0");
 
     private final String majorVersion;
     private final String minorVersion;
