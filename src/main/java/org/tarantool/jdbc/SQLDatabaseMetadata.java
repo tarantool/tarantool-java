@@ -1037,7 +1037,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public int getSQLStateType() throws SQLException {
-        return 0;
+        return DatabaseMetaData.sqlStateSQL;
     }
 
     @Override

@@ -390,4 +390,9 @@ public class JdbcDatabaseMetaDataIT {
         }
     }
 
+    @Test
+    public void testSqlStateType() throws SQLException {
+        assertEquals(DatabaseMetaData.sqlStateSQL, meta.getSQLStateType());
+    }
+
 }
