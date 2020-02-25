@@ -31,7 +31,7 @@ To get the Java connector for Tarantool 1.6.9, visit
 <dependency>
   <groupId>org.tarantool</groupId>
   <artifactId>connector</artifactId>
-  <version>1.9.2</version>
+  <version>1.9.4</version>
 </dependency>
 ```
 
