@@ -1,5 +1,7 @@
 package org.tarantool;
 
+import org.tarantool.util.ServerVersion;
+
 import org.junit.jupiter.api.Assumptions;
 
 public class TestAssumptions {

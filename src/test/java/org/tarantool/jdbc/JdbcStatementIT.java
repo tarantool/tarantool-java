@@ -8,10 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 import static org.tarantool.jdbc.SqlAssertions.assertSqlExceptionHasStatus;
 
-import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
 import org.tarantool.TestUtils;
 import org.tarantool.util.SQLStates;
+import org.tarantool.util.ServerVersion;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -568,6 +568,164 @@ public class JdbcStatementIT {
         assertFalse(stmt.isPoolable());
         stmt.setPoolable(true);
         assertTrue(stmt.isPoolable());
+    }
+
+    @Test
+    public void testDisabledEscapeSyntax() throws Exception {
+        stmt.setEscapeProcessing(false);
+        assertThrows(SQLException.class, () -> stmt.executeQuery("SELECT val FROM test ORDER BY id {limit 2}"));
+    }
+
+    @Test
+    public void testLimitEscapeSyntax() throws Exception {
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')");
+
+        try (ResultSet resultSet = stmt.executeQuery("SELECT val FROM test ORDER BY id {limit 2}")) {
+            assertTrue(resultSet.next());
+            assertEquals("one", resultSet.getString(1));
+            assertTrue(resultSet.next());
+            assertEquals("two", resultSet.getString(1));
+            assertFalse(resultSet.next());
+        }
+        try (ResultSet resultSet = stmt.executeQuery("SELECT val FROM test ORDER BY id {limit 2 offset 2}")) {
+            assertTrue(resultSet.next());
+            assertEquals("three", resultSet.getString(1));
+            assertTrue(resultSet.next());
+            assertEquals("four", resultSet.getString(1));
+            assertFalse(resultSet.next());
+        }
+    }
+
+    @Test
+    public void testLikeEscapeSyntax() throws Exception {
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, 'one%'), (2, 't_wo'), (3, 'three%'), (4, 'four')");
+
+        try (ResultSet resultSet = stmt.executeQuery("SELECT val FROM test WHERE val LIKE '%|%' {escape '|'}")) {
+            assertTrue(resultSet.next());
+            assertEquals("one%", resultSet.getString(1));
+            assertTrue(resultSet.next());
+            assertEquals("three%", resultSet.getString(1));
+            assertFalse(resultSet.next());
+        }
+        try (ResultSet resultSet = stmt.executeQuery("SELECT val FROM test WHERE val LIKE '_>_%' {escape '>'}")) {
+            assertTrue(resultSet.next());
+            assertEquals("t_wo", resultSet.getString(1));
+            assertFalse(resultSet.next());
+        }
+    }
+
+    @Test
+    public void testOuterJoinEscapeSyntax() throws Exception {
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, 'one')");
+
+        try (ResultSet resultSet = stmt.executeQuery(
+            "SELECT {fn concat('t1-', t1.val)}, {fn concat('t2-', t2.val)} " +
+                "FROM {oj test t1 LEFT OUTER JOIN test t2 ON t1.id = 1}"
+        )) {
+            assertTrue(resultSet.next());
+            assertEquals("t1-one", resultSet.getString(1));
+            assertEquals("t2-one", resultSet.getString(2));
+            assertFalse(resultSet.next());
+        }
+    }
+
+    @Test
+    public void testSystemFunctionEscapeSyntax() throws Exception {
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, NULL)");
+
+        try (ResultSet resultSet = stmt.executeQuery("SELECT {fn user()}, {fn database()}")) {
+            assertTrue(resultSet.next());
+            assertEquals("test_admin", resultSet.getString(1));
+            assertEquals("universe", resultSet.getString(2));
+            assertFalse(resultSet.next());
+        }
+        try (ResultSet resultSet = stmt.executeQuery("SELECT {fn ifnull(val, 'one-one')} FROM test WHERE id = 1")) {
+            assertTrue(resultSet.next());
+            assertEquals("one-one", resultSet.getString(1));
+            assertFalse(resultSet.next());
+        }
+    }
+
+    @Test
+    public void testNumericFunctionEscapeSyntax() throws Exception {
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, NULL)");
+
+        try (ResultSet resultSet = stmt.executeQuery("SELECT {fn abs(5 - 10)}, {fn round({fn pi()}, 0)}")) {
+            assertTrue(resultSet.next());
+            assertEquals(5, resultSet.getInt(1));
+            assertEquals(3, resultSet.getInt(2));
+            assertFalse(resultSet.next());
+        }
+        try (ResultSet resultSet = stmt.executeQuery("SELECT {fn rand(123)}")) {
+            assertTrue(resultSet.next());
+            assertTrue(resultSet.getDouble(1) >= 0.0);
+            assertTrue(resultSet.getDouble(1) < 1.0);
+            assertFalse(resultSet.next());
+        }
+    }
+
+    @Test
+    public void testStringFunctionEscapeSyntax() throws Exception {
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, 'one'), (2, 'TWO'), (3, 'three'), (4, ' four ')");
+
+        try (ResultSet resultSet = stmt.executeQuery(
+            "SELECT {fn /* space */ char(32)}, " +
+                "{fn ucase(val)}, " +
+                "{fn right(val, 1)}, " +
+                "{fn concat('3 ', val)} " +
+                "FROM test WHERE id = 3"
+        )) {
+            assertTrue(resultSet.next());
+            assertEquals(" ", resultSet.getString(1));
+            assertEquals("THREE", resultSet.getString(2));
+            assertEquals("e", resultSet.getString(3));
+            assertEquals("3 three", resultSet.getString(4));
+            assertFalse(resultSet.next());
+        }
+        try (ResultSet resultSet = stmt.executeQuery(
+            "SELECT {fn lcase(val)}, " +
+                "{fn left(val, 2)}, " +
+                "{fn replace({fn lcase(val)}, 'two', '2')}, " +
+                "{fn substring(val, 1, 2)} " +
+                "FROM test WHERE id = 2"
+        )) {
+            assertTrue(resultSet.next());
+            assertEquals("two", resultSet.getString(1));
+            assertEquals("TW", resultSet.getString(2));
+            assertEquals("2", resultSet.getString(3));
+            assertEquals("TW", resultSet.getString(4));
+            assertFalse(resultSet.next());
+        }
+        try (ResultSet resultSet = stmt.executeQuery(
+            "SELECT {fn ltrim(val)}, " +
+                "{fn rtrim(val)} " +
+                "FROM test WHERE id = 4"
+        )) {
+            assertTrue(resultSet.next());
+            assertEquals("four ", resultSet.getString(1));
+            assertEquals(" four", resultSet.getString(2));
+            assertFalse(resultSet.next());
+        }
+    }
+
+    /**
+     * Test length and soundex functions
+     * which became available since 2.2.0
+     */
+    @Test
+    void testStringFunctionFrom22() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_2);
+
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, ' one ')");
+
+        try (ResultSet resultSet = stmt.executeQuery(
+            "SELECT {fn length(val)}, {fn soundex(val)} FROM test"
+        )) {
+            assertTrue(resultSet.next());
+            assertEquals(4, resultSet.getInt(1));
+            assertEquals("O500", resultSet.getString(2));
+            assertFalse(resultSet.next());
+        }
     }
 
     private List<?> consoleSelect(Object key) {

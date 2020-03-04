@@ -6,13 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.tarantool.TestUtils.makeDefaultClientConfig;
 
-import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolClientConfig;
 import org.tarantool.TarantoolClientImpl;
 import org.tarantool.TarantoolTestHelper;
 import org.tarantool.TestAssumptions;
 import org.tarantool.schema.TarantoolIndexMeta.IndexOptions;
 import org.tarantool.schema.TarantoolIndexMeta.IndexPart;
+import org.tarantool.util.ServerVersion;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;

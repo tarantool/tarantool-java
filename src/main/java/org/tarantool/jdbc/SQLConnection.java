@@ -63,12 +63,15 @@ public class SQLConnection implements TarantoolConnection {
     private DatabaseMetaData cachedMetadata;
     private int resultSetHoldability = UNSET_HOLDABILITY;
 
+    private final EscapeSyntaxParser escapeSyntaxParser;
+
     public SQLConnection(String url, Properties properties) throws SQLException {
         this.url = url;
         this.properties = properties;
 
         try {
             client = makeSqlClient(makeAddress(properties), makeConfigFromProperties(properties));
+            escapeSyntaxParser = new EscapeSyntaxParser(this);
         } catch (Exception e) {
             throw new SQLException("Couldn't initiate connection using " + SQLDriver.diagProperties(properties), e);
         }
@@ -189,7 +192,7 @@ public class SQLConnection implements TarantoolConnection {
     @Override
     public String nativeSQL(String sql) throws SQLException {
         checkNotClosed();
-        throw new SQLFeatureNotSupportedException();
+        return escapeSyntaxParser.translate(sql, true);
     }
 
     @Override

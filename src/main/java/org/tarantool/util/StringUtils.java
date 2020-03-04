@@ -1,5 +1,8 @@
 package org.tarantool.util;
 
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 public class StringUtils {
 
     public static boolean isEmpty(String string) {
@@ -16,6 +19,12 @@ public class StringUtils {
 
     public static boolean isNotBlank(String string) {
         return !isBlank(string);
+    }
+
+    public static String toCsvList(Enum<?>[] values) {
+        return Stream.of(values)
+            .map(Enum::name)
+            .collect(Collectors.joining(","));
     }
 
 }

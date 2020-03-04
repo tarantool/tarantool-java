@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
-import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
+import org.tarantool.util.ServerVersion;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -23,8 +23,12 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class JdbcDatabaseMetaDataIT {
 
@@ -284,12 +288,14 @@ public class JdbcDatabaseMetaDataIT {
     @Test
     public void testUnwrap() throws SQLException {
         assertEquals(meta, meta.unwrap(SQLDatabaseMetadata.class));
+        assertEquals(meta, meta.unwrap(TarantoolDatabaseMetaData.class));
         assertThrows(SQLException.class, () -> meta.unwrap(Integer.class));
     }
 
     @Test
     public void testIsWrapperFor() throws SQLException {
         assertTrue(meta.isWrapperFor(SQLDatabaseMetadata.class));
+        assertTrue(meta.isWrapperFor(TarantoolDatabaseMetaData.class));
         assertFalse(meta.isWrapperFor(Integer.class));
     }
 
@@ -388,6 +394,71 @@ public class JdbcDatabaseMetaDataIT {
             assertFalse(meta.ownDeletesAreVisible(type));
             assertFalse(meta.deletesAreDetected(type));
         }
+    }
+
+    @Test
+    void testDatabaseVersion() throws SQLException {
+        ServerVersion version = new ServerVersion(testHelper.getInstanceVersion());
+        assertEquals(version.getMajorVersion(), meta.getDatabaseMajorVersion());
+        assertEquals(version.getMinorVersion(), meta.getDatabaseMinorVersion());
+    }
+
+    @Test
+    void testVendorDatabaseVersion() throws SQLException {
+        ServerVersion version = new ServerVersion(testHelper.getInstanceVersion());
+        TarantoolDatabaseMetaData vendorMeta = meta.unwrap(TarantoolDatabaseMetaData.class);
+        assertEquals(version, vendorMeta.getDatabaseVersion());
+    }
+
+    @Test
+    void testJdbcVersion() throws SQLException {
+        assertEquals(4, meta.getJDBCMajorVersion());
+        assertEquals(2, meta.getJDBCMinorVersion());
+    }
+
+    @Test
+    void testDatabaseProductName() throws SQLException {
+        assertEquals("Tarantool", meta.getDatabaseProductName());
+    }
+
+    @Test
+    void testDatabaseProductVersion() throws SQLException {
+        ServerVersion version = new ServerVersion(testHelper.getInstanceVersion());
+        ServerVersion databaseProductVersion = new ServerVersion(meta.getDatabaseProductVersion());
+        assertEquals(version, databaseProductVersion);
+    }
+
+    @Test
+    void testStringFunctionSupport() throws SQLException {
+        String[] systemFunctions = meta.getStringFunctions().split(",");
+        assertEquals(EscapedFunctions.StringFunction.values().length, systemFunctions.length);
+        Set<String> actualSet = new HashSet<>(Arrays.asList(systemFunctions));
+        Set<String> expectedSet = Arrays.stream(EscapedFunctions.StringFunction.values())
+            .map(Enum::toString)
+            .collect(Collectors.toSet());
+        assertEquals(expectedSet, actualSet);
+    }
+
+    @Test
+    void testNumericFunctionSupport() throws SQLException {
+        String[] systemFunctions = meta.getNumericFunctions().split(",");
+        assertEquals(EscapedFunctions.NumericFunction.values().length, systemFunctions.length);
+        Set<String> actualSet = new HashSet<>(Arrays.asList(systemFunctions));
+        Set<String> expectedSet = Arrays.stream(EscapedFunctions.NumericFunction.values())
+            .map(Enum::toString)
+            .collect(Collectors.toSet());
+        assertEquals(expectedSet, actualSet);
+    }
+
+    @Test
+    void testSystemFunctionSupport() throws SQLException {
+        String[] systemFunctions = meta.getSystemFunctions().split(",");
+        assertEquals(EscapedFunctions.SystemFunction.values().length, systemFunctions.length);
+        Set<String> actualSet = new HashSet<>(Arrays.asList(systemFunctions));
+        Set<String> expectedSet = Arrays.stream(EscapedFunctions.SystemFunction.values())
+            .map(Enum::toString)
+            .collect(Collectors.toSet());
+        assertEquals(expectedSet, actualSet);
     }
 
 }

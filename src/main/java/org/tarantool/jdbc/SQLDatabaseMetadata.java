@@ -5,10 +5,11 @@ import static org.tarantool.util.JdbcConstants.DatabaseMetadataTable;
 import org.tarantool.SqlProtoUtils;
 import org.tarantool.Version;
 import org.tarantool.jdbc.type.TarantoolSqlType;
+import org.tarantool.util.ServerVersion;
+import org.tarantool.util.StringUtils;
 import org.tarantool.util.TupleTwo;
 
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.RowIdLifetime;
 import java.sql.SQLException;
@@ -21,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class SQLDatabaseMetadata implements DatabaseMetaData {
+public class SQLDatabaseMetadata implements TarantoolDatabaseMetaData {
 
     protected static final int _VSPACE = 281;
     protected static final int _VINDEX = 289;
@@ -89,7 +90,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public String getDatabaseProductName() throws SQLException {
-        return "Tarantool";
+        return SQLConstant.PRODUCT_NAME;
     }
 
     @Override
@@ -179,17 +180,17 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public String getNumericFunctions() throws SQLException {
-        return "";
+        return StringUtils.toCsvList(EscapedFunctions.NumericFunction.values());
     }
 
     @Override
     public String getStringFunctions() throws SQLException {
-        return "";
+        return StringUtils.toCsvList(EscapedFunctions.StringFunction.values());
     }
 
     @Override
     public String getSystemFunctions() throws SQLException {
-        return "";
+        return StringUtils.toCsvList(EscapedFunctions.SystemFunction.values());
     }
 
     @Override
@@ -274,7 +275,7 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public boolean supportsLikeEscapeClause() throws SQLException {
-        return false;
+        return true;
     }
 
     @Override
@@ -1017,22 +1018,31 @@ public class SQLDatabaseMetadata implements DatabaseMetaData {
 
     @Override
     public int getDatabaseMajorVersion() throws SQLException {
-        return 0;
+        return getDatabaseVersion().getMajorVersion();
     }
 
     @Override
     public int getDatabaseMinorVersion() throws SQLException {
-        return 0;
+        return getDatabaseVersion().getMinorVersion();
+    }
+
+    @Override
+    public ServerVersion getDatabaseVersion() throws SQLException {
+        try {
+            return new ServerVersion(connection.getServerVersion());
+        } catch (Exception cause) {
+            throw new SQLException("Could not get the current server version number", cause);
+        }
     }
 
     @Override
     public int getJDBCMajorVersion() throws SQLException {
-        return 2;
+        return SQLConstant.DRIVER_MAJOR_VERSION;
     }
 
     @Override
     public int getJDBCMinorVersion() throws SQLException {
-        return 1;
+        return SQLConstant.DRIVER_MINOR_VERSION;
     }
 
     @Override
