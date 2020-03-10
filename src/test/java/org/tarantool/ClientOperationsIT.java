@@ -8,6 +8,7 @@ import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
 import org.tarantool.schema.TarantoolIndexNotFoundException;
 import org.tarantool.schema.TarantoolSpaceNotFoundException;
+import org.tarantool.util.ServerVersion;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;

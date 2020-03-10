@@ -30,8 +30,17 @@ public abstract class SqlProtoUtils {
         return (List<List<Object>>) pack.getBody().get(Key.DATA.getId());
     }
 
+    public static List<SQLMetaData> getSQLBindMetadata(TarantoolPacket pack) {
+        return getMetadata(pack, Key.SQL_BIND_METADATA);
+    }
+
     public static List<SQLMetaData> getSQLMetadata(TarantoolPacket pack) {
-        List<Map<Integer, Object>> meta = (List<Map<Integer, Object>>) pack.getBody().get(Key.SQL_METADATA.getId());
+        return getMetadata(pack, Key.SQL_METADATA);
+    }
+
+    private static List<SQLMetaData> getMetadata(TarantoolPacket pack, Key targetKey) {
+        List<Map<Integer, Object>> meta = (List<Map<Integer, Object>>) pack.getBody()
+            .getOrDefault(targetKey.getId(), Collections.emptyList());
         List<SQLMetaData> values = new ArrayList<>(meta.size());
         for (Map<Integer, Object> item : meta) {
             values.add(new SQLMetaData(
@@ -40,6 +49,10 @@ public abstract class SqlProtoUtils {
             );
         }
         return values;
+    }
+
+    public static Long getStatementId(TarantoolPacket pack) {
+        return ((Number) pack.getBody().get(Key.SQL_STATEMENT_ID.getId())).longValue();
     }
 
     public static Long getSQLRowCount(TarantoolPacket pack) {

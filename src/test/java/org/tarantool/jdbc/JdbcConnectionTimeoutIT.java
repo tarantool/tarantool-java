@@ -5,11 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
-import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolClientConfig;
 import org.tarantool.TarantoolOperation;
 import org.tarantool.TarantoolTestHelper;
 import org.tarantool.protocol.TarantoolPacket;
+import org.tarantool.util.ServerVersion;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;

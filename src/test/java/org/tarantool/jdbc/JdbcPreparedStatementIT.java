@@ -13,11 +13,14 @@ import static org.mockito.Mockito.anyObject;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
+import static org.tarantool.TestAssumptions.assumeServerVersionLessThan;
 
-import org.tarantool.ServerVersion;
+import org.tarantool.TarantoolException;
 import org.tarantool.TarantoolTestHelper;
+import org.tarantool.TarantoolThreadDaemonFactory;
 import org.tarantool.TestUtils;
 import org.tarantool.util.SQLStates;
+import org.tarantool.util.ServerVersion;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -35,8 +38,11 @@ import java.nio.charset.StandardCharsets;
 import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.JDBCType;
+import java.sql.ParameterMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
@@ -44,6 +50,10 @@ import java.sql.Types;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class JdbcPreparedStatementIT {
 
@@ -196,7 +206,7 @@ public class JdbcPreparedStatementIT {
 
     @Test
     void testForbiddenMethods() throws SQLException {
-        prep = conn.prepareStatement("TEST");
+        prep = conn.prepareStatement("SELECT 2");
 
         int i = 0;
         for (; i < 3; i++) {
@@ -206,13 +216,13 @@ public class JdbcPreparedStatementIT {
                 public void execute() throws Throwable {
                     switch (step) {
                     case 0:
-                        prep.executeQuery("TEST");
+                        prep.executeQuery("SELECT 1");
                         break;
                     case 1:
-                        prep.executeUpdate("TEST");
+                        prep.executeUpdate("SELECT 2");
                         break;
                     case 2:
-                        prep.execute("TEST");
+                        prep.execute("SELECT 3");
                         break;
                     default:
                         fail();
@@ -328,8 +338,8 @@ public class JdbcPreparedStatementIT {
 
     @Test
     void testStatementConnection() throws SQLException {
-        Statement statement = conn.prepareStatement("SELECT * FROM TEST");
-        assertEquals(conn, statement.getConnection());
+        prep = conn.prepareStatement("SELECT * FROM TEST");
+        assertEquals(conn, prep.getConnection());
     }
 
     @Test
@@ -376,38 +386,46 @@ public class JdbcPreparedStatementIT {
 
     @Test
     public void testMoreResultsButCloseAll() throws SQLException {
-        prep = conn.prepareStatement("SELECT val FROM test WHERE id = ?");
-        prep.setInt(1, 2);
-        prep.execute();
+        try (PreparedStatement statement = conn.prepareStatement("SELECT val FROM test WHERE id = ?")) {
+            statement.setInt(1, 2);
+            statement.execute();
+            assertThrows(
+                SQLFeatureNotSupportedException.class,
+                () -> statement.getMoreResults(Statement.CLOSE_ALL_RESULTS)
+            );
+        }
 
-        assertThrows(SQLFeatureNotSupportedException.class, () -> prep.getMoreResults(Statement.CLOSE_ALL_RESULTS));
+        try (PreparedStatement statement = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)")) {
+            statement.setInt(1, 21);
+            statement.setString(2, "twenty one");
+            statement.execute();
 
-        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
-        prep.setInt(1, 21);
-        prep.setString(2, "twenty one");
-        prep.execute();
-
-        assertEquals(1, prep.getUpdateCount());
-        assertFalse(prep.getMoreResults(Statement.CLOSE_ALL_RESULTS));
-        assertEquals(-1, prep.getUpdateCount());
+            assertEquals(1, statement.getUpdateCount());
+            assertFalse(statement.getMoreResults(Statement.CLOSE_ALL_RESULTS));
+            assertEquals(-1, statement.getUpdateCount());
+        }
     }
 
     @Test
     public void testMoreResultsButKeepCurrent() throws SQLException {
-        prep = conn.prepareStatement("SELECT val FROM test WHERE id = ?");
-        prep.setInt(1, 3);
-        prep.execute();
+        try (PreparedStatement statement = conn.prepareStatement("SELECT val FROM test WHERE id = ?")) {
+            statement.setInt(1, 3);
+            statement.execute();
+            assertThrows(
+                SQLFeatureNotSupportedException.class,
+                () -> statement.getMoreResults(Statement.KEEP_CURRENT_RESULT)
+            );
+        }
 
-        assertThrows(SQLFeatureNotSupportedException.class, () -> prep.getMoreResults(Statement.KEEP_CURRENT_RESULT));
+        try (PreparedStatement statement = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)")) {
+            statement.setInt(1, 22);
+            statement.setString(2, "twenty two");
+            statement.execute();
 
-        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
-        prep.setInt(1, 22);
-        prep.setString(2, "twenty two");
-        prep.execute();
-
-        assertEquals(1, prep.getUpdateCount());
-        assertFalse(prep.getMoreResults(Statement.KEEP_CURRENT_RESULT));
-        assertEquals(-1, prep.getUpdateCount());
+            assertEquals(1, statement.getUpdateCount());
+            assertFalse(statement.getMoreResults(Statement.KEEP_CURRENT_RESULT));
+            assertEquals(-1, statement.getUpdateCount());
+        }
     }
 
     @Test
@@ -717,6 +735,237 @@ public class JdbcPreparedStatementIT {
             () -> prep.setCharacterStream(2, throwingReader)
         );
         assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
+    }
+
+    @Test
+    public void testGetAllColumnsMetadata() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        prep = conn.prepareStatement("SELECT * FROM test");
+        ResultSetMetaData metaData = prep.getMetaData();
+
+        assertEquals(3, metaData.getColumnCount());
+        assertEquals("ID", metaData.getColumnName(1));
+        assertEquals(JDBCType.BIGINT.getVendorTypeNumber(), metaData.getColumnType(1));
+
+        assertEquals("VAL", metaData.getColumnName(2));
+        assertEquals(JDBCType.VARCHAR.getVendorTypeNumber(), metaData.getColumnType(2));
+
+        assertEquals("BIN_VAL", metaData.getColumnName(3));
+        assertEquals(JDBCType.BINARY.getVendorTypeNumber(), metaData.getColumnType(3));
+    }
+
+    @Test
+    public void testGetSpecifiedColumnMetadata() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        prep = conn.prepareStatement("SELECT val FROM test WHERE val = ?");
+        ResultSetMetaData metaData = prep.getMetaData();
+
+        assertEquals(1, metaData.getColumnCount());
+
+        assertEquals("VAL", metaData.getColumnName(1));
+        assertEquals(JDBCType.VARCHAR.getVendorTypeNumber(), metaData.getColumnType(1));
+    }
+
+    @Test
+    public void testGetNullMetaDataWhenDml() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
+        ResultSetMetaData metaData = prep.getMetaData();
+        assertNull(metaData);
+    }
+
+    @Test
+    public void testGetMetaDataAfterQueryExecution() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        testHelper.executeSql("INSERT INTO test(id, val) VALUES (1, 'one')");
+
+        prep = conn.prepareStatement("SELECT val FROM test WHERE val = ?");
+        ResultSetMetaData metaDataBefore = prep.getMetaData();
+        prep.setInt(1, 1);
+        prep.execute();
+        ResultSetMetaData metaDataAfter = prep.getMetaData();
+
+        assertEquals(metaDataBefore.getColumnCount(), metaDataAfter.getColumnCount());
+        assertEquals(metaDataBefore.getColumnName(1), metaDataAfter.getColumnName(1));
+        assertEquals(metaDataBefore.getColumnType(1), metaDataAfter.getColumnType(1));
+    }
+
+    @Test
+    public void testUnsupportedPreparedStatement() throws SQLException {
+        assumeServerVersionLessThan(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        prep = conn.prepareStatement("SELECT val FROM test");
+        assertThrows(SQLException.class, () -> prep.getMetaData());
+    }
+
+    @Test
+    public void testCachePreparedStatementsCount() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        final String cacheCountExpression = "box.info:sql().cache.stmt_count";
+
+        int preparedCount = testHelper.evaluate(cacheCountExpression);
+        assertEquals(0, preparedCount);
+        try (
+            PreparedStatement statement1 = conn.prepareStatement("INSERT INTO test (id, val) VALUES (?, ?)");
+            PreparedStatement statement2 = conn.prepareStatement("SELECT val FROM test")
+        ) {
+            preparedCount = testHelper.evaluate(cacheCountExpression);
+            assertEquals(2, preparedCount);
+        }
+        preparedCount = testHelper.evaluate(cacheCountExpression);
+        assertEquals(0, preparedCount);
+    }
+
+    @Test
+    public void testCachePreparedDuplicates() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        final String cacheCountExpression = "box.info:sql().cache.stmt_count";
+
+        int preparedCount = testHelper.evaluate(cacheCountExpression);
+        assertEquals(0, preparedCount);
+        try (
+            PreparedStatement statement1 = conn.prepareStatement("SELECT val FROM test");
+            PreparedStatement statement2 = conn.prepareStatement("SELECT val FROM test")
+        ) {
+            preparedCount = testHelper.evaluate(cacheCountExpression);
+            assertEquals(1, preparedCount);
+        }
+        preparedCount = testHelper.evaluate(cacheCountExpression);
+        assertEquals(0, preparedCount);
+    }
+
+    @Test
+    public void testSharePreparedStatementsPerSession() {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+
+        int threadsNumber = 16;
+        int iterations = 100;
+        final CountDownLatch latch = new CountDownLatch(threadsNumber);
+        ExecutorService executor = Executors.newFixedThreadPool(
+            threadsNumber,
+            new TarantoolThreadDaemonFactory("shared-statements")
+        );
+
+        // multiple threads can prepare/deallocate same prepared statements simultaneously
+        // using same connection. Tarantool does not count references of same SQL in scope
+        // of one session that leads the driver should deal with it on its side and
+        // deallocate after the last duplicate is released
+        for (int i = 0; i < threadsNumber; i++) {
+            executor.submit(() -> {
+                try {
+                    for (int k = 0; k < iterations; k++) {
+                        try (
+                            PreparedStatement statement1 = conn.prepareStatement("SELECT 1;");
+                            PreparedStatement statement2 = conn.prepareStatement("SELECT 1;")
+                        ) {
+                            statement1.execute();
+                            statement2.execute();
+                        }
+                        try (
+                            PreparedStatement statement1 = conn.prepareStatement("SELECT 1;");
+                            PreparedStatement statement2 = conn.prepareStatement("SELECT 2;")
+                        ) {
+                            statement1.execute();
+                            statement2.execute();
+                        }
+                        try (PreparedStatement statement = conn.prepareStatement("SELECT 1;")) {
+                            statement.execute();
+                        }
+                        try (PreparedStatement statement = conn.prepareStatement("SELECT 2;")) {
+                            statement.execute();
+                        }
+
+                    }
+                } catch (Exception ignored) {
+                    return;
+                }
+                latch.countDown();
+            });
+        }
+
+        try {
+            assertTrue(latch.await(20, TimeUnit.SECONDS));
+            int preparedCount = testHelper.evaluate("box.info:sql().cache.stmt_count");
+            assertEquals(0, preparedCount);
+        } catch (InterruptedException e) {
+            fail(e);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void testOutOfMemoryWhenPrepareStatement() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        final int oldSize = testHelper.evaluate("box.cfg.sql_cache_size");
+
+        // emulate out of memory turning a prepered cache off
+        testHelper.executeLua("box.cfg{sql_cache_size=0}");
+        SQLException error = assertThrows(
+            SQLException.class,
+            () -> conn.prepareStatement("SELECT val FROM test")
+        );
+
+        assertTrue(error.getMessage().startsWith("Failed to execute SQL"));
+        assertTrue(error.getCause() instanceof TarantoolException);
+        assertTrue(error.getCause().getMessage().startsWith("Failed to prepare SQL"));
+
+        testHelper.executeLua("box.cfg{sql_cache_size= " + oldSize + "}");
+    }
+
+    @Test
+    public void testExpirePreparedStatementAfterDdl() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        try (
+            PreparedStatement statement = conn.prepareStatement("INSERT INTO test (id, val) VALUES (?, ?)");
+        ) {
+            statement.setInt(1, 1);
+            statement.setString(2, "one");
+            assertEquals(1, statement.executeUpdate());
+
+            testHelper.executeSql(
+                "CREATE TABLE another_test (id INT PRIMARY KEY)",
+                "DROP TABLE another_test"
+            );
+
+            statement.setInt(1, 2);
+            statement.setString(2, "two");
+            SQLException error = assertThrows(SQLException.class, statement::executeUpdate);
+            assertTrue(error.getCause().getMessage().contains("statement has expired"));
+        }
+    }
+
+    @Test
+    public void testDeallocateExpiredPreparedStatement() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        try (
+            PreparedStatement statement = conn.prepareStatement("SELECT 2;");
+        ) {
+            assertTrue(statement.execute());
+            testHelper.executeSql(
+                "CREATE TABLE another_test (id INT PRIMARY KEY)",
+                "DROP TABLE another_test"
+            );
+        }
+        int preparedCount = testHelper.evaluate("box.info:sql().cache.stmt_count");
+        assertEquals(0, preparedCount);
+    }
+
+    @Test
+    public void testPreparedParameterMetaData() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        prep = conn.prepareStatement("SELECT val FROM test WHERE id = ? AND val = ?");
+        ParameterMetaData parameterMetaData = prep.getParameterMetaData();
+        assertNotNull(parameterMetaData);
+        assertEquals(2, parameterMetaData.getParameterCount());
+    }
+
+    @Test
+    public void testEmptyParameterMetaData() throws SQLException {
+        assumeMinimalServerVersion(testHelper.getInstanceVersion(), ServerVersion.V_2_3);
+        prep = conn.prepareStatement("SELECT * FROM test");
+        ParameterMetaData parameterMetaData = prep.getParameterMetaData();
+        assertNotNull(parameterMetaData);
+        assertEquals(0, parameterMetaData.getParameterCount());
     }
 
     private List<?> consoleSelect(Object key) {

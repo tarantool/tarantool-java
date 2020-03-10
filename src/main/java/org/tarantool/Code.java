@@ -13,6 +13,8 @@ public enum Code  {
     UPSERT(9),
     CALL(10),
     EXECUTE(11),
+    PREPARE(13),
+    DEALLOCATE(13),
     PING(64),
     SUBSCRIBE(66);
 

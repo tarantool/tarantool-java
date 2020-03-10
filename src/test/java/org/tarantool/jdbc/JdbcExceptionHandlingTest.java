@@ -3,6 +3,7 @@ package org.tarantool.jdbc;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -152,7 +153,7 @@ public class JdbcExceptionHandlingTest {
         throws SQLException {
         Exception ex = new CommunicationException("TEST");
         SQLTarantoolClientImpl.SQLRawOps sqlOps = mock(SQLTarantoolClientImpl.SQLRawOps.class);
-        doThrow(ex).when(sqlOps).execute(anyObject());
+        doThrow(ex).when(sqlOps).execute(anyLong(), anyObject());
 
         SQLTarantoolClientImpl client = buildSQLClient(sqlOps, null);
         final Statement stmt = new SQLStatement(buildTestSQLConnection(client, "jdbc:tarantool://0:0"));
@@ -168,8 +169,14 @@ public class JdbcExceptionHandlingTest {
     private void checkPreparedStatementCommunicationException(final ThrowingConsumer<PreparedStatement> consumer)
         throws SQLException {
         Exception ex = new CommunicationException("TEST");
+        SQLPreparedHolder preparedHolder = new SQLPreparedHolder(
+            0L,
+            Collections.emptyList(),
+            Collections.emptyList()
+        );
         SQLTarantoolClientImpl.SQLRawOps sqlOps = mock(SQLTarantoolClientImpl.SQLRawOps.class);
-        doThrow(ex).when(sqlOps).execute(anyObject());
+        doThrow(ex).when(sqlOps).execute(anyLong(), anyObject());
+        when(sqlOps.prepare(anyLong(), anyObject())).thenReturn(preparedHolder);
 
         SQLTarantoolClientImpl client = buildSQLClient(sqlOps, null);
         final PreparedStatement prep = new SQLPreparedStatement(
@@ -231,6 +238,11 @@ public class JdbcExceptionHandlingTest {
             @Override
             protected SQLTarantoolClientImpl makeSqlClient(String address, TarantoolClientConfig config) {
                 return client;
+            }
+
+            @Override
+            protected String getServerVersion() {
+                return "2.1.0";
             }
         };
     }

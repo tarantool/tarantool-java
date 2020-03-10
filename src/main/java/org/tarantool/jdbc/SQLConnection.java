@@ -1,12 +1,15 @@
 package org.tarantool.jdbc;
 
+import org.tarantool.Code;
 import org.tarantool.CommunicationException;
+import org.tarantool.Key;
 import org.tarantool.SocketChannelProvider;
 import org.tarantool.SqlProtoUtils;
 import org.tarantool.TarantoolClientConfig;
 import org.tarantool.TarantoolClientImpl;
 import org.tarantool.TarantoolOperation;
 import org.tarantool.TarantoolRequest;
+import org.tarantool.TarantoolRequestArgumentFactory;
 import org.tarantool.protocol.TarantoolPacket;
 import org.tarantool.util.JdbcConstants;
 import org.tarantool.util.SQLStates;
@@ -45,7 +48,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 
 /**
  * Tarantool {@link Connection} implementation.
@@ -60,6 +62,18 @@ public class SQLConnection implements TarantoolConnection {
     private final SQLTarantoolClientImpl client;
     private final String url;
     private final Properties properties;
+
+    /**
+     * Tarantool v2.3.1 does not take into consideration
+     * query duplicates within one session. Each connection
+     * tracks such statements to know when a statement can
+     * be safely removed.
+     *
+     * @see #prepare(long, String)
+     * @see #deallocate(long, Long)
+     */
+    private final Map<Long, PreparedStatementReference> preparedStatementReferences = new HashMap<>();
+
     private DatabaseMetaData cachedMetadata;
     private int resultSetHoldability = UNSET_HOLDABILITY;
 
@@ -530,9 +544,10 @@ public class SQLConnection implements TarantoolConnection {
     @Override
     public SQLResultHolder execute(long timeout, SQLQueryHolder query) throws SQLException {
         checkNotClosed();
+        ExecuteQueryCommand action = new ExecuteQueryCommand(query, client.sqlRawOps());
         return (useNetworkTimeout(timeout))
-            ? executeWithNetworkTimeout(query)
-            : executeWithQueryTimeout(timeout, query);
+            ? executeWithNetworkTimeout(action)
+            : executeWithQueryTimeout(timeout, action);
     }
 
     @Override
@@ -540,11 +555,35 @@ public class SQLConnection implements TarantoolConnection {
         throws SQLException {
         checkNotClosed();
         SQLTarantoolClientImpl.SQLRawOps sqlOps = client.sqlRawOps();
-        SQLBatchResultHolder batchResult = useNetworkTimeout(timeout)
-            ? sqlOps.executeBatch(queries)
-            : sqlOps.executeBatch(timeout, queries);
+        long time = useNetworkTimeout(timeout) ? 0L : timeout;
+        return sqlOps.executeBatch(time, queries);
+    }
 
-        return batchResult;
+    @Override
+    public SQLPreparedHolder prepare(long timeout, String sqlText) throws SQLException {
+        checkNotClosed();
+        synchronized (preparedStatementReferences) {
+            SQLPreparedHolder holder = executeCommand(timeout, new PrepareQueryCommand(sqlText, client.sqlRawOps()));
+            PreparedStatementReference reference = preparedStatementReferences.get(holder.getStatementId());
+            if (reference == null) {
+                reference = new PreparedStatementReference(holder.getStatementId());
+                preparedStatementReferences.put(holder.getStatementId(), reference);
+            }
+            reference.counter++;
+            return holder;
+        }
+    }
+
+    @Override
+    public void deallocate(long timeout, Long statementId) throws SQLException {
+        checkNotClosed();
+        synchronized (preparedStatementReferences) {
+            PreparedStatementReference reference = preparedStatementReferences.get(statementId);
+            if (reference != null && --reference.counter == 0) {
+                executeCommand(timeout, new DeallocateQueryCommand(statementId, client.sqlRawOps()));
+                preparedStatementReferences.remove(statementId);
+            }
+        }
     }
 
     private boolean useNetworkTimeout(long timeout) throws SQLException {
@@ -552,37 +591,56 @@ public class SQLConnection implements TarantoolConnection {
         return timeout == 0 || (networkTimeout > 0 && networkTimeout < timeout);
     }
 
-    private SQLResultHolder executeWithNetworkTimeout(SQLQueryHolder query) throws SQLException {
+    private <R> R executeCommand(long timeout, QueryCommand<R> action) throws SQLException {
+        return (useNetworkTimeout(timeout))
+            ? executeWithNetworkTimeout(action)
+            : executeWithQueryTimeout(timeout, action);
+    }
+
+    /**
+     * Executes a query command using a predefined network timeout.
+     *
+     * @param action command to be executed
+     * @param <R>    result of the action
+     *
+     * @return query result
+     *
+     * @throws SQLException if any execution errors occur
+     */
+    private <R> R executeWithNetworkTimeout(QueryCommand<R> action) throws SQLException {
         try {
-            return client.sqlRawOps().execute(query);
+            return action.execute(0L);
         } catch (Exception e) {
             handleException(e);
-            throw new SQLException(formatError(query), e);
+            throw new SQLException(formatError(action.getQuery()), e);
         }
     }
 
     /**
-     * Executes a query using a custom timeout.
+     * Executes a query command using a custom timeout.
+     * In contrast to {@link #executeWithNetworkTimeout(QueryCommand)}
+     * it provides handling of timeout errors by wrapping them via {@link StatementTimeoutException}.
      *
-     * @param timeout query timeout
-     * @param query   query
+     * @param timeout command timeout
+     * @param action  command to be executed
+     * @param <R>     result of the action
      *
-     * @return SQL result holder
+     * @return action result
      *
      * @throws StatementTimeoutException if query execution took more than query timeout
      * @throws SQLException              if any other errors occurred
      */
-    private SQLResultHolder executeWithQueryTimeout(long timeout, SQLQueryHolder query) throws SQLException {
+    private <R> R executeWithQueryTimeout(long timeout, QueryCommand<R> action) throws SQLException {
         try {
-            return client.sqlRawOps().execute(timeout, query);
+            return action.execute(timeout);
         } catch (Exception e) {
             // statement timeout should not affect the current connection
             // but can be handled by the caller side
             if (e.getCause() instanceof TimeoutException) {
-                throw new StatementTimeoutException(formatError(query), e.getCause());
+                throw new StatementTimeoutException(formatError(action.getQuery()), e.getCause());
             }
             handleException(e);
-            throw new SQLException(formatError(query), e);
+            throw new SQLException(formatError(action.getQuery()), e);
         }
     }
 
@@ -736,43 +794,71 @@ public class SQLConnection implements TarantoolConnection {
 
     static class SQLTarantoolClientImpl extends TarantoolClientImpl {
 
-        private Future<?> executeQuery(SQLQueryHolder queryHolder) {
-            return exec(makeSqlRequest(queryHolder.getQuery(), queryHolder.getParams()));
-        }
-
-        private Future<?> executeQuery(SQLQueryHolder queryHolder, long timeoutMillis) {
-            TarantoolRequest request = makeSqlRequest(queryHolder.getQuery(), queryHolder.getParams());
-            request.setTimeout(Duration.of(timeoutMillis, ChronoUnit.MILLIS));
+        private Future<?> executeQuery(SQLQueryHolder query, long timeoutMillis) {
+            boolean prepared = query.isPrepared();
+            TarantoolRequest request = new TarantoolRequest(
+                Code.EXECUTE,
+                TarantoolRequestArgumentFactory.value(prepared ? Key.SQL_STATEMENT_ID : Key.SQL_TEXT),
+                TarantoolRequestArgumentFactory.value(prepared ? query.getStatementId() : query.getQuery()),
+                TarantoolRequestArgumentFactory.value(Key.SQL_BIND),
+                TarantoolRequestArgumentFactory.value(query.getParams())
+            );
+            if (timeoutMillis > 0) {
+                request.setTimeout(Duration.of(timeoutMillis, ChronoUnit.MILLIS));
+            }
             return exec(request);
         }
 
-        final SQLRawOps sqlRawOps = new SQLRawOps() {
-            @Override
-            public SQLResultHolder execute(SQLQueryHolder query) {
-                return (SQLResultHolder) syncGet(executeQuery(query));
+        private Future<?> prepareStatement(String queryText, long timeoutMillis) {
+            TarantoolRequest prepareRequest = new TarantoolRequest(
+                Code.PREPARE,
+                TarantoolRequestArgumentFactory.value(Key.SQL_TEXT),
+                TarantoolRequestArgumentFactory.value(queryText)
+            );
+            if (timeoutMillis > 0) {
+                prepareRequest.setTimeout(Duration.ofMillis(timeoutMillis));
             }
+            return exec(prepareRequest);
+        }
 
+        private Future<?> deallocateStatement(long statementId, long timeoutMillis) {
+            TarantoolRequest prepareRequest = new TarantoolRequest(
+                Code.DEALLOCATE,
+                TarantoolRequestArgumentFactory.value(Key.SQL_STATEMENT_ID),
+                TarantoolRequestArgumentFactory.value(statementId)
+            );
+            if (timeoutMillis > 0) {
+                prepareRequest.setTimeout(Duration.ofMillis(timeoutMillis));
+            }
+            return exec(prepareRequest);
+        }
+
+        final SQLRawOps sqlRawOps = new SQLRawOps() {
             @Override
             public SQLResultHolder execute(long timeoutMillis, SQLQueryHolder query) {
                 return (SQLResultHolder) syncGet(executeQuery(query, timeoutMillis));
             }
 
             @Override
-            public SQLBatchResultHolder executeBatch(List<SQLQueryHolder> queries) {
-                return executeInternal(queries, (query) -> executeQuery(query));
+            public SQLBatchResultHolder executeBatch(long timeoutMillis, List<SQLQueryHolder> query) {
+                return executeBatchInternal(timeoutMillis, query);
             }
 
             @Override
-            public SQLBatchResultHolder executeBatch(long timeoutMillis, List<SQLQueryHolder> queries) {
-                return executeInternal(queries, (query) -> executeQuery(query, timeoutMillis));
+            public SQLPreparedHolder prepare(long timeoutMillis, String sqlQuery) {
+                return (SQLPreparedHolder) syncGet(prepareStatement(sqlQuery, timeoutMillis));
             }
 
-            private SQLBatchResultHolder executeInternal(List<SQLQueryHolder> queries,
-                                                         Function<SQLQueryHolder, Future<?>> fetcher) {
+            @Override
+            public void deallocate(long timeoutMillis, long statementId) {
+                syncGet(deallocateStatement(statementId, timeoutMillis));
+            }
+
+            private SQLBatchResultHolder executeBatchInternal(long timeout, List<SQLQueryHolder> queries) {
                 List<Future<?>> sqlFutures = new ArrayList<>();
                 // using queries pipelining to emulate a batch request
                 for (SQLQueryHolder query : queries) {
-                    sqlFutures.add(fetcher.apply(query));
+                    sqlFutures.add(executeQuery(query, timeout));
                 }
                 // wait for all the results
                 Exception lastError = null;
@@ -813,25 +899,127 @@ public class SQLConnection implements TarantoolConnection {
 
         @Override
         protected void completeSql(TarantoolOperation operation, TarantoolPacket pack) {
-            Long rowCount = SqlProtoUtils.getSQLRowCount(pack);
-            SQLResultHolder result = (rowCount == null)
-                ? SQLResultHolder.ofQuery(SqlProtoUtils.getSQLMetadata(pack), SqlProtoUtils.getSQLData(pack))
-                : SQLResultHolder.ofUpdate(rowCount.intValue(), SqlProtoUtils.getSQLAutoIncrementIds(pack));
-            ((CompletableFuture) operation.getResult()).complete(result);
+            if (operation.getCode() == Code.PREPARE) {
+                SQLPreparedHolder result = new SQLPreparedHolder(
+                    SqlProtoUtils.getStatementId(pack),
+                    SqlProtoUtils.getSQLMetadata(pack),
+                    SqlProtoUtils.getSQLBindMetadata(pack)
+                );
+                ((CompletableFuture) operation.getResult()).complete(result);
+            } else if (operation.getCode() == Code.DEALLOCATE) {
+                operation.getResult().complete(null);
+            } else {
+                Long rowCount = SqlProtoUtils.getSQLRowCount(pack);
+                SQLResultHolder result = (rowCount == null)
+                    ? SQLResultHolder.ofQuery(SqlProtoUtils.getSQLMetadata(pack), SqlProtoUtils.getSQLData(pack))
+                    : SQLResultHolder.ofUpdate(rowCount.intValue(), SqlProtoUtils.getSQLAutoIncrementIds(pack));
+                ((CompletableFuture) operation.getResult()).complete(result);
+            }
         }
 
         interface SQLRawOps {
 
-            SQLResultHolder execute(SQLQueryHolder query);
-
             SQLResultHolder execute(long timeoutMillis, SQLQueryHolder query);
-
-            SQLBatchResultHolder executeBatch(List<SQLQueryHolder> queries);
 
             SQLBatchResultHolder executeBatch(long timeoutMillis, List<SQLQueryHolder> queries);
 
+            SQLPreparedHolder prepare(long timeoutMillis, String sqlQuery);
+
+            void deallocate(long timeoutMillis, long statementId);
         }
 
+    }
+
+    private interface QueryCommand<R> {
+
+        R execute(long timeoutInMillis);
+
+        SQLQueryHolder getQuery();
+
+    }
+
+    private static final class ExecuteQueryCommand implements QueryCommand<SQLResultHolder> {
+
+        private SQLQueryHolder query;
+        private SQLTarantoolClientImpl.SQLRawOps operations;
+
+        public ExecuteQueryCommand(SQLQueryHolder query, SQLTarantoolClientImpl.SQLRawOps operations) {
+            this.query = query;
+            this.operations = operations;
+        }
+
+        @Override
+        public SQLResultHolder execute(long timeoutInMillis) {
+            return operations.execute(timeoutInMillis, query);
+        }
+
+        @Override
+        public SQLQueryHolder getQuery() {
+            return query;
+        }
+
+    }
+
+    private static final class PrepareQueryCommand implements QueryCommand<SQLPreparedHolder> {
+
+        private String text;
+        private SQLQueryHolder dummyQuery;
+        private SQLTarantoolClientImpl.SQLRawOps operations;
+
+        public PrepareQueryCommand(String text, SQLTarantoolClientImpl.SQLRawOps operations) {
+            // Tarantool does not support direct SQL syntax to PREPARE
+            // server statements so driver generate a fake query for possible error output
+            this.text = text;
+            this.dummyQuery = SQLQueryHolder.of("/* Auto-generated query */ PREPARE x AS " + text);
+            this.operations = operations;
+        }
+
+        @Override
+        public SQLPreparedHolder execute(long timeoutInMillis) {
+            return operations.prepare(timeoutInMillis, text);
+        }
+
+        @Override
+        public SQLQueryHolder getQuery() {
+            return dummyQuery;
+        }
+
+    }
+
+    private static final class DeallocateQueryCommand implements QueryCommand<Void> {
+
+        private long statementId;
+        private SQLQueryHolder dummyQuery;
+        private SQLTarantoolClientImpl.SQLRawOps operations;
+
+        public DeallocateQueryCommand(long statementId, SQLTarantoolClientImpl.SQLRawOps operations) {
+            // Tarantool does not support direct SQL syntax to DEALLOCATE
+            // server statements so driver generate a fake query for possible error output
+            this.dummyQuery = SQLQueryHolder.of("/* Auto-generated query */ DEALLOCATE PREPARE " + statementId);
+            this.statementId = statementId;
+            this.operations = operations;
+        }
+
+        @Override
+        public Void execute(long timeoutInMillis) {
+            operations.deallocate(timeoutInMillis, statementId);
+            return null;
+        }
+
+        @Override
+        public SQLQueryHolder getQuery() {
+            return dummyQuery;
+        }
+
+    }
+
+    private static class PreparedStatementReference {
+        long statementId;
+        long counter;
+
+        public PreparedStatementReference(long statementId) {
+            this.statementId = statementId;
+        }
     }
 
 }

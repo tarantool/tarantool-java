@@ -113,6 +113,10 @@ public class TarantoolOperation implements Comparable<TarantoolOperation> {
         return code;
     }
 
+    public boolean isSqlRelated() {
+        return code == Code.EXECUTE || code == Code.PREPARE;
+    }
+
     public TarantoolOperation getDependedOperation() {
         return dependedOperation;
     }

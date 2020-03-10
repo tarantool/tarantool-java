@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
-import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
+import org.tarantool.util.ServerVersion;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -70,7 +70,7 @@ public class JdbcConnectionIT {
 
     @Test
     public void testPrepareStatement() throws SQLException {
-        PreparedStatement prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES(?, ?)");
+        PreparedStatement prep = conn.prepareStatement("SELECT 1");
         assertNotNull(prep);
         prep.close();
     }
@@ -185,7 +185,7 @@ public class JdbcConnectionIT {
 
     @Test
     public void testPrepareHoldableStatement() throws SQLException {
-        String sqlString = "TEST";
+        String sqlString = "SELECT 2";
         Statement statement = conn.prepareStatement(sqlString);
         assertEquals(ResultSet.HOLD_CURSORS_OVER_COMMIT, statement.getResultSetHoldability());
 
@@ -205,7 +205,7 @@ public class JdbcConnectionIT {
     public void testPrepareUnsupportedHoldableStatement() throws SQLException {
         assertThrows(SQLFeatureNotSupportedException.class,
             () -> {
-                String sqlString = "SELECT * FROM TEST";
+                String sqlString = "SELECT 3";
                 conn.prepareStatement(
                     sqlString,
                     ResultSet.TYPE_FORWARD_ONLY,
@@ -217,7 +217,7 @@ public class JdbcConnectionIT {
 
     @Test
     public void testPrepareWrongHoldableStatement() throws SQLException {
-        String sqlString = "SELECT * FROM TEST";
+        String sqlString = "SELECT 1";
         assertThrows(SQLException.class,
             () -> {
                 conn.prepareStatement(
@@ -289,7 +289,7 @@ public class JdbcConnectionIT {
 
     @Test
     public void testPrepareScrollableStatement() throws SQLException {
-        String sqlString = "TEST";
+        String sqlString = "SELECT 2";
         Statement statement = conn.prepareStatement(sqlString);
         assertEquals(ResultSet.TYPE_FORWARD_ONLY, statement.getResultSetType());
 
@@ -308,11 +308,11 @@ public class JdbcConnectionIT {
     @Test
     public void testPrepareUnsupportedScrollableStatement() throws SQLException {
         assertThrows(SQLFeatureNotSupportedException.class, () -> {
-            String sqlString = "SELECT * FROM TEST";
+            String sqlString = "SELECT 1";
             conn.prepareStatement(sqlString, ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
         });
         assertThrows(SQLFeatureNotSupportedException.class, () -> {
-            String sqlString = "SELECT * FROM TEST";
+            String sqlString = "SELECT 2";
             conn.prepareStatement(
                 sqlString,
                 ResultSet.TYPE_SCROLL_SENSITIVE,
@@ -324,7 +324,7 @@ public class JdbcConnectionIT {
 
     @Test
     public void testPrepareWrongScrollableStatement() throws SQLException {
-        String sqlString = "SELECT * FROM TEST";
+        String sqlString = "SELECT 1";
         assertThrows(SQLException.class,
             () -> {
                 conn.prepareStatement(
@@ -404,7 +404,7 @@ public class JdbcConnectionIT {
 
     @Test
     public void testPrepareStatementWithClosedConnection() {
-        String sqlString = "SELECT * FROM TEST";
+        String sqlString = "SELECT 1";
         assertThrows(SQLException.class,
             () -> {
                 conn.close();
@@ -429,7 +429,7 @@ public class JdbcConnectionIT {
 
     @Test
     public void testGeneratedKeys() throws SQLException {
-        String sql = "SELECT * FROM test";
+        String sql = "SELECT 1";
         PreparedStatement preparedStatement = conn.prepareStatement(sql, Statement.NO_GENERATED_KEYS);
         assertNotNull(preparedStatement);
         preparedStatement.close();

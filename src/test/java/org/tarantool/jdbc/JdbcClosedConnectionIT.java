@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 import static org.tarantool.jdbc.SqlAssertions.assertSqlExceptionHasStatus;
 
-import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
 import org.tarantool.util.SQLStates;
+import org.tarantool.util.ServerVersion;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -94,7 +94,7 @@ public class JdbcClosedConnectionIT {
 
     @Test
     public void testPreparedStatement() throws SQLException {
-        PreparedStatement preparedStatement = connection.prepareStatement("TEST");
+        PreparedStatement preparedStatement = connection.prepareStatement("SELECT 1");
         connection.close();
 
         int i = 0;

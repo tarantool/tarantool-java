@@ -32,7 +32,6 @@ public abstract class ProtoUtils {
     public static final int LENGTH_OF_SIZE_MESSAGE = 5;
 
     private static final int DEFAULT_INITIAL_REQUEST_SIZE = 4096;
-    private static final String WELCOME = "Tarantool ";
 
     /**
      * Reads tarantool binary protocol's packet from {@code inputStream}.
@@ -65,7 +64,7 @@ public abstract class ProtoUtils {
      *
      * @param bufferReader readable channel that have to be in blocking mode
      *                     or instance of {@link ReadableViaSelectorChannel}
-     * @param msgPackLite MessagePack decoder instance
+     * @param msgPackLite  MessagePack decoder instance
      *
      * @return tarantool binary protocol message wrapped by instance of {@link TarantoolPacket}
      *
@@ -120,9 +119,9 @@ public abstract class ProtoUtils {
     /**
      * Connects to a tarantool node described by {@code socket}. Performs an authentication if required
      *
-     * @param socket   a socket channel to a tarantool node
-     * @param username auth username
-     * @param password auth password
+     * @param socket      a socket channel to a tarantool node
+     * @param username    auth username
+     * @param password    auth password
      * @param msgPackLite MessagePack encoder / decoder instance
      *
      * @return object with information about a connection/
@@ -141,8 +140,7 @@ public abstract class ProtoUtils {
         inputStream.read(inputBytes);
 
         String firstLine = new String(inputBytes);
-        assertCorrectWelcome(firstLine, socket.getRemoteSocketAddress());
-        String serverVersion = firstLine.substring(WELCOME.length());
+        final TarantoolGreeting greeting = parseGreetingLine(firstLine, socket.getRemoteSocketAddress());
 
         inputStream.read(inputBytes);
         String salt = new String(inputBytes);
@@ -157,15 +155,15 @@ public abstract class ProtoUtils {
             assertNoErrCode(responsePacket);
         }
 
-        return new TarantoolGreeting(serverVersion);
+        return greeting;
     }
 
     /**
      * Connects to a tarantool node described by {@code socketChannel}. Performs an authentication if required.
      *
-     * @param channel  a socket channel to tarantool node. The channel have to be in blocking mode
-     * @param username auth username
-     * @param password auth password
+     * @param channel     a socket channel to tarantool node. The channel have to be in blocking mode
+     * @param username    auth username
+     * @param password    auth password
      * @param msgPackLite MessagePack encoder / decoder instance
      *
      * @return object with information about a connection/
@@ -182,10 +180,9 @@ public abstract class ProtoUtils {
         channel.read(welcomeBytes);
 
         String firstLine = new String(welcomeBytes.array());
-        assertCorrectWelcome(firstLine, channel.getRemoteAddress());
-        final String serverVersion = firstLine.substring(WELCOME.length());
+        final TarantoolGreeting greeting = parseGreetingLine(firstLine, channel.getRemoteAddress());
 
-        ((Buffer)welcomeBytes).clear();
+        ((Buffer) welcomeBytes).clear();
         channel.read(welcomeBytes);
         String salt = new String(welcomeBytes.array());
 
@@ -197,17 +194,7 @@ public abstract class ProtoUtils {
             assertNoErrCode(authResponse);
         }
 
-        return new TarantoolGreeting(serverVersion);
-    }
-
-    private static void assertCorrectWelcome(String firstLine, SocketAddress remoteAddress) {
-        if (!firstLine.startsWith(WELCOME)) {
-            String errMsg = "Failed to connect to node " + remoteAddress.toString() +
-                ": Welcome message should starts with tarantool but starts with '" +
-                firstLine +
-                "'";
-            throw new CommunicationException(errMsg, new IllegalStateException("Invalid welcome packet"));
-        }
+        return greeting;
     }
 
     private static void assertNoErrCode(TarantoolPacket authResponse) {
@@ -329,6 +316,15 @@ public abstract class ProtoUtils {
             return ByteBuffer.wrap(buf, 0, count);
         }
 
+    }
+
+    private static TarantoolGreeting parseGreetingLine(String line, SocketAddress remoteAddress) {
+        try {
+            return new TarantoolGreeting(line);
+        } catch (Exception cause) {
+            String message = "Failed to connect to node " + remoteAddress.toString();
+            throw new CommunicationException(message, cause);
+        }
     }
 
 }

@@ -9,8 +9,8 @@ import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 import static org.tarantool.TestAssumptions.assumeServerVersionLessThan;
 import static org.tarantool.TestAssumptions.assumeServerVersionOutOfRange;
 
-import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
+import org.tarantool.util.ServerVersion;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;

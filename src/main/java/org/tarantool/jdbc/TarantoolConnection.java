@@ -37,4 +37,30 @@ public interface TarantoolConnection extends Connection {
     SQLBatchResultHolder executeBatch(long timeout, List<SQLQueryHolder> queries)
         throws SQLException;
 
+    /**
+     * Prepares SQL query and obtain prepared statement metadata.
+     * It requires Tarantool 2.3.1 or above.
+     *
+     * @param timeout query timeout
+     * @param sqlText query string to be prepared
+     *
+     * @return metadata of the prepared statement
+     *
+     * @throws SQLException if errors occur while the query is being performed.
+     *                      {@link java.sql.SQLTimeoutException} is raised when execution time exceeds the timeout
+     */
+    SQLPreparedHolder prepare(long timeout, String sqlText) throws SQLException;
+
+    /**
+     * Removes a previously prepared SQL server statement.
+     * It requires Tarantool 2.3.1 or above.
+     *
+     * @param timeout     query timeout
+     * @param statementId server statement ID
+     *
+     * @throws SQLException if errors occur while the query is being performed.
+     *                      {@link java.sql.SQLTimeoutException} is raised when execution time exceeds the timeout
+     */
+    void deallocate(long timeout, Long statementId) throws SQLException;
+
 }

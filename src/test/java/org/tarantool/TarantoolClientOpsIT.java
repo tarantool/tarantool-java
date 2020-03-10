@@ -12,6 +12,8 @@ import static org.tarantool.TestUtils.openConnection;
 import static org.tarantool.TestUtils.toLuaDelete;
 import static org.tarantool.TestUtils.toLuaSelect;
 
+import org.tarantool.util.ServerVersion;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;

@@ -8,6 +8,8 @@ import static org.tarantool.TestUtils.makeDefaultClientConfig;
 import static org.tarantool.TestUtils.makeTestClient;
 import static org.tarantool.TestUtils.openConnection;
 
+import org.tarantool.util.ServerVersion;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;

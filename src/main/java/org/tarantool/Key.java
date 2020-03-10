@@ -29,10 +29,13 @@ public enum Key implements Callable<Integer> {
     SQL_FIELD_TYPE(0x1),
 
     SQL_METADATA(0x32),
+    SQL_BIND_METADATA(0x33),
+    SQL_BIND_COUNT(0x34),
     SQL_TEXT(0x40),
     SQL_BIND(0x41),
     SQL_OPTIONS(0x42),
     SQL_INFO(0x42),
+    SQL_STATEMENT_ID(0x43),
     SQL_ROW_COUNT(0x00),
     SQL_INFO_AUTOINCREMENT_IDS(0x01);
 
