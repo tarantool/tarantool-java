@@ -27,7 +27,7 @@ jobs:
       env: []
       jdk: openjdk11
       before_script: skip
-      script: mvn checkstyle:check
+      script: mvn checkstyle:check javadoc:javadoc
       after_success: skip
 
 before_script:
