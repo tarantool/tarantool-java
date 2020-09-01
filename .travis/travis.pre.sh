@@ -14,4 +14,9 @@ EOF
 sudo apt-get update
 sudo apt-get -y install tarantool tarantool-common
 
-sudo tarantoolctl stop example
+# Stop 'example' instance if it exists.
+#
+# See https://github.com/tarantool/tarantool/issues/4507
+if [ -e /etc/tarantool/instances.enabled/example.lua ]; then
+    sudo tarantoolctl stop example
+fi
