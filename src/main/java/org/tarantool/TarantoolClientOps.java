@@ -1,5 +1,7 @@
 package org.tarantool;
 
+import org.tarantool.dsl.TarantoolRequestSpec;
+
 /**
  * Provides a set of typical operations with data in Tarantool.
  *
@@ -40,6 +42,8 @@ public interface TarantoolClientOps<T, O, P, R> {
     R call(String function, Object... args);
 
     R eval(String expression, Object... args);
+
+    R execute(TarantoolRequestSpec requestSpec);
 
     void ping();
 

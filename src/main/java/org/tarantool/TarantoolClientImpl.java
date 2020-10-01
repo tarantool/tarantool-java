@@ -1,5 +1,8 @@
 package org.tarantool;
 
+import org.tarantool.conversion.ConverterRegistry;
+import org.tarantool.conversion.DefaultConverterRegistry;
+import org.tarantool.dsl.TarantoolRequestSpec;
 import org.tarantool.logging.Logger;
 import org.tarantool.logging.LoggerFactory;
 import org.tarantool.protocol.ProtoConstants;
@@ -92,6 +95,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     protected Thread writer;
 
     protected TarantoolSchemaMeta schemaMeta = new TarantoolMetaSpacesCache(this);
+    protected ConverterRegistry converterRegistry = new DefaultConverterRegistry();
 
     protected Thread connector = new Thread(new Runnable() {
         @Override
@@ -277,6 +281,18 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     @Override
     public TarantoolSchemaMeta getSchemaMeta() {
         return schemaMeta;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public TarantoolResultSet executeRequest(TarantoolRequestSpec requestSpec) {
+        TarantoolRequest request = requestSpec.toTarantoolRequest(getSchemaMeta());
+        List<Object> result = (List<Object>) syncGet(exec(request));
+        return new InMemoryResultSet(result, isSingleResultRow(request.getCode()), converterRegistry);
+    }
+
+    private boolean isSingleResultRow(Code code) {
+        return code == Code.EVAL || code == Code.CALL || code == Code.OLD_CALL;
     }
 
     /**

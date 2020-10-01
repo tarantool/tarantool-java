@@ -1,5 +1,6 @@
 package org.tarantool;
 
+import org.tarantool.dsl.TarantoolRequestSpec;
 import org.tarantool.schema.TarantoolSchemaMeta;
 
 import java.util.List;
@@ -33,4 +34,5 @@ public interface TarantoolClient {
 
     TarantoolSchemaMeta getSchemaMeta();
 
+    TarantoolResultSet executeRequest(TarantoolRequestSpec requestSpec);
 }

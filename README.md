@@ -17,6 +17,7 @@ To get the Java connector for Tarantool 1.6.9, visit
 * [Spring NamedParameterJdbcTemplate usage example](#spring-namedparameterjdbctemplate-usage-example)
 * [JDBC](#JDBC)
 * [Cluster support](#cluster-support)
+* [Getting a result](#getting-a-result)
 * [Logging](#logging)
 * [Building](#building)
 * [Where to get help](#where-to-get-help)
@@ -133,6 +134,194 @@ all the results, you could override this:
 protected void complete(TarantoolPacket packet, CompletableFuture<?> future);
 ```
 
+### Supported operation types
+
+Given a tarantool space as:
+
+```lua
+box.schema.space.create('cars', { format =
+    { {name='id', type='integer'},"
+      {name='name', type='string'},"
+      {name='max_mph', type='integer'} }
+});
+box.space.cars:create_index('pk', { type='TREE', parts={'id'} });
+box.space.cars:create_index('speed_idx', { type='TREE', unique=false, parts={'max_mph', type='unsigned'} });
+``` 
+
+and a stored function as well:
+
+```lua
+function getVehiclesSlowerThan(max_mph, max_size)
+    return box.space.cars.index.speed_idx:select(max_mph, {iterator='LT', limit=max_size});
+end;
+```
+
+Let's have a look what sort of operations we can apply to it using a connector. 
+*Note*: assume Tarantool generated id equal `512` for the newly created `cars` space.
+
+* SELECT (find tuples matching the search pattern)
+
+For instance, we can get a single tuple by id like 
+
+```java
+ops.select(512, 0, Collections.singletonList(1), 0, 1, Iterator.EQ);
+```
+
+or using more readable lookup names
+
+```java
+ops.select("cars", "pk", Collections.singletonList(1), 0, 1, Iterator.EQ);
+```
+
+or even using builder-way to construct a query part-by-part
+
+```java
+import static org.tarantool.dsl.Requests.selectRequest;
+
+ops.execute(
+    selectRequest("cars", "pk")
+        .iterator(Iterator.EQ)
+        .limit(1)
+);
+```
+
+* INSERT (put a tuple in the space)
+
+Let's insert a new tuple into the space 
+
+```java
+ops.insert(512, Arrays.asList(1, "Lada Niva", 81));
+```
+
+do the same using names
+
+```java
+ops.insert("cars", Arrays.asList(1, "Lada Niva", 81));
+```
+
+or using DSL
+
+```java
+import static org.tarantool.dsl.Requests.insertRequest;
+
+ops.execute(
+    insertRequest("cars", Arrays.asList(1, "Lada Niva", 81))
+);
+```
+
+* REPLACE (insert a tuple into the space or replace an existing one)
+
+The syntax is quite similar to insert operation
+
+```java
+import static org.tarantool.dsl.Requests.replaceRequest;
+
+ops.replace(512, Arrays.asList(2, "UAZ-469", 60));
+ops.replace("cars", Arrays.asList(2, "UAZ-469", 60));
+ops.execute(
+    replaceRequest("cars", Arrays.asList(2, "UAZ-469", 60))
+);
+```
+
+* UPDATE (update a tuple)
+
+Let's modify one of existing tuples
+
+```java
+ops.update(512, Collections.singletonList(1), Arrays.asList("=", 1, "Lada 4×4"));
+```
+
+Lookup way:
+
+```java
+ops.update("cars", Collections.singletonList(1), Arrays.asList("=", 1, "Lada 4×4"));
+```
+
+or using DSL
+
+```java
+import static org.tarantool.dsl.Operations.assign;
+import static org.tarantool.dsl.Requests.updateRequest;
+
+ops.execute(
+    updateRequest("cars", Collections.singletonList(1), assign(1, "Lada 4×4"))
+);
+```
+
+*Note*: since Tarantool 2.3.x you can refer to tuple fields by name:
+
+```java
+ops.update(512, Collections.singletonList(1), Arrays.asList("=", "name", "Lada 4×4"));
+```
+
+* UPSERT (update a tuple if it exists, otherwise try to insert it as a new tuple)
+
+An example looks as a mix of both insert and update operations:
+
+```java
+import static org.tarantool.dsl.Operations.assign;
+import static org.tarantool.dsl.Requests.upsertRequest;
+
+ops.upsert(512, Collections.singletonList(3), Arrays.asList(3, "KAMAZ-65224", 65), Arrays.asList("=", 2, 65));
+ops.upsert("cars", Collections.singletonList(3), Arrays.asList(3, "KAMAZ-65224", 65), Arrays.asList("=", 2, 65));
+ops.execute(
+    upsertRequest("cars", Collections.singletonList(3), assign(2, 65))
+);
+``` 
+
+*Note*: since Tarantool 2.3.x you can refer to tuple fields by name:
+
+```java
+ops.upsert("cars", Collections.singletonList(3), Arrays.asList(3, "KAMAZ-65224", 65), Arrays.asList("=", "max_mph", 65));
+```
+
+* DELETE (delete a tuple)
+
+Remove a tuple using one of the following forms:
+
+```java
+import static org.tarantool.dsl.Requests.deleteRequest;
+
+ops().delete(512, Collections.singletonList(1));
+// same via lookup
+ops().delete("cars", Collections.singletonList(1));
+// same via DSL
+ops.execute(deleteRequest("cars", Collections.singletonList(1)));
+```
+
+* CALL / CALL v1.6 (call a stored function)
+
+Let's invoke the predefined function to fetch slower enough vehicles:
+
+```java
+import static org.tarantool.dsl.Requests.callRequest;
+
+ops().call("getVehiclesSlowerThan", 80, 10);
+// same via DSL
+ops.execute(callRequest("getVehiclesSlowerThan").arguments(80, 10));
+```
+
+*NOTE*: to use obsolete Tarantool v1.6 operation, configure it as follows:
+
+```java
+ops().setCallCode(Code.OLD_CALL);
+ops().call("getVehiclesSlowerThan", 80, 10);
+// same via DSL
+ops.execute(callRequest("getVehiclesSlowerThan").arguments(80, 10).useCall16(true));
+```  \
+
+* EVAL (evaluate a Lua expression)
+
+To evaluate expressions using Lua, you can invoke the following operation:
+
+```java
+import static org.tarantool.dsl.Requests.evalRequest;
+
+ops().eval("return getVehiclesSlowerThan(...)", 90, 50);
+// same via DSL
+ops.execute(evalRequest("return getVehiclesSlowerThan(...)")).arguments(90, 50));
+```
+
 ### Client config options
 
 The client configuration options are represented through the `TarantoolClientConfig` class.
@@ -228,6 +417,80 @@ against its integer IDs.
    a cause of request timeout.
 3. The client guarantees an order of synchronous requests per thread. Other cases such
    as asynchronous or multi-threaded requests may be out of order before the execution.
+
+## Getting a result
+
+Traditionally, when a response is parsed by the internal MsgPack implementation the client
+will return it as a heterogeneous list of objects `List` that in most cases is inconvenient
+for users to use. It requires a type guessing as well as a writing more boilerplate code to work
+with typed data. Most of the methods which are provided by `TarantoolClientOps` (i.e. `select`)
+return raw de-serialized data via `List`. 
+
+Consider a small example how it is usually used:
+
+```java
+// get an untyped array of tuples
+List<?> result = client.syncOps().execute(Requests.selectRequest("space", "pk"));
+for (int i = 0; i < result.size(); i++) {
+    // get the first tuple (also untyped)
+    List<?> row = result.get(i);
+    // try to cast the first tuple as a couple of values
+    int id = (int) row.get(0);
+    String text = (String) row.get(1);
+    processEntry(id, text);
+}
+```
+
+There is an additional way to work with data using `TarantoolClient.executeRequest(TarantoolRequestConvertible)`
+method. This method returns a result wrapper over original data that allows to extract in a more
+typed manner rather than it is directly provided by MsgPack serialization. The `executeRequest`
+returns the `TarantoolResultSet` which provides a bunch of methods to get data. Inside the result
+set the data is represented as a list of rows (tuples) where each row has columns (fields).
+In general, it is possible that different rows have different size of their columns in scope of
+the same result. 
+
+```java
+TarantoolResultSet result = client.executeRequest(Requests.selectRequest("space", "pk"));
+while (result.next()) {
+    long id = result.getLong(0);
+    String text = result.getString(1);
+    processEntry(id, text);
+}
+```
+
+The `TarantoolResultSet` provides an implicit conversation between types if it's possible.
+
+Numeric types internally can represent each other if a type range allows to do it. For example,
+byte 100 can be represented as a short, int and other types wider than byte. But 200 integer
+cannot be narrowed to a byte because of overflow (byte range is [-128..127]). If a floating
+point number is converted to a integer then the fraction part will be omitted. It is also
+possible to convert a valid string to a number. 
+
+Boolean type can be obtained from numeric types such as byte, short, int, long, BigInteger,
+float and double where 1 (1.0) means true and 0 (0.0) means false. Or it can be got from
+a string using well-known patterns such as "1", "t|true", "y|yes", "on" for true and
+"0", "f|false", "n|no", "off" for false respectively.
+
+String type can be converted from a byte array and any numeric types. In case of `byte[]`
+all bytes will be interpreted as a UTF-8 sequence.  
+
+There is a special method called `getObject(int, Map)` where a user can provide its own
+mapping functions to be applied if a designated type matches a value one.
+
+For instance, using the following map each strings will be transformed to an upper case and
+boolean values will be represented as strings "yes" or "no":
+
+```java
+Map<Class<?>, Function<Object, Object>> mappers = new HashMap<>();
+mappers.put(
+    String.class,
+    v -> ((String) v).toUpperCase()
+);
+mappers.put(
+    Boolean.class,
+    v -> (boolean) v ? "yes" : "no"
+);
+``` 
 
 ## Spring NamedParameterJdbcTemplate usage example
 
