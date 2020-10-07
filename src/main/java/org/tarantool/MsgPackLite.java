@@ -7,7 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,7 +15,65 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 /**
- * forked from https://bitbucket.org/sirbrialliance/msgpack-java-lite
+ * A simple binary (de-)serializer based on {@code msgpack-java-lite} implementation.
+ *
+ * <p>
+ * Supported types for serialization:
+ *
+ * <ul>
+ *     <li>null as MsgPack Nil value</li>
+ *     <li>
+ *         primitive types and their wrappers (byte, char, short, int, long, float, double, boolean) as
+ *         the corresponding MsgPack format values.
+ *     </li>
+ *     <li>{@link java.math.BigInteger}, especially to represent a MsgPack uint 64 value</li>
+ *     <li>{@link org.tarantool.Code} as an integer value</li>
+ *     <li>{@link java.lang.String}</li>
+ *     <li>java arrays and {@link java.util.List} as an MsgPack array format</li>
+ *     <li>{@link java.util.Map} as an MsgPack map format</li>
+ *     <li>
+ *         {@link java.util.concurrent.Callable} that can return any object of the types
+ *         listed above.
+ *     </li>
+ * </ul>
+ *
+ * <p>
+ * Note: a value will be serialized using as a short form as possible (i.e. long value 1L
+ * will be accommodated using 1 byte via fixnum 0b00000001)
+ *
+ * <p>
+ * Supported types for deserialization:
+ *
+ * <ul>
+ *      <li>MsgPack Nil as null value</li>
+ *      <li>
+ *          MsgPack unsigned integral numbers
+ *          positive fixnum, uint8, uint16 always will be parsed as an int value;
+ *          uint32, uint64 (< 2^63) - as a long value;
+ *          uint64 (>= 2^63) - as {@link java.math.BigInteger}.
+ *      </li>
+ *      <li>
+ *          MsgPack signed integral numbers
+ *          negative fixnum, int8 will be parsed as a byte value;
+ *          int16 - as a short value;
+ *          int32 - as a int value;
+ *          int64 - as a long value.
+ *      </li>
+ *      <li>MsgPack float32, float64 as float and double respectively</li>
+ *      <li>{@link java.math.BigInteger}, in case of uint64 being bigger than 2^63-1</li>
+ *      <li>MsgPack string as a {@link java.lang.String} object</li>
+ *      <li>MsgPack array as a {@link java.util.List} object container</li>
+ *      <li>MsgPack map as a {@link java.util.Map} object container</li>
+ *      <li>MsgPack binary array as a {@literal byte[]} object</li>
+ * </ul>>
+ *
+ * <p>
+ * Note: de-serializing of strings, arrays, maps, and binary arrays is limited up to
+ * 2^31-1 elements that is incompatible with MsgPack spec where a boundary is 2^32-1.
+ * It will raise an exception when such an object size is received.
+ *
+ * @see <a href="https://bitbucket.org/sirbrialliance/msgpack-java-lite">msgpack-java-lite</a>
+ * @see <a href="https://github.com/msgpack/msgpack/blob/master/spec.md">MessagePack specification</a>
  */
 public class MsgPackLite {
 
@@ -34,10 +92,11 @@ public class MsgPackLite {
     protected static final BigInteger BI_MAX_LONG = BigInteger.valueOf(Long.MAX_VALUE);
     protected static final BigInteger BI_MAX_64BIT = BigInteger.valueOf(2).pow(64).subtract(BigInteger.ONE);
 
-    //these values are from http://wiki.msgpack.org/display/MSGPACK/Format+specification
     protected static final byte MP_NULL = (byte) 0xc0;
+
     protected static final byte MP_FALSE = (byte) 0xc2;
     protected static final byte MP_TRUE = (byte) 0xc3;
+
     protected static final byte MP_BIN8 = (byte) 0xc4;
     protected static final byte MP_BIN16 = (byte) 0xc5;
     protected static final byte MP_BIN32 = (byte) 0xc6;
@@ -45,40 +104,64 @@ public class MsgPackLite {
     protected static final byte MP_FLOAT = (byte) 0xca;
     protected static final byte MP_DOUBLE = (byte) 0xcb;
 
-    protected static final byte MP_FIXNUM = (byte) 0x00;//last 7 bits is value
+    // positive fix. number 0b0xxxxxxx - last seven bits represent a value
+    protected static final byte MP_FIXNUM = (byte) 0x00;
+
+    // negative fix. number 0b111xxxxx - last five bits represent a value
+    // me wishes for signed numbers.
+    protected static final int MP_NEGATIVE_FIXNUM_INT = 0xe0;
+
+    // variable multi-byte unsigned integers
     protected static final byte MP_UINT8 = (byte) 0xcc;
     protected static final byte MP_UINT16 = (byte) 0xcd;
     protected static final byte MP_UINT32 = (byte) 0xce;
     protected static final byte MP_UINT64 = (byte) 0xcf;
 
-    protected static final byte MP_NEGATIVE_FIXNUM = (byte) 0xe0;//last 5 bits is value
-    protected static final int MP_NEGATIVE_FIXNUM_INT = 0xe0;//  /me wishes for signed numbers.
+    // variable multi-byte signed integers
     protected static final byte MP_INT8 = (byte) 0xd0;
     protected static final byte MP_INT16 = (byte) 0xd1;
     protected static final byte MP_INT32 = (byte) 0xd2;
     protected static final byte MP_INT64 = (byte) 0xd3;
 
-    protected static final byte MP_FIXARRAY = (byte) 0x90;//last 4 bits is size
+    // fix. array size 0b1001xxxx - last four bits represent an array size
+    protected static final byte MP_FIXARRAY = (byte) 0x90;
     protected static final int MP_FIXARRAY_INT = 0x90;
+
+    // variable multi-byte array size
     protected static final byte MP_ARRAY16 = (byte) 0xdc;
     protected static final byte MP_ARRAY32 = (byte) 0xdd;
 
-    protected static final byte MP_FIXMAP = (byte) 0x80;//last 4 bits is size
+    // fix. map size 0b1000xxxx - last four bits represent a map size
+    protected static final byte MP_FIXMAP = (byte) 0x80;
     protected static final int MP_FIXMAP_INT = 0x80;
+
+    // variable multi-byte map size
     protected static final byte MP_MAP16 = (byte) 0xde;
     protected static final byte MP_MAP32 = (byte) 0xdf;
 
-    protected static final byte MP_FIXSTR = (byte) 0xa0;//last 5 bits is size
+    // fix. string length 0b101xxxxx - last five bits represent a string size in bytes
+    protected static final byte MP_FIXSTR = (byte) 0xa0;
     protected static final int MP_FIXSTR_INT = 0xa0;
+
+    // variable multi-byte string length
     protected static final byte MP_STR8 = (byte) 0xd9;
     protected static final byte MP_STR16 = (byte) 0xda;
     protected static final byte MP_STR32 = (byte) 0xdb;
 
-    public void pack(Object item, OutputStream os) throws IOException {
-        DataOutputStream out = new DataOutputStream(os);
+    /**
+     * Serializes an object.
+     *
+     * @param item   object to be serialized
+     * @param output target output stream
+     *
+     * @throws IOException if any I/O errors occur while writing
+     * @throws IllegalArgumentException if an object to be parsed is not supported
+     */
+    public void pack(Object item, OutputStream output) throws IOException {
+        DataOutputStream out = new DataOutputStream(output);
         if (item instanceof Callable) {
             try {
-                item = ((Callable) item).call();
+                item = ((Callable<?>) item).call();
             } catch (Exception e) {
                 throw new IllegalArgumentException(e);
             }
@@ -86,13 +169,13 @@ public class MsgPackLite {
         if (item == null) {
             out.write(MP_NULL);
         } else if (item instanceof Boolean) {
-            out.write(((Boolean) item).booleanValue() ? MP_TRUE : MP_FALSE);
+            out.write(((boolean) item) ? MP_TRUE : MP_FALSE);
         } else if (item instanceof Number || item instanceof Code) {
             if (item instanceof Float) {
-                out.write(MP_FLOAT);
+                out.writeByte(MP_FLOAT);
                 out.writeFloat((Float) item);
             } else if (item instanceof Double) {
-                out.write(MP_DOUBLE);
+                out.writeByte(MP_DOUBLE);
                 out.writeDouble((Double) item);
             } else {
                 if (item instanceof BigInteger) {
@@ -101,7 +184,8 @@ public class MsgPackLite {
                     if (isPositive && value.compareTo(BI_MAX_64BIT) > 0 ||
                         value.compareTo(BI_MIN_LONG) < 0) {
                         throw new IllegalArgumentException(
-                            "Cannot encode BigInteger as MsgPack: out of -2^63..2^64-1 range");
+                            "Cannot encode BigInteger as MsgPack: out of -2^63..2^64-1 range"
+                        );
                     }
                     if (isPositive && value.compareTo(BI_MAX_LONG) > 0) {
                         byte[] data = value.toByteArray();
@@ -109,7 +193,7 @@ public class MsgPackLite {
                         for (int i = 0; i < data.length - 8; ++i) {
                             assert data[i] == 0;
                         }
-                        out.write(MP_UINT64);
+                        out.writeByte(MP_UINT64);
                         out.write(data, data.length - 8, 8);
                         return;
                     }
@@ -117,92 +201,79 @@ public class MsgPackLite {
                 long value = item instanceof Code ? ((Code) item).getId() : ((Number) item).longValue();
                 if (value >= 0) {
                     if (value <= MAX_7BIT) {
-                        out.write((int) value | MP_FIXNUM);
+                        out.writeByte((int) value | MP_FIXNUM);
                     } else if (value <= MAX_8BIT) {
-                        out.write(MP_UINT8);
-                        out.write((int) value);
+                        out.writeByte(MP_UINT8);
+                        out.writeByte((int) value);
                     } else if (value <= MAX_16BIT) {
-                        out.write(MP_UINT16);
+                        out.writeByte(MP_UINT16);
                         out.writeShort((int) value);
                     } else if (value <= MAX_32BIT) {
-                        out.write(MP_UINT32);
+                        out.writeByte(MP_UINT32);
                         out.writeInt((int) value);
                     } else {
-                        out.write(MP_UINT64);
+                        out.writeByte(MP_UINT64);
                         out.writeLong(value);
                     }
                 } else {
                     if (value >= -(MAX_5BIT + 1)) {
-                        out.write((int) (value & 0xff));
+                        out.writeByte((int) (value & 0xff));
                     } else if (value >= -(MAX_7BIT + 1)) {
-                        out.write(MP_INT8);
-                        out.write((int) value);
+                        out.writeByte(MP_INT8);
+                        out.writeByte((int) value);
                     } else if (value >= -(MAX_15BIT + 1)) {
-                        out.write(MP_INT16);
+                        out.writeByte(MP_INT16);
                         out.writeShort((int) value);
                     } else if (value >= -(MAX_31BIT + 1)) {
-                        out.write(MP_INT32);
+                        out.writeByte(MP_INT32);
                         out.writeInt((int) value);
                     } else {
-                        out.write(MP_INT64);
+                        out.writeByte(MP_INT64);
                         out.writeLong(value);
                     }
                 }
             }
         } else if (item instanceof String) {
-            byte[] data = ((String) item).getBytes("UTF-8");
+            byte[] data = ((String) item).getBytes(StandardCharsets.UTF_8);
             if (data.length <= MAX_5BIT) {
-                out.write(data.length | MP_FIXSTR);
+                out.writeByte(data.length | MP_FIXSTR);
             } else if (data.length <= MAX_8BIT) {
-                out.write(MP_STR8);
+                out.writeByte(MP_STR8);
                 out.writeByte(data.length);
             } else if (data.length <= MAX_16BIT) {
-                out.write(MP_STR16);
+                out.writeByte(MP_STR16);
                 out.writeShort(data.length);
             } else {
-                out.write(MP_STR32);
+                out.writeByte(MP_STR32);
                 out.writeInt(data.length);
             }
             out.write(data);
-        } else if (item instanceof byte[] || item instanceof ByteBuffer) {
-            byte[] data;
-            if (item instanceof byte[]) {
-                data = (byte[]) item;
-            } else {
-                ByteBuffer bb = ((ByteBuffer) item);
-                if (bb.hasArray()) {
-                    data = bb.array();
-                } else {
-                    data = new byte[bb.capacity()];
-                    bb.position();
-                    bb.limit(bb.capacity());
-                    bb.get(data);
-                }
-            }
+        } else if (item instanceof byte[]) {
+            byte[] data = (byte[]) item;
             if (data.length <= MAX_8BIT) {
-                out.write(MP_BIN8);
+                out.writeByte(MP_BIN8);
                 out.writeByte(data.length);
             } else if (data.length <= MAX_16BIT) {
-                out.write(MP_BIN16);
+                out.writeByte(MP_BIN16);
                 out.writeShort(data.length);
             } else {
-                out.write(MP_BIN32);
+                out.writeByte(MP_BIN32);
                 out.writeInt(data.length);
             }
             out.write(data);
         } else if (item instanceof List || item.getClass().isArray()) {
-            int length = item instanceof List ? ((List) item).size() : Array.getLength(item);
+            int length = item instanceof List ? ((List<?>) item).size() : Array.getLength(item);
             if (length <= MAX_4BIT) {
-                out.write(length | MP_FIXARRAY);
+                out.writeByte(length | MP_FIXARRAY);
             } else if (length <= MAX_16BIT) {
-                out.write(MP_ARRAY16);
+                out.writeByte(MP_ARRAY16);
                 out.writeShort(length);
             } else {
-                out.write(MP_ARRAY32);
+                out.writeByte(MP_ARRAY32);
                 out.writeInt(length);
             }
             if (item instanceof List) {
-                List list = ((List) item);
+                List<?> list = ((List<?>) item);
                 for (Object element : list) {
                     pack(element, out);
                 }
@@ -212,17 +283,18 @@ public class MsgPackLite {
                 }
             }
         } else if (item instanceof Map) {
-            Map<Object, Object> map = (Map<Object, Object>) item;
-            if (map.size() <= MAX_4BIT) {
-                out.write(map.size() | MP_FIXMAP);
-            } else if (map.size() <= MAX_16BIT) {
-                out.write(MP_MAP16);
-                out.writeShort(map.size());
+            Map<?, ?> map = (Map<?, ?>) item;
+            int length = map.size();
+            if (length <= MAX_4BIT) {
+                out.writeByte(length | MP_FIXMAP);
+            } else if (length <= MAX_16BIT) {
+                out.writeByte(MP_MAP16);
+                out.writeShort(length);
             } else {
-                out.write(MP_MAP32);
-                out.writeInt(map.size());
+                out.writeByte(MP_MAP32);
+                out.writeInt(length);
             }
-            for (Map.Entry<Object, Object> kvp : map.entrySet()) {
+            for (Map.Entry<?, ?> kvp : map.entrySet()) {
                 pack(kvp.getKey(), out);
                 pack(kvp.getValue(), out);
             }
@@ -231,8 +303,18 @@ public class MsgPackLite {
         }
     }
 
-    public Object unpack(InputStream is) throws IOException {
-        DataInputStream in = new DataInputStream(is);
+    /**
+     * De-serializes next object from the binary stream.
+     *
+     * @param inputStream source data stream
+     *
+     * @return de-serialized value
+     *
+     * @throws IOException if any I/O errors occur while reading
+     * @throws IllegalArgumentException if none of the ranges is valid
+     */
+    public Object unpack(InputStream inputStream) throws IOException {
+        DataInputStream in = new DataInputStream(inputStream);
         int value = in.read();
         if (value < 0) {
             throw new IllegalArgumentException("No more input available when expecting a value");
@@ -249,11 +331,17 @@ public class MsgPackLite {
         case MP_DOUBLE:
             return in.readDouble();
         case MP_UINT8:
-            return in.read(); // read single byte, return as int
+            // uint8 -> int
+            // read byte, trick Java into treating it as unsigned, byte & int -> int
+            return in.readByte() & MAX_8BIT;
         case MP_UINT16:
-            return in.readShort() & MAX_16BIT; // read short, trick Java into treating it as unsigned, return int
+            // uint16 -> int
+            // short & int -> int
+            return in.readShort() & MAX_16BIT;
         case MP_UINT32:
-            return in.readInt() & MAX_32BIT; // read int, trick Java into treating it as unsigned, return long
+            // uint32 -> long
+            // int & long -> long
+            return in.readInt() & MAX_32BIT;
         case MP_UINT64: {
             long v = in.readLong();
             if (v >= 0) {
@@ -304,60 +392,83 @@ public class MsgPackLite {
         default:
             break;
         }
+        return unpackFixedSize(value, in);
+    }
 
-        if (value >= MP_NEGATIVE_FIXNUM_INT && value <= MP_NEGATIVE_FIXNUM_INT + MAX_5BIT) {
-            return (byte) value;
-        } else if (value >= MP_FIXARRAY_INT && value <= MP_FIXARRAY_INT + MAX_4BIT) {
-            return unpackList(value - MP_FIXARRAY_INT, in);
-        } else if (value >= MP_FIXMAP_INT && value <= MP_FIXMAP_INT + MAX_4BIT) {
-            return unpackMap(value - MP_FIXMAP_INT, in);
-        } else if (value >= MP_FIXSTR_INT && value <= MP_FIXSTR_INT + MAX_5BIT) {
-            return unpackStr(value - MP_FIXSTR_INT, in);
-        } else if (value <= MAX_7BIT) {
-            // MP_FIXNUM - the value is value as an int
-            return value;
+    /**
+     * Parses fixed sized objects.
+     *
+     * Supported ranges are:
+     *
+     * <li>positive 7-bit integers: 0x00 - 0x7f</li>
+     * <li>negative 5-bit integers: 0xe0 - 0xff</li>
+     * <li>strings upto 31 bytes: 0xa0 - 0xbf</li>
+     * <li>fixed size map: 0x80 - 0x8f</li>
+     * <li>fixed size array: 0x90 - 0x9f</li>
+     *
+     * @param size        encoded object size
+     * @param inputStream source stream
+     *
+     * @return parsed value
+     *
+     * @throws IOException if any I/O errors occur
+     * @throws IllegalArgumentException if none of the ranges is valid
+     */
+    private Object unpackFixedSize(int size, DataInputStream inputStream) throws IOException {
+        if (size >= MP_NEGATIVE_FIXNUM_INT && size <= MP_NEGATIVE_FIXNUM_INT + MAX_5BIT) {
+            return (byte) size;
+        } else if (size >= MP_FIXARRAY_INT && size <= MP_FIXARRAY_INT + MAX_4BIT) {
+            return unpackList(size - MP_FIXARRAY_INT, inputStream);
+        } else if (size >= MP_FIXMAP_INT && size <= MP_FIXMAP_INT + MAX_4BIT) {
+            return unpackMap(size - MP_FIXMAP_INT, inputStream);
+        } else if (size >= MP_FIXSTR_INT && size <= MP_FIXSTR_INT + MAX_5BIT) {
+            return unpackStr(size - MP_FIXSTR_INT, inputStream);
+        } else if (size <= MAX_7BIT) {
+            // fixnum -> int
+            return size;
         } else {
-            throw new IllegalArgumentException("Input contains invalid type value " + (byte) value);
+            throw new IllegalArgumentException("Input contains invalid type size " + (byte) size);
         }
     }
 
-    protected List unpackList(int size, DataInputStream in) throws IOException {
+    protected List<Object> unpackList(int size, DataInputStream in) throws IOException {
         if (size < 0) {
-            throw new IllegalArgumentException("Array to unpack too large for Java (more than 2^31 elements)!");
+            throw new IllegalArgumentException("Array to unpack too large for Java (more than 2^31-1 elements)!");
         }
-        List ret = new ArrayList(size);
+        List<Object> result = new ArrayList<>(size);
         for (int i = 0; i < size; ++i) {
-            ret.add(unpack(in));
+            result.add(unpack(in));
         }
-        return ret;
+        return result;
     }
 
-    protected Map unpackMap(int size, DataInputStream in) throws IOException {
+    protected Map<Object, Object> unpackMap(int size, DataInputStream in) throws IOException {
         if (size < 0) {
-            throw new IllegalArgumentException("Map to unpack too large for Java (more than 2^31 elements)!");
+            throw new IllegalArgumentException("Map to unpack too large for Java (more than 2^31-1 elements)!");
         }
-        Map ret = new HashMap(size);
+        // acquire size enough to avoid hash map internal resize (+25% of original size)
+        Map<Object, Object> result = new HashMap<>((int) ((size / 0.75f) + 1.0f));
         for (int i = 0; i < size; ++i) {
             Object key = unpack(in);
             Object value = unpack(in);
-            ret.put(key, value);
+            result.put(key, value);
         }
-        return ret;
+        return result;
     }
 
     protected Object unpackStr(int size, DataInputStream in) throws IOException {
         if (size < 0) {
-            throw new IllegalArgumentException("byte[] to unpack too large for Java (more than 2^31 elements)!");
+            throw new IllegalArgumentException("byte[] to unpack too large for Java (more than 2^31-1 elements)!");
         }
 
         byte[] data = new byte[size];
         in.readFully(data);
-        return new String(data, "UTF-8");
+        return new String(data, StandardCharsets.UTF_8);
     }
 
     protected Object unpackBin(int size, DataInputStream in) throws IOException {
         if (size < 0) {
-            throw new IllegalArgumentException("byte[] to unpack too large for Java (more than 2^31 elements)!");
+            throw new IllegalArgumentException("byte[] to unpack too large for Java (more than 2^31-1 elements)!");
         }
 
         byte[] data = new byte[size];
