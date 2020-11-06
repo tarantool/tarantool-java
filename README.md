@@ -133,6 +133,194 @@ all the results, you could override this:
 protected void complete(TarantoolPacket packet, CompletableFuture<?> future);
 ```
 
+### Supported operation types
+
+Given a tarantool space as:
+
+```lua
+box.schema.space.create('cars', { format =
+    { {name='id', type='integer'},"
+      {name='name', type='string'},"
+      {name='max_mph', type='integer'} }
+});
+box.space.cars:create_index('pk', { type='TREE', parts={'id'} });
+box.space.cars:create_index('speed_idx', { type='TREE', unique=false, parts={'max_mph', type='unsigned'} });
+``` 
+
+and a stored function as well:
+
+```lua
+function getVehiclesSlowerThan(max_mph, max_size)
+    return box.space.cars.index.speed_idx:select(max_mph, {iterator='LT', limit=max_size});
+end;
+```
+
+Let's have a look what sort of operations we can apply to it using a connector. 
+*Note*: assume Tarantool generated id equal `512` for the newly created `cars` space.
+
+* SELECT (find tuples matching the search pattern)
+
+For instance, we can get a single tuple by id like 
+
+```java
+ops.select(512, 0, Collections.singletonList(1), 0, 1, Iterator.EQ);
+```
+
+or using more readable lookup names
+
+```java
+ops.select("cars", "pk", Collections.singletonList(1), 0, 1, Iterator.EQ);
+```
+
+or even using builder-way to construct a query part-by-part
+
+```java
+import static org.tarantool.dsl.Requests.selectRequest;
+
+ops.execute(
+    selectRequest("cars", "pk")
+        .iterator(Iterator.EQ)
+        .limit(1)
+);
+```
+
+* INSERT (put a tuple in the space)
+
+Let's insert a new tuple into the space 
+
+```java
+ops.insert(512, Arrays.asList(1, "Lada Niva", 81));
+```
+
+do the same using names
+
+```java
+ops.insert("cars", Arrays.asList(1, "Lada Niva", 81));
+```
+
+or using DSL
+
+```java
+import static org.tarantool.dsl.Requests.insertRequest;
+
+ops.execute(
+    insertRequest("cars", Arrays.asList(1, "Lada Niva", 81))
+);
+```
+
+* REPLACE (insert a tuple into the space or replace an existing one)
+
+The syntax is quite similar to insert operation
+
+```java
+import static org.tarantool.dsl.Requests.replaceRequest;
+
+ops.replace(512, Arrays.asList(2, "UAZ-469", 60));
+ops.replace("cars", Arrays.asList(2, "UAZ-469", 60));
+ops.execute(
+    replaceRequest("cars", Arrays.asList(2, "UAZ-469", 60))
+);
+```
+
+* UPDATE (update a tuple)
+
+Let's modify one of existing tuples
+
+```java
+ops.update(512, Collections.singletonList(1), Arrays.asList("=", 1, "Lada 4×4"));
+```
+
+Lookup way:
+
+```java
+ops.update("cars", Collections.singletonList(1), Arrays.asList("=", 1, "Lada 4×4"));
+```
+
+or using DSL
+
+```java
+import static org.tarantool.dsl.Operations.assign;
+import static org.tarantool.dsl.Requests.updateRequest;
+
+ops.execute(
+    updateRequest("cars", Collections.singletonList(1), assign(1, "Lada 4×4"))
+);
+```
+
+*Note*: since Tarantool 2.3.x you can refer to tuple fields by name:
+
+```java
+ops.update(512, Collections.singletonList(1), Arrays.asList("=", "name", "Lada 4×4"));
+```
+
+* UPSERT (update a tuple if it exists, otherwise try to insert it as a new tuple)
+
+An example looks as a mix of both insert and update operations:
+
+```java
+import static org.tarantool.dsl.Operations.assign;
+import static org.tarantool.dsl.Requests.upsertRequest;
+
+ops.upsert(512, Collections.singletonList(3), Arrays.asList(3, "KAMAZ-65224", 65), Arrays.asList("=", 2, 65));
+ops.upsert("cars", Collections.singletonList(3), Arrays.asList(3, "KAMAZ-65224", 65), Arrays.asList("=", 2, 65));
+ops.execute(
+    upsertRequest("cars", Collections.singletonList(3), assign(2, 65))
+);
+``` 
+
+*Note*: since Tarantool 2.3.x you can refer to tuple fields by name:
+
+```java
+ops.upsert("cars", Collections.singletonList(3), Arrays.asList(3, "KAMAZ-65224", 65), Arrays.asList("=", "max_mph", 65));
+```
+
+* DELETE (delete a tuple)
+
+Remove a tuple using one of the following forms:
+
+```java
+import static org.tarantool.dsl.Requests.deleteRequest;
+
+ops().delete(512, Collections.singletonList(1));
+// same via lookup
+ops().delete("cars", Collections.singletonList(1));
+// same via DSL
+ops.execute(deleteRequest("cars", Collections.singletonList(1)));
+```
+
+* CALL / CALL v1.6 (call a stored function)
+
+Let's invoke the predefined function to fetch slower enough vehicles:
+
+```java
+import static org.tarantool.dsl.Requests.callRequest;
+
+ops().call("getVehiclesSlowerThan", 80, 10);
+// same via DSL
+ops.execute(callRequest("getVehiclesSlowerThan").arguments(80, 10));
+```
+
+*NOTE*: to use obsolete Tarantool v1.6 operation, configure it as follows:
+
+```java
+ops().setCallCode(Code.OLD_CALL);
+ops().call("getVehiclesSlowerThan", 80, 10);
+// same via DSL
+ops.execute(callRequest("getVehiclesSlowerThan").arguments(80, 10).useCall16(true));
+```  \
+
+* EVAL (evaluate a Lua expression)
+
+To evaluate expressions using Lua, you can invoke the following operation:
+
+```java
+import static org.tarantool.dsl.Requests.evalRequest;
+
+ops().eval("return getVehiclesSlowerThan(...)", 90, 50);
+// same via DSL
+ops.execute(evalRequest("return getVehiclesSlowerThan(...)")).arguments(90, 50));
+```
+
 ### Client config options
 
 The client configuration options are represented through the `TarantoolClientConfig` class.

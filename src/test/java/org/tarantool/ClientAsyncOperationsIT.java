@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.tarantool.TestAssertions.checkRawTupleResult;
 
+import org.tarantool.dsl.TarantoolRequestSpec;
 import org.tarantool.schema.TarantoolIndexNotFoundException;
 import org.tarantool.schema.TarantoolSpaceNotFoundException;
 
@@ -577,6 +578,11 @@ class ClientAsyncOperationsIT {
         @Override
         public Future<List<?>> eval(String expression, Object... args) {
             return originOps.eval(expression, args).toCompletableFuture();
+        }
+
+        @Override
+        public Future<List<?>> execute(TarantoolRequestSpec requestSpec) {
+            return originOps.execute(requestSpec).toCompletableFuture();
         }
 
         @Override
