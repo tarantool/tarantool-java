@@ -3,12 +3,15 @@ package org.tarantool.jdbc;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.tarantool.TestAssumptions.assumeMinimalServerVersion;
 
 import org.tarantool.ServerVersion;
 import org.tarantool.TarantoolTestHelper;
+import org.tarantool.util.SQLStates;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -26,8 +29,14 @@ import java.sql.ResultSet;
 import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLNonTransientException;
 import java.sql.Statement;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class JdbcConnectionIT {
 
@@ -456,5 +465,81 @@ public class JdbcConnectionIT {
         assertEquals(ClientInfoStatus.REASON_UNKNOWN_PROPERTY, failedProperties.get(targetProperty));
     }
 
+    @Test
+    void testConnectionAbort() throws SQLException {
+        assertFalse(conn.isClosed());
+        try (Statement statement = conn.createStatement()) {
+            conn.abort(Executors.newSingleThreadExecutor());
+            assertTrue(conn.isClosed());
+            SQLNonTransientException exception = assertThrows(
+                SQLNonTransientException.class,
+                () -> statement.executeQuery("SELECT 1")
+            );
+            assertEquals(exception.getMessage(), "Statement is closed.");
+        }
+    }
+
+    @Test
+    void testOperationInProgressAbort() throws SQLException, ExecutionException, InterruptedException {
+        testHelper.executeLua("box.internal.sql_create_function('TNT_SLEEP', 'INT'," +
+            " function(s) require('fiber').sleep(s); return s; end)");
+        final ExecutorService executor = Executors.newFixedThreadPool(2);
+        final int sleepSeconds = 10;
+
+        long startTime = System.currentTimeMillis();
+
+        Future<SQLException> workerFuture = executor.submit(() -> {
+            try {
+                Statement statement = conn.createStatement();
+                statement.execute("SELECT tnt_sleep(" + sleepSeconds + ")");
+            } catch (SQLException cause) {
+                return cause;
+            }
+            return null;
+        });
+
+        Future<SQLException> abortFuture = executor.submit(() -> {
+            ExecutorService abortExecutor = Executors.newSingleThreadExecutor();
+            try {
+                conn.abort(abortExecutor);
+            } catch (SQLException cause) {
+                return cause;
+            }
+            abortExecutor.shutdown();
+            try {
+                abortExecutor.awaitTermination(sleepSeconds, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+            }
+            return null;
+        });
+
+        SQLException workerException = workerFuture.get();
+        long endTime = System.currentTimeMillis();
+        assertNotNull(workerException, "Statement execution should have been aborted, thus throwing an exception");
+
+        SQLException abortException = abortFuture.get();
+        assertNull(abortException, () -> abortException.getMessage());
+
+        // It is expected to abort the statement as soon as possible.
+        // If the execution takes time more than 95% of the estimation the aborting fails.
+        assertTrue((endTime - startTime) < (sleepSeconds * 95 * 10));
+        assertTrue(conn.isClosed());
+    }
+
+    @Test
+    void testAlreadyClosedConnectionAbort() throws SQLException {
+        conn.close();
+        try {
+            conn.abort(Executors.newSingleThreadExecutor());
+        } catch (SQLException cause) {
+            fail("Unexpected error", cause);
+        }
+    }
+
+    @Test
+    void testNullParameterConnectionAbort() {
+        SQLException exception = assertThrows(SQLException.class, () -> conn.abort(null));
+        assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), exception.getSQLState());
+    }
 }
 
