@@ -38,6 +38,7 @@ public class TarantoolIndexMeta {
     }
 
     public static TarantoolIndexMeta fromTuple(List<?> tuple) {
+        @SuppressWarnings("unchecked")
         Map<String, Object> optionsMap = (Map<String, Object>) tuple.get(VINDEX_OPTIONS_FIELD_NUMBER);
 
         List<IndexPart> parts = Collections.emptyList();
@@ -46,7 +47,9 @@ public class TarantoolIndexMeta {
             // simplified index parts as an array
             // (when the parts don't use collation and is_nullable options)
             if (partsTuple.get(0) instanceof List) {
-                parts = ((List<List<?>>) partsTuple)
+                @SuppressWarnings("unchecked")
+                final List<List<?>> partsLists = (List<List<?>>) partsTuple;
+                parts = partsLists
                     .stream()
                     .map(part -> new IndexPart(
                             (Integer) part.get(VINDEX_PART_FIELD),
@@ -55,7 +58,9 @@ public class TarantoolIndexMeta {
                     )
                     .collect(Collectors.toList());
             } else if (partsTuple.get(0) instanceof Map) {
-                parts = ((List<Map<String, Object>>) partsTuple)
+                @SuppressWarnings("unchecked")
+                final List<Map<String, Object>> partsMaps = (List<Map<String, Object>>) partsTuple;
+                parts = partsMaps
                     .stream()
                     .map(part -> new IndexPart((Integer) part.get("field"), (String) part.get("type")))
                     .collect(Collectors.toList());

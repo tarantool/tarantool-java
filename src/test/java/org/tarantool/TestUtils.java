@@ -6,6 +6,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -61,22 +62,12 @@ public class TestUtils {
         "box.info.replication";
 
     public static String makeReplicationString(String user, String pass, String... addrs) {
-        StringBuilder sb = new StringBuilder();
-        for (int idx = 0; idx < addrs.length; idx++) {
-            if (sb.length() > 0) {
-                sb.append(';');
-            }
-            sb.append(user);
-            sb.append(':');
-            sb.append(pass);
-            sb.append('@');
-            sb.append(addrs[idx]);
-        }
-        return sb.toString();
+        final String userPassAt = user + ":"  + pass + "@";
+        return Arrays.stream(addrs).map(addr -> userPassAt + addr).collect(Collectors.joining(";"));
     }
 
     public static Map<String, String> makeInstanceEnv(int port, int consolePort) {
-        Map<String, String> env = new HashMap<String, String>();
+        Map<String, String> env = new HashMap<>();
         env.put("LISTEN", Integer.toString(port));
         env.put("ADMIN", Integer.toString(consolePort));
         return env;
@@ -166,7 +157,7 @@ public class TestUtils {
         return data;
     }
 
-    private static boolean parseAndCheckReplicationStatus(List data) {
+    private static boolean parseAndCheckReplicationStatus(List<?> data) {
         if (data == null || data.size() != 3) {
             throw new IllegalStateException("Unexpected format of replication status.");
         }
@@ -220,7 +211,7 @@ public class TestUtils {
 
     private static void appendKey(StringBuilder sb, Object key) {
         if (List.class.isAssignableFrom(key.getClass())) {
-            List parts = (List) key;
+            List<?> parts = (List<?>) key;
             for (int i = 0; i < parts.size(); i++) {
                 if (i != 0) {
                     sb.append(", ");

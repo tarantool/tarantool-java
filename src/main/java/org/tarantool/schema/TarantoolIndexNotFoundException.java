@@ -1,6 +1,7 @@
 package org.tarantool.schema;
 
 public class TarantoolIndexNotFoundException extends TarantoolSchemaException {
+    private static final long serialVersionUID = -1L;
 
     private final String indexName;
 

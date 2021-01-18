@@ -23,7 +23,9 @@ public class TarantoolSpaceMeta {
     private final Map<String, TarantoolIndexMeta> indexes;
 
     public static TarantoolSpaceMeta fromTuple(List<?> spaceTuple, List<List<?>> indexTuples) {
-        List<SpaceField> fields = ((List<Map<String, ?>>) spaceTuple.get(VSPACE_FORMAT_FIELD_NUMBER)).stream()
+        @SuppressWarnings("unchecked")
+        final List<Map<String, ?>> fieldsMaps = (List<Map<String, ?>>) spaceTuple.get(VSPACE_FORMAT_FIELD_NUMBER);
+        List<SpaceField> fields = fieldsMaps.stream()
             .map(field -> new SpaceField(field.get("name").toString(), field.get("type").toString()))
             .collect(Collectors.toList());
 

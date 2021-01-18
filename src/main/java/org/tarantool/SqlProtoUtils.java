@@ -16,8 +16,8 @@ public abstract class SqlProtoUtils {
         List<SQLMetaData> metaData = getSQLMetadata(pack);
 
         List<Map<String, Object>> values = new ArrayList<>(data.size());
-        for (List row : data) {
-            LinkedHashMap<String, Object> value = new LinkedHashMap<>();
+        for (List<Object> row : data) {
+            Map<String, Object> value = new LinkedHashMap<>();
             for (int i = 0; i < row.size(); i++) {
                 value.put(metaData.get(i).getName(), row.get(i));
             }
@@ -26,11 +26,13 @@ public abstract class SqlProtoUtils {
         return values;
     }
 
+    @SuppressWarnings("unchecked")
     public static List<List<Object>> getSQLData(TarantoolPacket pack) {
         return (List<List<Object>>) pack.getBody().get(Key.DATA.getId());
     }
 
     public static List<SQLMetaData> getSQLMetadata(TarantoolPacket pack) {
+        @SuppressWarnings("unchecked")
         List<Map<Integer, Object>> meta = (List<Map<Integer, Object>>) pack.getBody().get(Key.SQL_METADATA.getId());
         List<SQLMetaData> values = new ArrayList<>(meta.size());
         for (Map<Integer, Object> item : meta) {
@@ -43,26 +45,29 @@ public abstract class SqlProtoUtils {
     }
 
     public static Long getSQLRowCount(TarantoolPacket pack) {
+        @SuppressWarnings("unchecked")
         Map<Key, Object> info = (Map<Key, Object>) pack.getBody().get(Key.SQL_INFO.getId());
         Number rowCount;
-        if (info != null && (rowCount = ((Number) info.get(Key.SQL_ROW_COUNT.getId()))) != null) {
+        if (info != null && (rowCount = ((Number) info.get(Key.SQL_ROW_COUNT.getId()))) != null) { // TODO WTF? => info is Map<Key, ?> but queried by int
             return rowCount.longValue();
         }
         return null;
     }
 
     public static List<Integer> getSQLAutoIncrementIds(TarantoolPacket pack) {
+        @SuppressWarnings("unchecked")
         Map<Key, Object> info = (Map<Key, Object>) pack.getBody().get(Key.SQL_INFO.getId());
         if (info != null) {
-            List<Integer> generatedIds = (List<Integer>) info.get(Key.SQL_INFO_AUTOINCREMENT_IDS.getId());
+            @SuppressWarnings("unchecked")
+            List<Integer> generatedIds = (List<Integer>) info.get(Key.SQL_INFO_AUTOINCREMENT_IDS.getId()); // TODO WTF? => info is Map<Key, ?> but queried by int
             return generatedIds == null ? Collections.emptyList() : generatedIds;
         }
         return Collections.emptyList();
     }
 
     public static class SQLMetaData {
-        private String name;
-        private TarantoolSqlType type;
+        private final String name;
+        private final TarantoolSqlType type;
 
         /**
          * Constructs new SQL metadata based on a raw Tarantool
