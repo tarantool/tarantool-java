@@ -50,11 +50,14 @@ public abstract class ProtoUtils {
         int size = ((Number) msgPackLite.unpack(msgStream)).intValue();
         long mark = msgStream.getBytesRead();
 
-        Map<Integer, Object> headers = (Map<Integer, Object>) msgPackLite.unpack(msgStream);
+        @SuppressWarnings("unchecked")
+        final Map<Integer, Object> headers = (Map<Integer, Object>) msgPackLite.unpack(msgStream);
 
-        Map<Integer, Object> body = null;
+        final Map<Integer, Object> body;
         if (msgStream.getBytesRead() - mark < size) {
-            body = (Map<Integer, Object>) msgPackLite.unpack(msgStream);
+            body = castUnpackedBody(msgPackLite.unpack(msgStream));
+        } else {
+            body = null;
         }
 
         return new TarantoolPacket(headers, body);
@@ -97,9 +100,10 @@ public abstract class ProtoUtils {
             );
         }
         //noinspection unchecked (checked above)
+        @SuppressWarnings({"unchecked", "RedundantSuppression"})
         Map<Integer, Object> headers = (Map<Integer, Object>) unpackedHeaders;
 
-        Map<Integer, Object> body = null;
+        Map<Integer, Object> body;
         if (msgBytesStream.hasAvailable()) {
             Object unpackedBody = msgPackLite.unpack(msgBytesStream);
             if (!(unpackedBody instanceof Map)) {
@@ -110,11 +114,17 @@ public abstract class ProtoUtils {
                         unpackedBody != null ? unpackedBody.getClass().toString() : "null"
                 );
             }
-            //noinspection unchecked (checked above)
-            body = (Map<Integer, Object>) unpackedBody;
+            body = castUnpackedBody(unpackedBody);
+        } else {
+            body = null;
         }
 
         return new TarantoolPacket(headers, body);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<Integer, Object> castUnpackedBody(Object unpackedBody) {
+        return (Map<Integer, Object>) unpackedBody;
     }
 
     /**
@@ -243,7 +253,7 @@ public abstract class ProtoUtils {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
-        List auth = new ArrayList(2);
+        List<Object> auth = new ArrayList<>(2);
         auth.add("chap-sha1");
 
         byte[] p = sha1.digest(password.getBytes());

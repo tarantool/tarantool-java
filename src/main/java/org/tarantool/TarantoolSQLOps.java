@@ -18,6 +18,7 @@ public interface TarantoolSQLOps<Tuple, Update, Result> {
      *
      * @return result of query
      */
+    @SuppressWarnings("unchecked")
     Result query(String sql, Tuple... bind);
 
     /**
@@ -28,6 +29,7 @@ public interface TarantoolSQLOps<Tuple, Update, Result> {
      *
      * @return result of query
      */
+    @SuppressWarnings("unchecked")
     Update update(String sql, Tuple... bind);
 
 }

@@ -12,7 +12,7 @@ import java.io.StringReader;
 import java.math.BigDecimal;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.Clob;
@@ -48,7 +48,7 @@ public class SQLResultSet implements ResultSet {
     private final int maxRows;
     private final int maxFieldSize;
 
-    private AtomicBoolean isClosed = new AtomicBoolean(false);
+    private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
     private final int scrollType;
     private final int concurrencyLevel;
@@ -214,6 +214,7 @@ public class SQLResultSet implements ResultSet {
     }
 
     @Override
+    @Deprecated
     public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
         String raw = getString(columnIndex);
         if (raw == null) {
@@ -224,6 +225,7 @@ public class SQLResultSet implements ResultSet {
     }
 
     @Override
+    @Deprecated
     public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
         return getBigDecimal(findColumn(columnLabel), scale);
     }
@@ -325,7 +327,7 @@ public class SQLResultSet implements ResultSet {
     @Override
     public InputStream getAsciiStream(int columnIndex) throws SQLException {
         String string = getString(columnIndex);
-        return string == null ? null : new ByteArrayInputStream(string.getBytes(Charset.forName("ASCII")));
+        return string == null ? null : new ByteArrayInputStream(string.getBytes(StandardCharsets.US_ASCII));
     }
 
     @Override
@@ -334,12 +336,14 @@ public class SQLResultSet implements ResultSet {
     }
 
     @Override
+    @Deprecated
     public InputStream getUnicodeStream(int columnIndex) throws SQLException {
         String string = getString(columnIndex);
-        return string == null ? null : new ByteArrayInputStream(string.getBytes(Charset.forName("UTF-8")));
+        return string == null ? null : new ByteArrayInputStream(string.getBytes(StandardCharsets.UTF_8));
     }
 
     @Override
+    @Deprecated
     public InputStream getUnicodeStream(String columnLabel) throws SQLException {
         return getUnicodeStream(findColumn(columnLabel));
     }
@@ -401,12 +405,12 @@ public class SQLResultSet implements ResultSet {
     }
 
     @Override
-    public SQLWarning getWarnings() throws SQLException {
+    public SQLWarning getWarnings() {
         return null;
     }
 
     @Override
-    public void clearWarnings() throws SQLException {
+    public void clearWarnings() {
 
     }
 

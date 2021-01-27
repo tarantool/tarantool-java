@@ -313,18 +313,19 @@ class JdbcTypesIT {
 
     private static class TarantoolTestTypeHelper<T> {
 
-        private Class<T> cls;
+        private final Class<T> cls;
         private T[] vals;
         private TarantoolSqlType[] colTypes;
 
-        private Connection connection;
+        private final Connection connection;
 
         TarantoolTestTypeHelper(Connection connection, String tableName, Class<T> cls) {
             this.connection = connection;
             this.cls = cls;
         }
 
-        TarantoolTestTypeHelper<T> setValues(T... vals) {
+        @SuppressWarnings("unchecked")
+        final TarantoolTestTypeHelper<T> setValues(T... vals) {
             this.vals = vals;
             return this;
         }

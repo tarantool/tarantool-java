@@ -29,7 +29,7 @@ public class TarantoolPacket {
                     potenticalCode != null ? potenticalCode.getClass().toString() : "null"
             );
         }
-        Long code = (Long) potenticalCode;
+        long code = (Long) potenticalCode;
 
         return code == 0 ? code : ProtoUtils.extractErrorCode(code);
     }

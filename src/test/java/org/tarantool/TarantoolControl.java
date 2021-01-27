@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 public class TarantoolControl {
 
     public static class TarantoolControlException extends RuntimeException {
+        private static final long serialVersionUID = -1L;
 
         int code;
         String stdout;
@@ -46,7 +47,7 @@ public class TarantoolControl {
     protected static final String tarantoolCtlConfig = new File("src/test/resources/.tarantoolctl").getAbsolutePath();
     protected static final int RESTART_TIMEOUT = 2000;
     // Per-instance environment.
-    protected final Map<String, Map<String, String>> instanceEnv = new HashMap<String, Map<String, String>>();
+    protected final Map<String, Map<String, String>> instanceEnv = new HashMap<>();
 
     static {
         try {
@@ -86,11 +87,11 @@ public class TarantoolControl {
         rmdir(new File(f));
     }
 
-    private static void mkdir(File f) throws IOException {
+    private static void mkdir(File f) {
         f.mkdirs();
     }
 
-    private static void mkdir(String f) throws IOException {
+    private static void mkdir(String f) {
         mkdir(new File(f));
     }
 
@@ -98,15 +99,10 @@ public class TarantoolControl {
         if (dest.isDirectory()) {
             dest = new File(dest, source.getName());
         }
-        FileChannel sourceChannel = null;
-        FileChannel destChannel = null;
-        try {
-            sourceChannel = new FileInputStream(source).getChannel();
-            destChannel = new FileOutputStream(dest).getChannel();
+        try (FileChannel sourceChannel = new FileInputStream(source).getChannel();
+             FileChannel destChannel = new FileOutputStream(dest).getChannel()
+        ) {
             destChannel.transferFrom(sourceChannel, 0, sourceChannel.size());
-        } finally {
-            sourceChannel.close();
-            destChannel.close();
         }
     }
 
@@ -264,7 +260,7 @@ public class TarantoolControl {
     }
 
     public Map<String, String> buildInstanceEnvironment(String instanceName) {
-        Map<String, String> env = new HashMap<String, String>();
+        Map<String, String> env = new HashMap<>();
         env.put("PWD", tntCtlWorkDir);
         env.put("TEST_WORKDIR", tntCtlWorkDir);
 
@@ -305,11 +301,8 @@ public class TarantoolControl {
     }
 
     public void waitReplication(String instanceName, int timeout) {
-        TarantoolConsole console = openConsole(instanceName);
-        try {
+        try (TarantoolConsole console = openConsole(instanceName)) {
             TestUtils.waitReplication(console, timeout);
-        } finally {
-            console.close();
         }
     }
 
@@ -331,7 +324,7 @@ public class TarantoolControl {
         } else {
             int idx = admin.indexOf(':');
             return TarantoolConsole.open(idx < 0 ? "localhost" : admin.substring(0, idx),
-                Integer.valueOf(idx < 0 ? admin : admin.substring(idx + 1)));
+                Integer.parseInt(idx < 0 ? admin : admin.substring(idx + 1)));
         }
     }
 

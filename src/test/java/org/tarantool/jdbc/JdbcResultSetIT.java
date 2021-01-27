@@ -25,6 +25,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+@SuppressWarnings("SqlDialectInspection")
 public class JdbcResultSetIT {
 
     private static final String[] INIT_SQL = new String[] {
@@ -233,7 +234,7 @@ public class JdbcResultSetIT {
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getBinaryStream(2));
         assertTrue(resultSet.wasNull());
-        assertNull(resultSet.getUnicodeStream(2));
+        assertNull(resultSet.getCharacterStream(2));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getCharacterStream(2));
         assertTrue(resultSet.wasNull());

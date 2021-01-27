@@ -16,7 +16,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -166,7 +165,7 @@ public class TarantoolClientOpsIT {
     @ParameterizedTest
     @MethodSource("getClientOps")
     public void testInsertSimple(SyncOpsProvider provider) {
-        List tup = Arrays.asList(100, "hundred");
+        List<?> tup = Arrays.asList(100, "hundred");
         List<?> res = provider.getClientOps().insert(spaceId, tup);
 
         checkRawTupleResult(res, tup);
@@ -193,7 +192,7 @@ public class TarantoolClientOpsIT {
     public void testInsertBigInteger(SyncOpsProvider provider) {
         BigInteger id = BigInteger.valueOf(2).pow(64).subtract(BigInteger.ONE);
 
-        List tup = Arrays.asList(id, "big");
+        List<?> tup = Arrays.asList(id, "big");
         List<?> res = provider.getClientOps().insert(spaceId, tup);
 
         checkRawTupleResult(res, tup);
@@ -210,7 +209,7 @@ public class TarantoolClientOpsIT {
     @ParameterizedTest
     @MethodSource("getClientOps")
     public void testInsertMultiPart(SyncOpsProvider provider) {
-        List tup = Arrays.asList(100, "hundred", "h u n d r e d");
+        List<?> tup = Arrays.asList(100, "hundred", "h u n d r e d");
         List<?> res = provider.getClientOps().insert(multiPartSpaceId, tup);
 
         checkRawTupleResult(res, tup);
@@ -259,9 +258,9 @@ public class TarantoolClientOpsIT {
     private void checkReplace(TarantoolClientOps<Integer, List<?>, Object, List<?>> clientOps,
                               String space,
                               int spaceId,
-                              List key,
-                              List createTuple,
-                              List updateTuple) {
+                              List<?> key,
+                              List<?> createTuple,
+                              List<?> updateTuple) {
         List<?> res = clientOps.replace(spaceId, createTuple);
         checkRawTupleResult(res, createTuple);
 
@@ -279,9 +278,9 @@ public class TarantoolClientOpsIT {
     @ParameterizedTest
     @MethodSource("getClientOps")
     public void testUpdateNonExistingHasNoEffect(SyncOpsProvider provider) {
-        List op0 = Arrays.asList("=", 3, "trez");
+        List<?> op0 = Arrays.asList("=", 3, "trez");
 
-        List res = provider.getClientOps().update(spaceId, Collections.singletonList(30), op0);
+        List<?> res = provider.getClientOps().update(spaceId, Collections.singletonList(30), op0);
 
         assertNotNull(res);
         assertEquals(0, res.size());
@@ -335,9 +334,9 @@ public class TarantoolClientOpsIT {
     private void checkUpdate(TarantoolClientOps<Integer, List<?>, Object, List<?>> clientOps,
                              String space,
                              int spaceId,
-                             List key,
-                             List initTuple,
-                             List expectedTuple,
+                             List<?> key,
+                             List<?> initTuple,
+                             List<?> expectedTuple,
                              Object... ops) {
         // Try update non-existing key.
         List<?> res = clientOps.update(spaceId, key, ops);
@@ -394,9 +393,9 @@ public class TarantoolClientOpsIT {
     private void checkUpsert(TarantoolClientOps<Integer, List<?>, Object, List<?>> clientOps,
                              String space,
                              int spaceId,
-                             List key,
-                             List defTuple,
-                             List expectedTuple,
+                             List<?> key,
+                             List<?> defTuple,
+                             List<?> expectedTuple,
                              Object... ops) {
         // Check that key doesn't exist.
         assertEquals(Collections.emptyList(), consoleSelect(space, key));
@@ -449,8 +448,8 @@ public class TarantoolClientOpsIT {
     private void checkDelete(TarantoolClientOps<Integer, List<?>, Object, List<?>> clientOps,
                              String space,
                              int spaceId,
-                             List key,
-                             List tuple) {
+                             List<?> key,
+                             List<?> tuple) {
         // Check the key doesn't exists.
         assertEquals(Collections.emptyList(), consoleSelect(space, key));
 
@@ -506,12 +505,9 @@ public class TarantoolClientOpsIT {
     @ParameterizedTest
     @MethodSource("getClientOps")
     public void testDeleteFromNonExistingSpace(SyncOpsProvider provider) {
-        TarantoolException ex = assertThrows(TarantoolException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                provider.getClientOps().delete(5555, Collections.singletonList(2));
-            }
-        });
+        TarantoolException ex = assertThrows(TarantoolException.class,
+            () -> provider.getClientOps().delete(5555, Collections.singletonList(2))
+        );
         assertEquals("Space '5555' does not exist", ex.getMessage());
 
         provider.close();
@@ -520,13 +516,10 @@ public class TarantoolClientOpsIT {
     @ParameterizedTest
     @MethodSource("getClientOps")
     public void testSelectUnsupportedIterator(SyncOpsProvider provider) {
-        TarantoolException ex = assertThrows(TarantoolException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                provider.getClientOps()
-                    .select(spaceId, pkIndexId, Collections.singletonList(1), 0, 1, Iterator.OVERLAPS);
-            }
-        });
+        TarantoolException ex = assertThrows(TarantoolException.class,
+            () -> provider.getClientOps()
+                .select(spaceId, pkIndexId, Collections.singletonList(1), 0, 1, Iterator.OVERLAPS)
+        );
         assertEquals(
             "Index 'pk' (TREE) of space 'basic_test' (memtx) does not support requested iterator type",
             ex.getMessage()
@@ -550,12 +543,9 @@ public class TarantoolClientOpsIT {
     @ParameterizedTest
     @MethodSource("getClientOps")
     public void testSelectFromNonExistingIndex(SyncOpsProvider provider) {
-        TarantoolException ex = assertThrows(TarantoolException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                provider.getClientOps().select(spaceId, 5555, Collections.singletonList(2), 0, 1, Iterator.EQ);
-            }
-        });
+        TarantoolException ex = assertThrows(TarantoolException.class,
+            () -> provider.getClientOps().select(spaceId, 5555, Collections.singletonList(2), 0, 1, Iterator.EQ)
+        );
         assertEquals("No index #5555 is defined in space 'basic_test'", ex.getMessage());
 
         provider.close();
@@ -564,13 +554,9 @@ public class TarantoolClientOpsIT {
     @ParameterizedTest
     @MethodSource("getClientOps")
     public void testSelectFromNonExistingSpace(SyncOpsProvider provider) {
-        TarantoolException ex = assertThrows(TarantoolException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                provider.getClientOps()
-                    .select(5555, 0, Collections.singletonList(5555), 0, 1, Iterator.EQ);
-            }
-        });
+        TarantoolException ex = assertThrows(TarantoolException.class,
+            () -> provider.getClientOps().select(5555, 0, Collections.singletonList(5555), 0, 1, Iterator.EQ)
+        );
         assertEquals("Space '5555' does not exist", ex.getMessage());
 
         provider.close();
@@ -579,7 +565,7 @@ public class TarantoolClientOpsIT {
     @ParameterizedTest
     @MethodSource("getClientOps")
     public void testInsertDuplicateKey(SyncOpsProvider provider) {
-        final List tup = Arrays.asList(1, "uno");
+        final List<?> tup = Arrays.asList(1, "uno");
         TarantoolException ex = assertThrows(
             TarantoolException.class,
             () -> provider.getClientOps().insert(spaceId, tup)
@@ -595,12 +581,9 @@ public class TarantoolClientOpsIT {
     @ParameterizedTest
     @MethodSource("getClientOps")
     public void testInsertToNonExistingSpace(SyncOpsProvider provider) {
-        TarantoolException ex = assertThrows(TarantoolException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                provider.getClientOps().insert(5555, Arrays.asList(1, "one"));
-            }
-        });
+        TarantoolException ex = assertThrows(TarantoolException.class,
+            () -> provider.getClientOps().insert(5555, Arrays.asList(1, "one"))
+        );
         assertEquals("Space '5555' does not exist", ex.getMessage());
 
         provider.close();
@@ -668,7 +651,7 @@ public class TarantoolClientOpsIT {
 
     private static class ClientSyncOpsProvider implements SyncOpsProvider {
 
-        private TarantoolClient client = makeTestClient(makeDefaultClientConfig(), RESTART_TIMEOUT);
+        private final TarantoolClient client = makeTestClient(makeDefaultClientConfig(), RESTART_TIMEOUT);
 
         @Override
         public TarantoolClientOps<Integer, List<?>, Object, List<?>> getClientOps() {
@@ -684,7 +667,7 @@ public class TarantoolClientOpsIT {
 
     private static class ConnectionSyncOpsProvider implements SyncOpsProvider {
 
-        private TarantoolConnection connection = makeConnection();
+        private final TarantoolConnection connection = makeConnection();
 
         @Override
         public TarantoolClientOps<Integer, List<?>, Object, List<?>> getClientOps() {

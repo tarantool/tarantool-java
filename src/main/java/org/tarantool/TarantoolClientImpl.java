@@ -557,7 +557,10 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             } else if (operation.getCode() == Code.EXECUTE) {
                 completeSql(operation, packet);
             } else {
-                ((CompletableFuture) result).complete(packet.getData());
+                @SuppressWarnings("unchecked")
+                final CompletableFuture<Object> resultObj = (CompletableFuture<Object>) result;
+
+                resultObj.complete(packet.getData());
             }
         } else if (code == ProtoConstants.ERR_WRONG_SCHEMA_VERSION) {
             if (schemaId > schemaMeta.getSchemaVersion()) {
@@ -620,12 +623,13 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
     protected void completeSql(TarantoolOperation operation, TarantoolPacket pack) {
         Long rowCount = SqlProtoUtils.getSQLRowCount(pack);
-        CompletableFuture<?> result = operation.getResult();
+        @SuppressWarnings("unchecked")
+        CompletableFuture<Object> result = (CompletableFuture<Object>) operation.getResult();
         if (rowCount != null) {
-            ((CompletableFuture) result).complete(rowCount);
+            result.complete(rowCount);
         } else {
             List<Map<String, Object>> values = SqlProtoUtils.readSqlResult(pack);
-            ((CompletableFuture) result).complete(values);
+            result.complete(values);
         }
     }
 
@@ -745,6 +749,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     }
 
     @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public TarantoolClientOps<Integer, List<?>, Object, Future<List<?>>> asyncOps() {
         return (TarantoolClientOps) this;
     }
@@ -782,6 +787,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
             }
 
             @Override
+            @SuppressWarnings("unchecked")
             public List<Map<String, Object>> query(String sql, Object... bind) {
                 return (List<Map<String, Object>>) syncGet(exec(makeSqlRequest(sql, Arrays.asList(bind))));
             }
@@ -792,11 +798,13 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     public TarantoolSQLOps<Object, Future<Long>, Future<List<Map<String, Object>>>> sqlAsyncOps() {
         return new TarantoolSQLOps<Object, Future<Long>, Future<List<Map<String, Object>>>>() {
             @Override
+            @SuppressWarnings("unchecked")
             public Future<Long> update(String sql, Object... bind) {
                 return (Future<Long>) exec(makeSqlRequest(sql, Arrays.asList(bind)));
             }
 
             @Override
+            @SuppressWarnings("unchecked")
             public Future<List<Map<String, Object>>> query(String sql, Object... bind) {
                 return (Future<List<Map<String, Object>>>) exec(makeSqlRequest(sql, Arrays.asList(bind)));
             }
@@ -807,7 +815,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
 
         @Override
         protected List<?> exec(TarantoolRequest request) {
-            return (List) syncGet(TarantoolClientImpl.this.exec(request));
+            return (List<?>) syncGet(TarantoolClientImpl.this.exec(request));
         }
 
     }
@@ -1055,6 +1063,7 @@ public class TarantoolClientImpl extends TarantoolBase<Future<?>> implements Tar
     protected class ComposableAsyncOps extends BaseClientOps<CompletionStage<List<?>>> {
 
         @Override
+        @SuppressWarnings("unchecked")
         protected CompletionStage<List<?>> exec(TarantoolRequest request) {
             return (CompletionStage<List<?>>) TarantoolClientImpl.this.exec(request);
         }

@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -78,7 +79,7 @@ public class MsgPackLite {
         DataOutputStream out = new DataOutputStream(os);
         if (item instanceof Callable) {
             try {
-                item = ((Callable) item).call();
+                item = ((Callable<?>) item).call();
             } catch (Exception e) {
                 throw new IllegalArgumentException(e);
             }
@@ -86,7 +87,7 @@ public class MsgPackLite {
         if (item == null) {
             out.write(MP_NULL);
         } else if (item instanceof Boolean) {
-            out.write(((Boolean) item).booleanValue() ? MP_TRUE : MP_FALSE);
+            out.write((Boolean) item ? MP_TRUE : MP_FALSE);
         } else if (item instanceof Number || item instanceof Code) {
             if (item instanceof Float) {
                 out.write(MP_FLOAT);
@@ -150,7 +151,7 @@ public class MsgPackLite {
                 }
             }
         } else if (item instanceof String) {
-            byte[] data = ((String) item).getBytes("UTF-8");
+            byte[] data = ((String) item).getBytes(StandardCharsets.UTF_8);
             if (data.length <= MAX_5BIT) {
                 out.write(data.length | MP_FIXSTR);
             } else if (data.length <= MAX_8BIT) {
@@ -191,7 +192,7 @@ public class MsgPackLite {
             }
             out.write(data);
         } else if (item instanceof List || item.getClass().isArray()) {
-            int length = item instanceof List ? ((List) item).size() : Array.getLength(item);
+            int length = item instanceof List ? ((List<?>) item).size() : Array.getLength(item);
             if (length <= MAX_4BIT) {
                 out.write(length | MP_FIXARRAY);
             } else if (length <= MAX_16BIT) {
@@ -202,7 +203,7 @@ public class MsgPackLite {
                 out.writeInt(length);
             }
             if (item instanceof List) {
-                List list = ((List) item);
+                List<?> list = ((List<?>) item);
                 for (Object element : list) {
                     pack(element, out);
                 }
@@ -212,6 +213,7 @@ public class MsgPackLite {
                 }
             }
         } else if (item instanceof Map) {
+            @SuppressWarnings("unchecked")
             Map<Object, Object> map = (Map<Object, Object>) item;
             if (map.size() <= MAX_4BIT) {
                 out.write(map.size() | MP_FIXMAP);
@@ -321,22 +323,22 @@ public class MsgPackLite {
         }
     }
 
-    protected List unpackList(int size, DataInputStream in) throws IOException {
+    protected List<?> unpackList(int size, DataInputStream in) throws IOException {
         if (size < 0) {
             throw new IllegalArgumentException("Array to unpack too large for Java (more than 2^31 elements)!");
         }
-        List ret = new ArrayList(size);
+        List<Object> ret = new ArrayList<>(size);
         for (int i = 0; i < size; ++i) {
             ret.add(unpack(in));
         }
         return ret;
     }
 
-    protected Map unpackMap(int size, DataInputStream in) throws IOException {
+    protected Map<?, ?> unpackMap(int size, DataInputStream in) throws IOException {
         if (size < 0) {
             throw new IllegalArgumentException("Map to unpack too large for Java (more than 2^31 elements)!");
         }
-        Map ret = new HashMap(size);
+        Map<Object, Object> ret = new HashMap<>(size);
         for (int i = 0; i < size; ++i) {
             Object key = unpack(in);
             Object value = unpack(in);
@@ -345,17 +347,17 @@ public class MsgPackLite {
         return ret;
     }
 
-    protected Object unpackStr(int size, DataInputStream in) throws IOException {
+    protected String unpackStr(int size, DataInputStream in) throws IOException {
         if (size < 0) {
             throw new IllegalArgumentException("byte[] to unpack too large for Java (more than 2^31 elements)!");
         }
 
         byte[] data = new byte[size];
         in.readFully(data);
-        return new String(data, "UTF-8");
+        return new String(data, StandardCharsets.UTF_8);
     }
 
-    protected Object unpackBin(int size, DataInputStream in) throws IOException {
+    protected byte[] unpackBin(int size, DataInputStream in) throws IOException {
         if (size < 0) {
             throw new IllegalArgumentException("byte[] to unpack too large for Java (more than 2^31 elements)!");
         }

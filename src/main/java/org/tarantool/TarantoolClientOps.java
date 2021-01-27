@@ -25,12 +25,16 @@ public interface TarantoolClientOps<T, O, P, R> {
 
     R replace(String space, O tuple);
 
+    @SuppressWarnings("unchecked")
     R update(Integer space, O key, P... tuple);
 
+    @SuppressWarnings("unchecked")
     R update(String space, O key, P... tuple);
 
+    @SuppressWarnings("unchecked")
     R upsert(Integer space, O key, O defTuple, P... ops);
 
+    @SuppressWarnings("unchecked")
     R upsert(String space, O key, O defTuple, P... ops);
 
     R delete(Integer space, O key);
