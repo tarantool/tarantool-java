@@ -29,6 +29,7 @@ import org.junit.jupiter.api.function.Executable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
@@ -45,6 +46,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+@SuppressWarnings({"SqlNoDataSourceInspection", "SqlDialectInspection"})
 public class JdbcPreparedStatementIT {
 
     private static final String[] INIT_SQL = new String[] {
@@ -604,6 +606,7 @@ public class JdbcPreparedStatementIT {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     public void testSetBadStream() throws Exception {
         prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
 
@@ -624,7 +627,7 @@ public class JdbcPreparedStatementIT {
         prep.setInt(1, 1);
         InputStream unicodeStream = new ByteArrayInputStream("zéro one два みっつ 四 Fünf".getBytes("UTF-8"));
         // zéro is 5 bytes length because é consists of tow bytes 0xC3 0xA9
-        prep.setUnicodeStream(2, unicodeStream, 5);
+        prep.setCharacterStream(2, new InputStreamReader(unicodeStream), 5);
 
         assertFalse(prep.execute());
         assertEquals("zéro", consoleSelect(1).get(1));
@@ -634,8 +637,10 @@ public class JdbcPreparedStatementIT {
     public void testSetNegativeUnicodeStream() throws Exception {
         prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
         prep.setInt(1, 1);
-        InputStream unicodeStream = new ByteArrayInputStream("one and two and even three".getBytes("UTF-8"));
-        SQLException error = assertThrows(SQLException.class, () -> prep.setUnicodeStream(2, unicodeStream, -9));
+        Reader unicodeStream = new InputStreamReader(
+            new ByteArrayInputStream("one and two and even three".getBytes(StandardCharsets.UTF_8))
+        );
+        SQLException error = assertThrows(SQLException.class, () -> prep.setCharacterStream(2, unicodeStream, -9));
         assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
     }
 
@@ -706,16 +711,14 @@ public class JdbcPreparedStatementIT {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     public void testSetBadCharacterStream() throws Exception {
         prep = conn.prepareStatement("INSERT INTO test(id, val) VALUES (?, ?)");
 
         Reader throwingReader = mock(Reader.class);
         when(throwingReader.read(anyObject(), anyInt(), anyInt())).thenThrow(IOException.class);
 
-        SQLException error = assertThrows(
-            SQLException.class,
-            () -> prep.setCharacterStream(2, throwingReader)
-        );
+        SQLException error = assertThrows(SQLException.class, () -> prep.setCharacterStream(2, throwingReader));
         assertEquals(SQLStates.INVALID_PARAMETER_VALUE.getSqlState(), error.getSQLState());
     }
 

@@ -25,8 +25,8 @@ public class TarantoolClusterStoredFunctionDiscoverer implements TarantoolCluste
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TarantoolClusterStoredFunctionDiscoverer.class);
 
-    private TarantoolClientImpl client;
-    private String entryFunction;
+    private final TarantoolClientImpl client;
+    private final String entryFunction;
 
     public TarantoolClusterStoredFunctionDiscoverer(TarantoolClusterClientConfig clientConfig,
                                                     TarantoolClientImpl client) {
@@ -66,7 +66,10 @@ public class TarantoolClusterStoredFunctionDiscoverer implements TarantoolCluste
 
         LinkedHashSet<String> passed = new LinkedHashSet<>();
         LinkedHashSet<String> skipped = new LinkedHashSet<>();
-        for (Object item : ((List<Object>) result.get(0))) {
+
+        @SuppressWarnings("unchecked")
+        final List<Object> resultHead = (List<Object>) result.get(0);
+        for (Object item : resultHead) {
             if (!(item instanceof String)) {
                 skipped.add(item.toString());
                 continue;

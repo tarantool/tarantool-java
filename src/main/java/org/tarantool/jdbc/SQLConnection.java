@@ -457,9 +457,7 @@ public class SQLConnection implements TarantoolConnection {
                                                     Collection<Object> properties,
                                                     SQLException cause) throws SQLClientInfoException {
         Map<String, ClientInfoStatus> failedProperties = new HashMap<>();
-        properties.forEach(property -> {
-            failedProperties.put(property.toString(), ClientInfoStatus.REASON_UNKNOWN);
-        });
+        properties.forEach(property -> failedProperties.put(property.toString(), ClientInfoStatus.REASON_UNKNOWN));
         throw new SQLClientInfoException(reason, cause.getSQLState(), failedProperties, cause);
     }
 
@@ -472,9 +470,9 @@ public class SQLConnection implements TarantoolConnection {
      */
     private void throwUnknownClientProperties(Collection<Object> properties) throws SQLClientInfoException {
         Map<String, ClientInfoStatus> failedProperties = new HashMap<>();
-        properties.forEach(property -> {
-            failedProperties.put(property.toString(), ClientInfoStatus.REASON_UNKNOWN_PROPERTY);
-        });
+        properties.forEach(property -> failedProperties.put(property.toString(),
+            ClientInfoStatus.REASON_UNKNOWN_PROPERTY)
+        );
         throw new SQLClientInfoException(failedProperties);
     }
 
@@ -817,7 +815,9 @@ public class SQLConnection implements TarantoolConnection {
             SQLResultHolder result = (rowCount == null)
                 ? SQLResultHolder.ofQuery(SqlProtoUtils.getSQLMetadata(pack), SqlProtoUtils.getSQLData(pack))
                 : SQLResultHolder.ofUpdate(rowCount.intValue(), SqlProtoUtils.getSQLAutoIncrementIds(pack));
-            ((CompletableFuture) operation.getResult()).complete(result);
+            @SuppressWarnings("unchecked")
+            CompletableFuture<SQLResultHolder> future = (CompletableFuture<SQLResultHolder>) operation.getResult();
+            future.complete(result);
         }
 
         interface SQLRawOps {

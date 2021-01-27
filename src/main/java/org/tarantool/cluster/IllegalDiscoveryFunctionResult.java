@@ -5,6 +5,7 @@ package org.tarantool.cluster;
  *  a function result as unsupported.
  */
 public class IllegalDiscoveryFunctionResult extends RuntimeException {
+    private static final long serialVersionUID = -1L;
 
     public IllegalDiscoveryFunctionResult(String message) {
         super(message);
